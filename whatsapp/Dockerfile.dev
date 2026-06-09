@@ -1,0 +1,15 @@
+# Dev image: install dependencies only. Source is bind-mounted at runtime.
+# Rebuild when package.json or package-lock.json changes:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml build whatsapp
+FROM node:22-alpine
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm install
+
+RUN mkdir -p /app/sessions /app/logs
+ENV SESSIONS_DIR=/app/sessions
+ENV LOG_FILE=/app/logs/whatsapp.log
+
+EXPOSE 8080
+CMD ["npm", "run", "dev"]

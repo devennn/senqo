@@ -1,0 +1,53 @@
+# Development override: hot reload via bind mounts + dev servers (tsx watch / Vite).
+# Does not replace production images in docker-compose.yml — merge with the base file.
+#
+#   docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Rebuild a service after adding/updating npm dependencies (package.json / package-lock.json):
+#   docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml build backend
+#   docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml up -d backend
+#
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/tsconfig.json:/app/tsconfig.json
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+      VITE_DEV_HOST: "0.0.0.0"
+      VITE_DEV_API_PROXY: http://backend:3001
+      VITE_HMR_CLIENT_PORT: ${DEV_FRONTEND_PORT:-8080}
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+
+  whatsapp:
+    build:
+      context: ./whatsapp
+      dockerfile: Dockerfile.dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+    volumes:
+      - ./whatsapp/sessions:/app/sessions
+      - ./whatsapp/logs:/app/logs
+      - ./whatsapp/src:/app/src
+      - ./whatsapp/tsconfig.json:/app/tsconfig.json

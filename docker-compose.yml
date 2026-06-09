@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_USER: senqo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-senqo}
+      POSTGRES_DB: senqo
+    volumes:
+      - pg_data:/var/lib/postgresql
+      - ./database/scripts/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U senqo -d senqo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.migrate
+    environment:
+      DATABASE_URL: postgresql://senqo:${DB_PASSWORD:-senqo}@postgres:5432/senqo
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports: ["3001:3001"]
+    environment:
+      PORT: 3001
+      APP_URL: http://backend:3001
+      FRONTEND_URL: http://localhost:8080
+      DATABASE_URL: postgresql://senqo:${DB_PASSWORD:-senqo}@postgres:5432/senqo
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_BUCKET: ${S3_BUCKET:-senqo-wa}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      WHATSAPP_WEBHOOK_AUTHORIZATION: ${WHATSAPP_WEBHOOK_AUTHORIZATION:-developmentauthtoken}
+      WHATSAPP_MEDIA_ALLOWED_HOSTS: whatsapp,localhost
+      WHATSAPP_SERVICE_URL: http://whatsapp:8080
+      WHATSAPP_SERVICE_API_KEY: ${WHATSAPP_SERVICE_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      INBOUND_AI_DEBOUNCE_SECONDS: ${INBOUND_AI_DEBOUNCE_SECONDS:-7}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      API_KEY_PEPPER: ${API_KEY_PEPPER}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ""
+    restart: unless-stopped
+    ports:
+      - "${DEV_FRONTEND_PORT:-8080}:${FRONTEND_CONTAINER_PORT:-80}"
+    depends_on: [backend]
+
+  # First-party WhatsApp session manager built directly on Baileys (whatsapp/).
+  # Holds one Baileys socket per connection, generates QR codes, sends/receives
+  # messages, and pushes canonical events to the backend webhook. Auth state
+  # persists under ./whatsapp/sessions on the host (gitignored) so restarts reconnect without a QR.
+  whatsapp:
+    build: ./whatsapp
+    restart: unless-stopped
+    ports: ["3002:8080"]
+    environment:
+      PORT: 8080
+      WHATSAPP_SERVICE_API_KEY: ${WHATSAPP_SERVICE_API_KEY}
+      WHATSAPP_WEBHOOK_AUTHORIZATION: ${WHATSAPP_WEBHOOK_AUTHORIZATION:-developmentauthtoken}
+      BACKEND_WEBHOOK_URL: http://backend:3001/api/whatsapp/events
+      SESSIONS_DIR: /app/sessions
+      LOG_LEVEL: info
+      LOG_FILE: /app/logs/whatsapp.log
+    volumes:
+      - ./whatsapp/sessions:/app/sessions
+      - ./whatsapp/logs:/app/logs
+    depends_on: [backend]
+
+volumes:
+  pg_data:

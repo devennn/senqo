@@ -1,0 +1,90 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineHelpHint } from "@/components/ui/inline-help-hint";
+import { HANDOFF_TOPIC_UI_PAGE_SIZE } from "@/lib/agent-handoff-topic-limits";
+import { TablePagination } from "@/pages/dashboard/components/table-pagination";
+import type { WorkspaceHandoffTopicGroupSummary } from "@/types/repositories";
+
+type Props = {
+  groups: WorkspaceHandoffTopicGroupSummary[];
+  selectedGroupId: string | undefined;
+  onAddGroup: () => void;
+  groupHref: (id: string) => string;
+};
+
+export function HandoffTopicGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupHref }: Props) {
+  const pageSize = HANDOFF_TOPIC_UI_PAGE_SIZE;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    if (!selectedGroupId || groups.length === 0) return;
+    const idx = groups.findIndex((g) => g.id === selectedGroupId);
+    if (idx < 0) return;
+    setPage(Math.floor(idx / pageSize) + 1);
+  }, [selectedGroupId, pageSize, groups]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+    setPage((p) => Math.min(Math.max(p, 1), totalPages));
+  }, [groups.length, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const startOffset = (safePage - 1) * pageSize;
+  const listGroups = groups.slice(startOffset, startOffset + pageSize);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <CardTitle>Handoff groups</CardTitle>
+              <InlineHelpHint label="About handoff groups">
+                <>
+                  <p>
+                    Workspace-wide named folders for human takeover topics. Each row lists a trigger phrase plus guidance for the AI.
+                  </p>
+                  <p>Attach groups per agent on Profile. Changes apply to every agent using the group.</p>
+                </>
+              </InlineHelpHint>
+            </div>
+            <CardDescription>Select a group to view or edit.</CardDescription>
+          </div>
+          <Button type="button" size="sm" className="w-full sm:w-auto sm:shrink-0" onClick={onAddGroup}>
+            Add group
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {groups.length > 0 ? (
+          <>
+            {listGroups.map((group) => (
+              <Link
+                key={group.id}
+                to={groupHref(group.id)}
+                className={`block rounded-md border px-3 py-2 text-sm ${
+                  selectedGroupId === group.id
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border/70 text-muted-foreground"
+                }`}
+              >
+                <p className="truncate font-medium">{group.name}</p>
+                <p className="truncate text-xs">
+                  {group.entry_count} {group.entry_count === 1 ? "topic" : "topics"}
+                </p>
+              </Link>
+            ))}
+            {groups.length > pageSize ? (
+              <TablePagination page={safePage} total={groups.length} pageSize={pageSize} onPage={setPage} />
+            ) : null}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">No groups yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

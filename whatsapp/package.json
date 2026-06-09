@@ -1,0 +1,30 @@
+{
+  "name": "senqo-whatsapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "First-party WhatsApp session manager built directly on Baileys. Replaces Evolution API.",
+  "scripts": {
+    "dev": "node ./node_modules/.bin/tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "baileys": "^7.0.0-rc13",
+    "hono": "^4.7.10",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/qrcode": "^1.5.5",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

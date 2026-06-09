@@ -1,0 +1,6 @@
+---
+description: Canonical agent instructions — stack, architecture, UI, forms, and product conventions
+alwaysApply: true
+---
+
+All agent instructions for this repo live in **`AGENTS.md`** at the repo root. Read that file (and the section relevant to your task) before making changes.
