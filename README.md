@@ -138,5 +138,3 @@ docker compose up -d --build
 ## License
 
 MIT
-
-Test push to main
