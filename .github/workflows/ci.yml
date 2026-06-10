@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hygiene:
+    name: Test hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Disallow skipped or todo tests
+        run: |
+          if grep -rE 'it\.todo|test\.skip' backend/src frontend/src whatsapp/src --include='*.test.*'; then
+            echo "Remove it.todo / test.skip from test files before merging."
+            exit 1
+          fi
+
+  package:
+    name: ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [backend, frontend, whatsapp]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "22.12"
+          cache: npm
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+
+      - name: Install native build tools (backend isolated-vm)
+        if: matrix.package == 'backend'
+        run: sudo apt-get update && sudo apt-get install -y python3 make g++
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.package }}
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: ${{ matrix.package }}
+        run: npm run lint
+
+      - name: Test
+        working-directory: ${{ matrix.package }}
+        env:
+          NODE_OPTIONS: ${{ matrix.package == 'backend' && '--no-node-snapshot' || '' }}
+        run: npm test
+
+  build:
+    name: Production build
+    needs: [hygiene, package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+
+      - name: Install native build tools (backend isolated-vm)
+        run: sudo apt-get update && sudo apt-get install -y python3 make g++
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build backend and frontend
+        run: npm run build
