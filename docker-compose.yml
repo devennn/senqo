@@ -51,6 +51,8 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
       API_KEY_PEPPER: ${API_KEY_PEPPER}
+      WORKSPACE_SECRETS_KEY: ${WORKSPACE_SECRETS_KEY:-dev-workspace-secrets-key-change-in-production-32b}
+      NODE_OPTIONS: --no-node-snapshot
     depends_on:
       migrate:
         condition: service_completed_successfully

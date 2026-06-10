@@ -33,4 +33,6 @@ export const env = {
   /** Shared secret presented to the WhatsApp service as the `x-api-key` header. */
   whatsappServiceApiKey: process.env.WHATSAPP_SERVICE_API_KEY ?? "",
   apiKeyPepper: requireEnv("API_KEY_PEPPER"),
+  /** AES-256-GCM key for workspace secrets (32-byte hex from openssl rand -hex 32). */
+  workspaceSecretsKey: requireEnv("WORKSPACE_SECRETS_KEY"),
 };

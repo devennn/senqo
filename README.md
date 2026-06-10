@@ -29,6 +29,10 @@ Senqo is an open-source platform that connects your WhatsApp Business numbers to
 | Operator insights | Dashboard-only explanation of what grounded each AI reply (templates, context, skills, behavior) |
 | Per-connection attach | Bind an agent to a specific WhatsApp line; Inactive / Testing / Live modes |
 | Inbound processing | Debounced AI runs per conversation; only text and images reach the model (other media triggers human handoff) |
+| Custom tools | Engineer-authored TypeScript modules in **Tool Catalog**; compiled on save, executed in an **isolated-vm** sandbox with bridged `fetch` (SSRF-guarded) |
+| Workspace secrets | **Settings → Secrets** stores encrypted env values injected as `ctx.env` at tool runtime (never exposed to the UI after save) |
+| Built-in tools | Platform tools (send WhatsApp, schedule tasks, handoff, labels, load skills) are always on and not shown in the UI |
+| Demo tool | New workspaces get a seeded `get_weather` custom tool (Open-Meteo, no API key) |
 
 ### Knowledge Base (Agent)
 
@@ -77,6 +81,7 @@ Senqo is an open-source platform that connects your WhatsApp Business numbers to
 |---------|-------------|
 | Workspace profile | Display name, storage usage breakdown (agent assets vs conversation media), 10 GB default quota |
 | API keys | Create, list, delete workspace API keys with optional expiry |
+| Workspace secrets | Encrypted key/value pairs for custom tool `requiredEnv` (create, rotate, delete) |
 | Team management | List members; invite by email |
 | User profile | Name fields; password change |
 

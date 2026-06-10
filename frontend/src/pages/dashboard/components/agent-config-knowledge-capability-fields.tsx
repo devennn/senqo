@@ -24,6 +24,7 @@ export function AgentConfigKnowledgeCapabilityFields({
   contextTabHref,
   assetsTabHref,
   handoffTabHref,
+  toolsTabHref,
   workspaceContextDirty,
   assetGroupsDirty,
   responseTemplatesDirty,
@@ -105,6 +106,7 @@ export function AgentConfigKnowledgeCapabilityFields({
           toolsDirty={toolsDirty}
           skillsDirty={skillsDirty}
           saving={saving}
+          toolsTabHref={toolsTabHref}
         />
       </div>
     </div>

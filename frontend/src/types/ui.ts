@@ -1,6 +1,6 @@
 import type {
   AgentConfigRecord,
-  AgentToolDefinitionRecord,
+  WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
   WorkspaceHandoffTopicGroupSummary,
@@ -35,7 +35,7 @@ export type AgentConfigFormNormalizedSnapshot = {
 export type AgentConfigFormProps = {
   agent: AgentConfigRecord;
   connections: AgentConfigConnectionOption[];
-  availableTools: AgentToolDefinitionRecord[];
+  availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
@@ -80,7 +80,7 @@ export type AgentConfigFormAutoAssignLabelsFieldProps = {
 } & AgentFormInlineSaveProps;
 
 export type AgentConfigKnowledgeCapabilityFieldsProps = {
-  availableTools: AgentToolDefinitionRecord[];
+  availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
@@ -96,6 +96,7 @@ export type AgentConfigKnowledgeCapabilityFieldsProps = {
   contextTabHref: string;
   assetsTabHref: string;
   handoffTabHref: string;
+  toolsTabHref: string;
   workspaceContextDirty: boolean;
   assetGroupsDirty: boolean;
   responseTemplatesDirty: boolean;
@@ -136,13 +137,14 @@ export type AgentAssetGroupsFieldsProps = {
 } & AgentConfigSubsectionInlineSaveProps;
 
 export type AgentToolsFieldsProps = {
-  tools: AgentToolDefinitionRecord[];
+  tools: WorkspaceCustomToolListItem[];
   skills: WorkspaceSkillDefinitionRecord[];
   selectedTools: Set<string>;
   selectedSkills: Set<string>;
   toolsDirty: boolean;
   skillsDirty: boolean;
   saving: boolean;
+  toolsTabHref: string;
 };
 
 export type CreateAgentDialogProps = {

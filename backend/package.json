@@ -10,6 +10,7 @@
     "lint": "tsc --noEmit",
     "agent": "node ./node_modules/.bin/tsx src/scripts/agent.ts",
     "skills:seed": "node ./node_modules/.bin/tsx src/scripts/seed-skills.ts",
+    "tools:seed": "node ./node_modules/.bin/tsx src/scripts/seed-tools.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -29,20 +30,22 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
+    "esbuild": "^0.28.0",
     "hono": "^4.7.10",
+    "isolated-vm": "^5.0.4",
     "jose": "^6.2.3",
     "papaparse": "^5.5.3",
     "pg": "^8.21.0",
     "pg-boss": "^12.18.2",
     "resend": "^6.12.2",
     "tailwind-merge": "^3.5.0",
+    "typescript": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22",
     "@types/papaparse": "^5.5.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }
 }

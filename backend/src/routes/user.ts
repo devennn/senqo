@@ -67,7 +67,24 @@ import {
   CONTEXT_TITLE_MAX_LEN,
   CONTEXT_BODY_MAX_LEN,
 } from "../repositories/workspace-context-groups.js";
-import { listActiveAgentToolDefinitions } from "../repositories/agent-tools.js";
+import {
+  listWorkspaceCustomTools,
+  getWorkspaceCustomToolById,
+  upsertWorkspaceCustomTool,
+  deleteWorkspaceCustomTool,
+  validateCustomToolKeysForWorkspace,
+} from "../repositories/workspace-custom-tools.js";
+import {
+  listWorkspaceSecrets,
+  createWorkspaceSecret,
+  updateWorkspaceSecretValue,
+  deleteWorkspaceSecret,
+  getWorkspaceSecretById,
+} from "../repositories/workspace-secrets.js";
+import { normalizeRequiredEnvNames, stripLegacyToolExports } from "../lib/custom-tool-source.js";
+import { resolveCustomToolEnv } from "../services/custom-tool-env.js";
+import { hashCustomToolSource } from "../services/custom-tool-compile.js";
+import { runCustomTool } from "../services/tool-sandbox/run.js";
 import {
   listWorkspaceSkills,
   listActiveWorkspaceSkills,
@@ -294,15 +311,15 @@ app.put("/agents/:id", async (c) => {
     return c.json({ error: "agent_not_found" }, 404);
   }
 
-  const [allowedTools, allowedSkills] = await Promise.all([
-    listActiveAgentToolDefinitions(workspaceId),
+  const [toolValidation, allowedSkills] = await Promise.all([
+    validateCustomToolKeysForWorkspace(workspaceId, body.data.tools),
     listActiveWorkspaceSkills(workspaceId),
   ]);
-  const allowedToolKeys = new Set(allowedTools.map((t) => t.tool_key));
+  if (!toolValidation.ok) {
+    return c.json({ error: "invalid_custom_tools", message: toolValidation.message }, 400);
+  }
   const allowedSkillKeys = new Set(allowedSkills.map((s) => s.skill_key));
-  const normalizedTools = [...new Set(body.data.tools)].filter((k) =>
-    allowedToolKeys.has(k),
-  );
+  const normalizedTools = toolValidation.normalized;
   const normalizedSkills = [...new Set(body.data.skills)].filter((k) =>
     allowedSkillKeys.has(k),
   );
@@ -919,10 +936,190 @@ app.delete("/workspace-asset-groups/:id/assets/:assetId", async (c) => {
   return c.json({ ok: true });
 });
 
-app.get("/agent-tools", async (c) => {
+app.get("/custom-tools", async (c) => {
   const workspaceId = c.get("workspaceId");
-  const tools = await listActiveAgentToolDefinitions(workspaceId);
+  const tools = await listWorkspaceCustomTools(workspaceId);
   return c.json({ tools });
+});
+
+app.get("/custom-tools/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const tool = await getWorkspaceCustomToolById(workspaceId, c.req.param("id"));
+  if (!tool) return c.json({ error: "tool_not_found" }, 404);
+  return c.json({ tool });
+});
+
+app.post("/custom-tools", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const body = (await c.req.json()) as {
+    displayName?: string;
+    description?: string;
+    sourceCode?: string;
+    requiredEnv?: string[];
+  };
+  if (!body.displayName?.trim() || !body.sourceCode?.trim()) {
+    return c.json({ error: "tool_name_and_source_required" }, 400);
+  }
+  const result = await upsertWorkspaceCustomTool({
+    workspaceId,
+    displayName: body.displayName,
+    description: body.description ?? "",
+    sourceCode: body.sourceCode,
+    requiredEnv: body.requiredEnv,
+  });
+  if (!result.ok || !result.toolId) {
+    return c.json({ error: result.message || "create_tool_failed" }, 400);
+  }
+  return c.json({ toolId: result.toolId });
+});
+
+app.put("/custom-tools/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const toolId = c.req.param("id");
+  const current = await getWorkspaceCustomToolById(workspaceId, toolId);
+  if (!current) return c.json({ error: "tool_not_found" }, 404);
+  const body = (await c.req.json()) as {
+    displayName?: string;
+    description?: string;
+    sourceCode?: string;
+    requiredEnv?: string[];
+    testInput?: string;
+    isActive?: boolean;
+  };
+  const result = await upsertWorkspaceCustomTool({
+    workspaceId,
+    toolId,
+    displayName: body.displayName ?? current.display_name,
+    description: body.description ?? current.description,
+    sourceCode: body.sourceCode ?? current.source_code,
+    requiredEnv: body.requiredEnv ?? current.required_env,
+    testInput: body.testInput ?? current.test_input,
+    isActive: body.isActive ?? current.is_active,
+  });
+  if (!result.ok) {
+    return c.json({ error: result.message || "update_tool_failed" }, 400);
+  }
+  return c.json({ ok: true });
+});
+
+app.delete("/custom-tools/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const result = await deleteWorkspaceCustomTool({
+    workspaceId,
+    toolId: c.req.param("id"),
+  });
+  if (!result.ok) {
+    return c.json({ error: result.message || "delete_tool_failed" }, 400);
+  }
+  return c.json({ ok: true });
+});
+
+app.post("/custom-tools/:id/test", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const tool = await getWorkspaceCustomToolById(workspaceId, c.req.param("id"));
+  if (!tool) return c.json({ error: "tool_not_found" }, 404);
+  const body = (await c.req.json()) as {
+    input?: unknown;
+    sourceCode?: string;
+    requiredEnv?: string[];
+  };
+
+  let requiredEnv = tool.required_env;
+  if (body.requiredEnv) {
+    try {
+      requiredEnv = normalizeRequiredEnvNames(body.requiredEnv);
+    } catch (error) {
+      return c.json({ result: { ok: false, error: String(error) } });
+    }
+  }
+
+  const source = body.sourceCode?.trim()
+    ? stripLegacyToolExports(body.sourceCode)
+    : tool.source_code;
+  const sourceHash = hashCustomToolSource(source);
+  const envVars = await resolveCustomToolEnv(workspaceId, requiredEnv);
+  const missing = requiredEnv.filter((name) => !envVars[name]);
+  if (missing.length > 0) {
+    return c.json({
+      result: {
+        ok: false,
+        error: `Missing workspace secrets: ${missing.join(", ")}. Add values in Settings → Secrets and list each name under Required env.`,
+      },
+    });
+  }
+
+  const result = await runCustomTool({
+    source,
+    sourceHash,
+    input: body.input ?? {},
+    context: { workspaceId, sessionId: "test-session" },
+    env: envVars,
+  });
+  return c.json({ result });
+});
+
+app.get("/secrets", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const secrets = await listWorkspaceSecrets(workspaceId);
+  return c.json({ secrets });
+});
+
+app.post("/secrets", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const body = (await c.req.json()) as {
+    name?: string;
+    description?: string;
+    value?: string;
+  };
+  if (!body.name?.trim() || !body.value?.trim()) {
+    return c.json({ error: "secret_name_and_value_required" }, 400);
+  }
+  const result = await createWorkspaceSecret({
+    workspaceId,
+    name: body.name,
+    description: body.description ?? "",
+    value: body.value,
+  });
+  if (!result.ok || !result.secretId) {
+    return c.json({ error: result.message || "create_secret_failed" }, 400);
+  }
+  return c.json({ secretId: result.secretId, value: body.value });
+});
+
+app.put("/secrets/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const secretId = c.req.param("id");
+  const current = await getWorkspaceSecretById(workspaceId, secretId);
+  if (!current) return c.json({ error: "secret_not_found" }, 404);
+  const body = (await c.req.json()) as {
+    description?: string;
+    value?: string;
+  };
+  if (!body.value?.trim()) {
+    return c.json({ error: "secret_value_required" }, 400);
+  }
+  const result = await updateWorkspaceSecretValue({
+    workspaceId,
+    secretId,
+    description: body.description,
+    value: body.value,
+  });
+  if (!result.ok) {
+    return c.json({ error: result.message || "update_secret_failed" }, 400);
+  }
+  return c.json({ ok: true, value: body.value });
+});
+
+app.delete("/secrets/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const result = await deleteWorkspaceSecret({
+    workspaceId,
+    secretId: c.req.param("id"),
+  });
+  if (!result.ok) {
+    return c.json({ error: result.message || "delete_secret_failed" }, 400);
+  }
+  return c.json({ ok: true });
 });
 
 // ── Skills ──────────────────────────────────────────────────────────────────

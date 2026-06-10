@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useWorkspace } from "@/context/workspace";
 import type {
   AgentConfigRecord,
-  AgentToolDefinitionRecord,
+  WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
   WorkspaceHandoffTopicGroupSummary,
@@ -20,7 +20,7 @@ export type AgentPageData = {
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
-  tools: AgentToolDefinitionRecord[];
+  tools: WorkspaceCustomToolListItem[];
   skills: WorkspaceSkillDefinitionRecord[];
   connections: WhatsappConnection[];
 };
@@ -55,7 +55,7 @@ export function useAgents() {
           workspaceContextGroups?: WorkspaceContextGroupSummary[];
           workspaceAssetGroups?: WorkspaceAssetGroupSummary[];
         }>("/api/user/agents", requestOptions),
-        api.get<{ tools: AgentToolDefinitionRecord[] }>("/api/user/agent-tools", requestOptions),
+        api.get<{ tools: WorkspaceCustomToolListItem[] }>("/api/user/custom-tools", requestOptions),
         api.get<{ skills: WorkspaceSkillDefinitionRecord[] }>("/api/user/skills", requestOptions),
         api.get<{ connections: WhatsappConnection[] }>("/api/user/connections", requestOptions),
       ]);

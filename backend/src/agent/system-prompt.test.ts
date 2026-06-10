@@ -40,6 +40,7 @@ describe("resolveEnabledToolKeys", () => {
 const baseInput = {
   dryRun: false,
   enabledToolKeys: [...DEFAULT_TOOL_KEYS],
+  customToolDescriptions: {},
   workspaceContext: "We sell widgets.",
   responseTemplates: "Q: Returns? A: 30 days.",
   handoffTopics: "Billing, Complaints",
@@ -89,8 +90,10 @@ describe("buildAgentSystemPrompt", () => {
     const prompt = buildAgentSystemPrompt({
       ...baseInput,
       enabledToolKeys: ["create_task", "get_weather"],
+      customToolDescriptions: { get_weather: "Look up weather for a city." },
     });
     expect(prompt).toContain("`create_task`");
     expect(prompt).toContain("`get_weather`");
+    expect(prompt).toContain("Look up weather for a city.");
   });
 });

@@ -133,6 +133,7 @@ export function AgentConfigForm({
             contextTabHref={agentTabHref(wsPath, agent.id, "context")}
             assetsTabHref={agentTabHref(wsPath, agent.id, "assets")}
             handoffTabHref={agentTabHref(wsPath, agent.id, "handoff")}
+            toolsTabHref={agentTabHref(wsPath, agent.id, "tools")}
             workspaceContextDirty={sectionDirty.workspaceContext}
             assetGroupsDirty={sectionDirty.assetGroups}
             responseTemplatesDirty={sectionDirty.responseTemplates}

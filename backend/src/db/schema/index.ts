@@ -176,6 +176,41 @@ export const agentToolDefinitions = pgTable("agent_tool_definitions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const workspaceSecrets = pgTable("workspace_secrets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  ciphertext: text("ciphertext").notNull(),
+  iv: text("iv").notNull(),
+  tag: text("tag").notNull(),
+  valueHint: text("value_hint").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.workspaceId, t.name),
+  index("idx_workspace_secrets_workspace_updated").on(t.workspaceId, t.updatedAt.desc()),
+]);
+
+export const workspaceCustomTools = pgTable("workspace_custom_tools", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  toolKey: text("tool_key").notNull(),
+  displayName: text("display_name").notNull(),
+  description: text("description").notNull().default(""),
+  sourceCode: text("source_code").notNull(),
+  requiredEnv: jsonb("required_env").notNull().default([]),
+  inputSchema: jsonb("input_schema").notNull().default({}),
+  sourceHash: text("source_hash").notNull(),
+  testInput: text("test_input").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.workspaceId, t.toolKey),
+  index("idx_workspace_custom_tools_workspace_updated").on(t.workspaceId, t.updatedAt.desc()),
+]);
+
 export const workspaceSkillDefinitions = pgTable("workspace_skill_definitions", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),

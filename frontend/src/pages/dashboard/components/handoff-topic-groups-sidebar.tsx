@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { HANDOFF_TOPIC_UI_PAGE_SIZE } from "@/lib/agent-handoff-topic-limits";
 import { TablePagination } from "@/pages/dashboard/components/table-pagination";
@@ -37,26 +37,24 @@ export function HandoffTopicGroupsSidebar({ groups, selectedGroupId, onAddGroup,
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <CardTitle>Handoff groups</CardTitle>
-              <InlineHelpHint label="About handoff groups">
-                <>
-                  <p>
-                    Workspace-wide named folders for human takeover topics. Each row lists a trigger phrase plus guidance for the AI.
-                  </p>
-                  <p>Attach groups per agent on Profile. Changes apply to every agent using the group.</p>
-                </>
-              </InlineHelpHint>
-            </div>
-            <CardDescription>Select a group to view or edit.</CardDescription>
-          </div>
-          <Button type="button" size="sm" className="w-full sm:w-auto sm:shrink-0" onClick={onAddGroup}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          Handoff groups
+          <InlineHelpHint label="About handoff groups">
+            <>
+              <p>
+                Workspace-wide named folders for human takeover topics. Each row lists a trigger phrase plus guidance for the AI.
+              </p>
+              <p>Attach groups per agent on Profile. Changes apply to every agent using the group.</p>
+            </>
+          </InlineHelpHint>
+        </CardTitle>
+        <CardDescription>Select a group to view or edit.</CardDescription>
+        <CardAction className="-mt-0.5 shrink-0">
+          <Button type="button" size="sm" onClick={onAddGroup}>
             Add group
           </Button>
-        </div>
+        </CardAction>
       </CardHeader>
       <CardContent className="space-y-2">
         {groups.length > 0 ? (

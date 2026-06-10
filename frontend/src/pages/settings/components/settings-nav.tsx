@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Building2, KeyRound, User, Users } from "lucide-react";
+import { Building2, KeyRound, Lock, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/context/workspace";
 
@@ -7,6 +7,7 @@ const itemDefs = [
   { path: "/settings/profile", label: "Profile", icon: User },
   { path: "/settings/workspace", label: "Workspace", icon: Building2 },
   { path: "/settings/api", label: "API", icon: KeyRound },
+  { path: "/settings/secrets", label: "Secrets", icon: Lock },
   { path: "/settings/team", label: "Team", icon: Users },
 ] as const;
 

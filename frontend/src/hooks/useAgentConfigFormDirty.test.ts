@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type {
   AgentConfigRecord,
-  AgentToolDefinitionRecord,
+  WorkspaceCustomToolListItem,
   WorkspaceContextGroupSummary,
   WorkspaceResponseTemplateGroupSummary,
   WorkspaceSkillDefinitionRecord,
@@ -23,7 +23,18 @@ describe("useAgentConfigFormDirty helpers", () => {
     handoff_topic_groups: [],
     auto_assign_conversation_labels: true,
   };
-  const tool: AgentToolDefinitionRecord = { tool_key: "tool_a", scope: "configurable" };
+  const tool: WorkspaceCustomToolListItem = {
+    id: "t1",
+    workspace_id: "ws1",
+    tool_key: "tool_a",
+    display_name: "Tool A",
+    description: "",
+    required_env: [],
+    is_active: true,
+    source_hash: "abc",
+    created_at: "",
+    updated_at: "",
+  };
   const skill: WorkspaceSkillDefinitionRecord = { skill_key: "skill_a" };
   const rtGroup: WorkspaceResponseTemplateGroupSummary = { id: "rt1" };
   const ctxGroup: WorkspaceContextGroupSummary = { id: "ctx1" };

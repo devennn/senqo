@@ -17,14 +17,16 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   handoff_to_human: "Transfer the conversation to a human teammate.",
   apply_conversation_labels:
     "Assign AI conversation labels using workspace label UUIDs.",
-  get_weather: "Look up weather for a location.",
 };
 
-function formatAvailableTools(toolKeys: string[]): string {
+function formatAvailableTools(
+  toolKeys: string[],
+  customToolDescriptions: Record<string, string>,
+): string {
   return toolKeys
     .map((key) => {
       const description =
-        TOOL_DESCRIPTIONS[key] ?? "Workspace-configured tool.";
+        TOOL_DESCRIPTIONS[key] ?? customToolDescriptions[key] ?? "Workspace-configured tool.";
       return `- \`${key}\`: ${description}`;
     })
     .join("\n");
@@ -40,7 +42,7 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
   const whatsappRule = input.dryRun
     ? "Do not call `send_whatsapp_message`. Return draft text only."
     : "This is a WhatsApp conversation. Call `send_whatsapp_message` with the final message text. Do not stop at drafting only.";
-  const toolsText = formatAvailableTools(input.enabledToolKeys);
+  const toolsText = formatAvailableTools(input.enabledToolKeys, input.customToolDescriptions);
   const workspaceContext = input.workspaceContext.trim();
   const responseTemplates = input.responseTemplates.trim();
   const handoffTopics = input.handoffTopics.trim();

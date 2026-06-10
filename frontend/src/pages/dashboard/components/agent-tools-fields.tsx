@@ -13,9 +13,9 @@ export function AgentToolsFields({
   toolsDirty,
   skillsDirty,
   saving,
+  toolsTabHref,
 }: AgentToolsFieldsProps) {
   const { wsPath } = useWorkspace();
-  const configurable = tools.filter((t) => t.scope !== "system");
 
   return (
     <>
@@ -31,20 +31,22 @@ export function AgentToolsFields({
           ) : null}
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          {configurable.map((tool) => (
-            <label key={tool.id} className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm">
-              <span className="flex items-center gap-2">
-                <input type="checkbox" name="tools" value={tool.tool_key} defaultChecked={selectedTools.has(tool.tool_key)} />
-                <span>{tool.display_name}</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className={`rounded px-1.5 py-0.5 text-xs ${tool.scope === "workspace" ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-700"}`}>
-                  {tool.scope === "workspace" ? "Custom" : "Free for all"}
-                </span>
-              </span>
+          {tools.map((tool) => (
+            <label key={tool.id} className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-sm">
+              <input type="checkbox" name="tools" value={tool.tool_key} defaultChecked={selectedTools.has(tool.tool_key)} />
+              <span>{tool.display_name}</span>
             </label>
           ))}
         </div>
+        {tools.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No custom tools yet.{" "}
+            <Link to={toolsTabHref} className="font-medium text-primary underline-offset-4 hover:underline">
+              Open Tool Catalog
+            </Link>{" "}
+            to create one.
+          </p>
+        ) : null}
       </fieldset>
       <fieldset className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">

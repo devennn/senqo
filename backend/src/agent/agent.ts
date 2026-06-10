@@ -19,6 +19,7 @@ import { resolveSessionId } from "../agent/session.js";
 import { buildAgentInstructions } from "../agent/skills-catalog.js";
 import { getAgentTools } from "../agent/tools/index.js";
 import { normalizeStoredContentForModelMessage } from "../lib/agent-multimodal-normalize.js";
+import { BUILTIN_AGENT_TOOL_KEYS } from "../lib/builtin-agent-tool-keys.js";
 import { env } from "../lib/env.js";
 import type { StoredUserImageUrlPart, StoredUserTextPart } from "../types/agent-multimodal.js";
 import {
@@ -45,13 +46,8 @@ const agentOutputSchema = z.object({
     "Dashboard-only: why this run's reply fits the customer and what grounded it (thread, templates, context, skills, behavior, tools). Never customer-facing. Use an empty string when there is nothing to explain.",
   ),
 });
-const DEFAULT_AGENT_TOOL_KEYS = [
-  "create_task",
-  "load_skills",
-  "send_whatsapp_message",
-  "handoff_to_human",
-  "apply_conversation_labels",
-] as const;
+
+const DEFAULT_AGENT_TOOL_KEYS = BUILTIN_AGENT_TOOL_KEYS;
 
 function isMissingToolResultError(messageText: string): boolean {
   return /Tool result(s)? (is|are) missing for tool call(s)?/i.test(messageText);
@@ -188,7 +184,7 @@ export async function runAgentSession(
       ...(Array.isArray(config?.tools) ? config.tools : []),
     ]),
   );
-  const tools = getAgentTools(
+  const tools = await getAgentTools(
     {
       workspaceId: input.workspaceId,
       sessionId,

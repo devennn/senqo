@@ -1,11 +1,18 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import { env } from "../lib/env.js";
 
 const { Pool } = pg;
 
+function requireDatabaseUrl(): string {
+  const value = process.env.DATABASE_URL;
+  if (!value) {
+    throw new Error("Required environment variable DATABASE_URL is not set");
+  }
+  return value;
+}
+
 const pool = new Pool({
-  connectionString: env.databaseUrl,
+  connectionString: requireDatabaseUrl(),
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

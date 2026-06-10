@@ -132,6 +132,7 @@ function emptyAgentSystemPromptInput(dryRun: boolean): Parameters<typeof buildAg
   return {
     dryRun,
     enabledToolKeys: [...DEFAULT_TOOL_KEYS],
+    customToolDescriptions: {},
     workspaceContext: "",
     responseTemplates: "",
     handoffTopics: "",
@@ -185,9 +186,19 @@ export async function buildAgentInstructions(
     })),
   }));
 
+  const customToolKeys = Array.isArray(activeConfig.tools)
+    ? activeConfig.tools.map(String).filter((key) => !DEFAULT_TOOL_KEYS.includes(key as (typeof DEFAULT_TOOL_KEYS)[number]))
+    : [];
+  const { listWorkspaceCustomToolsByKeys } = await import("../repositories/workspace-custom-tools.js");
+  const customTools = await listWorkspaceCustomToolsByKeys(workspaceId, customToolKeys);
+  const customToolDescriptions = Object.fromEntries(
+    customTools.map((tool) => [tool.tool_key, tool.description || tool.display_name]),
+  );
+
   return buildAgentSystemPrompt({
     dryRun,
     enabledToolKeys: resolveEnabledToolKeys(activeConfig.tools),
+    customToolDescriptions,
     workspaceContext,
     responseTemplates,
     handoffTopics,

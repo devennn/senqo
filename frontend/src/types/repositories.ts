@@ -143,6 +143,39 @@ export type AgentToolDefinitionRecord = {
   updated_at: string;
 };
 
+export type WorkspaceSecretListItem = {
+  id: string;
+  name: string;
+  description: string;
+  value_hint: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkspaceSecretCreateResponse = {
+  secretId: string;
+  value: string;
+};
+
+export type WorkspaceCustomToolListItem = {
+  id: string;
+  workspace_id: string;
+  tool_key: string;
+  display_name: string;
+  description: string;
+  required_env: string[];
+  is_active: boolean;
+  source_hash: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkspaceCustomToolDetailRecord = WorkspaceCustomToolListItem & {
+  source_code: string;
+  input_schema: Record<string, unknown>;
+  test_input: string;
+};
+
 export type WorkspaceSkillDefinitionRecord = {
   id: string;
   workspace_id: string;

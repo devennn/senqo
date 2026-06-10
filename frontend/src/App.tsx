@@ -21,6 +21,7 @@ import ProfilePage from "@/pages/settings/Profile";
 import WorkspacePage from "@/pages/settings/Workspace";
 import TeamPage from "@/pages/settings/Team";
 import ApiKeysPage from "@/pages/settings/ApiKeys";
+import SecretsPage from "@/pages/settings/Secrets";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicy";
 import TermsOfServicePage from "@/pages/TermsOfService";
 import NotFoundPage from "@/pages/NotFound";
@@ -76,6 +77,7 @@ export default function App() {
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="workspace" element={<WorkspacePage />} />
                 <Route path="api" element={<ApiKeysPage />} />
+                <Route path="secrets" element={<SecretsPage />} />
                 <Route path="team" element={<TeamPage />} />
               </Route>
               <Route path="*" element={<NotFoundPage />} />

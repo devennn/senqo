@@ -1,35 +1,42 @@
 import type { ToolSet } from "ai";
 import { createTaskTool } from "../tools/create-task-tool.js";
-import { getWeatherTool } from "../tools/get-weather-tool.js";
 import { createApplyConversationLabelsTool } from "../tools/apply-conversation-labels-tool.js";
 import { createHandoffToHumanTool } from "../tools/handoff-to-human-tool.js";
 import { createLoadSkillsTool } from "../tools/load-skills-tool.js";
 import { createSendWhatsappMessageTool } from "../tools/send-whatsapp-message-tool.js";
+import { loadCustomTools } from "../tools/custom-tools.js";
 import type { AgentToolRuntimeContext } from "../tools/shared.js";
-import type { AgentToolKey } from "../../types/agent.js";
+import type { BuiltinAgentToolKey } from "../../lib/builtin-agent-tool-keys.js";
+import { BUILTIN_AGENT_TOOL_KEYS } from "../../lib/builtin-agent-tool-keys.js";
 
-export function getAgentTools(
+export async function getAgentTools(
   context: AgentToolRuntimeContext,
   enabledToolKeys: string[],
-): ToolSet {
-  const registry: Record<AgentToolKey, ToolSet[AgentToolKey]> = {
+): Promise<ToolSet> {
+  if (!Array.isArray(enabledToolKeys)) {
+    return {};
+  }
+
+  const registry: Record<BuiltinAgentToolKey, ToolSet[BuiltinAgentToolKey]> = {
     create_task: createTaskTool(context),
     load_skills: createLoadSkillsTool(context),
-    get_weather: getWeatherTool,
     send_whatsapp_message: createSendWhatsappMessageTool(context),
     handoff_to_human: createHandoffToHumanTool(context),
     apply_conversation_labels: createApplyConversationLabelsTool(context),
   };
 
-  if (!Array.isArray(enabledToolKeys) || enabledToolKeys.length === 0) {
-    return {};
-  }
+  const builtinKeys = enabledToolKeys.filter((key): key is BuiltinAgentToolKey =>
+    (BUILTIN_AGENT_TOOL_KEYS as readonly string[]).includes(key),
+  );
+  const customKeys = enabledToolKeys.filter(
+    (key) => !(BUILTIN_AGENT_TOOL_KEYS as readonly string[]).includes(key),
+  );
 
-  return enabledToolKeys.reduce<ToolSet>((acc, toolKey) => {
-    if (!Object.hasOwn(registry, toolKey)) {
-      return acc;
-    }
-    acc[toolKey] = registry[toolKey as AgentToolKey];
+  const builtinTools = builtinKeys.reduce<ToolSet>((acc, toolKey) => {
+    acc[toolKey] = registry[toolKey];
     return acc;
   }, {});
+
+  const customTools = await loadCustomTools(context, customKeys);
+  return { ...builtinTools, ...customTools };
 }

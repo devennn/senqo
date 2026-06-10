@@ -116,10 +116,18 @@ To unlock full functionality, add these to `.env`:
 | `WHATSAPP_WEBHOOK_AUTHORIZATION` | WhatsApp webhook auth | Shared secret sent as the webhook `?token=` and validated by the backend |
 | `WHATSAPP_SERVICE_URL` | Backend → WhatsApp service | Only if not using Compose defaults (`http://whatsapp:8080`) |
 | `WHATSAPP_SERVICE_API_KEY` | Backend ↔ WhatsApp service auth | Shared secret sent as the `x-api-key` header; must match on both services |
+| `WORKSPACE_SECRETS_KEY` | Encrypted workspace secrets for custom tools | `openssl rand -hex 32` |
+| `NODE_OPTIONS=--no-node-snapshot` | isolated-vm on Node 20+ | Set in Compose for `backend` (production image includes it) |
 
 Without OpenRouter/Resend keys the backend will not start. Scheduled tasks and inbound AI debounce use **pg-boss** on the same Postgres database (no external queue account). Media (images, documents) won't display without working R2 credentials. WhatsApp linking still needs the `whatsapp` service running after the stack is up.
 
 **Deploy note:** Tasks created before a QStash → pg-boss migration may have legacy scheduler metadata; cancel/recreate them if a pending run does not fire after upgrade.
+
+## Custom agent tools
+
+- **Migrate** seeds the demo `get_weather` tool for every workspace (`seed-all-workspace-custom-tools.ts` runs after Drizzle migrate).
+- **New workspaces** also get the demo tool on first signup (`ensureProfile`).
+- Repair one workspace: `cd backend && npm run tools:seed -- -w <workspaceId>`
 
 ## Useful commands
 
@@ -171,7 +179,7 @@ cd whatsapp && npm run test:watch
 npm run test:e2e
 ```
 
-**E2E tests** run against the full `docker compose up -d` stack. The suite intercepts API calls with mocked responses by default so it runs without a real database. To run against a live backend, comment out the `page.route()` blocks in `e2e/senqo.spec.ts`.
+**E2E tests** mock API calls at the browser boundary by default (no real database). `npm run test:e2e` starts the frontend on port **5199** (`E2E_DEV_PORT`) or use `E2E_BASE_URL=http://localhost:8080` with Docker Compose. Feature specs target **~3 tests** each (happy path + critical behaviour); see `e2e/custom-tools.spec.ts`.
 
 **Repository tests** (principle 6 in `AGENTS.md`) hit a real Postgres. Start the Docker stack first:
 

@@ -174,6 +174,27 @@ Forbidden:
 | 12 | **No coverage thresholds** | Quality over quantity. A 95% line count with weak assertions is worse than 70% with strong behavioural coverage. Review what's untested in PRs manually, don't gate on a number. |
 | 13 | **Test from the outside in** | API tests assert the JSON a real client receives. Component tests assert the DOM a real user sees. Hook tests assert the data a real component would get. Never tunnel into internals to set up or verify state. |
 | 14 | **Don't test framework/library code** | Don't test that Drizzle inserts rows correctly, that Hono parses headers, that React re-renders on state change, or that Baileys connects to WhatsApp. Trust the library. Test _your_ logic on top of it. |
+| 15 | **E2E: ~3 tests per feature** | Each Playwright spec in `e2e/` targets one feature with **about three tests**: at least one **happy path**, the rest for **critical user-visible behaviour** only. See [E2E (Playwright)](#e2e-playwright) below. |
+| 16 | **Large features: E2E first** | For multi-file or cross-layer work, **start with failing Playwright tests** that describe the intended user flow, then implement until they pass. See [E2E (Playwright)](#e2e-playwright) below. |
+
+#### E2E (Playwright)
+
+Playwright specs live in **`e2e/`**. Run with **`npm run test:e2e`** (see `DEVELOPMENT.md` for port / `E2E_BASE_URL`).
+
+**Large features — outside-in workflow:**
+
+1. Add a new spec (or extend an existing one) with **~3 failing tests** — happy path plus critical behaviour.
+2. Run E2E locally and confirm they **fail for the right reason** (missing UI, wrong state), not flaky setup.
+3. Implement frontend, API, and persistence **until the spec passes**; add unit/integration tests at boundaries as you go.
+4. Keep mocks minimal — prefer routing real stack paths when the feature needs them; mock only what the E2E does not exercise.
+
+- **~3 tests per feature spec** — not a broad smoke suite.
+- **At least one happy path** — the user completes the main flow successfully.
+- **Remaining tests** — **critical behaviour only** (e.g. save disabled until dirty, validation errors users actually hit). Do not add E2E cases that duplicate unit coverage without user-visible value.
+- Assert what the **user sees** in the DOM (`getByRole`, labels, visible text). Mock API at the HTTP boundary (`page.route`) when not hitting a real stack.
+- Do not use **`waitForTimeout`** as the primary wait — use `expect`, `waitForURL`, or role/label locators.
+
+Example: `e2e/custom-tools.spec.ts`.
 
 #### Quality gates (enforcement)
 

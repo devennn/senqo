@@ -3,6 +3,7 @@ WORKDIR /app/backend
 COPY backend/package.json backend/package-lock.json* ./
 RUN npm ci
 COPY backend/drizzle.config.ts ./
+COPY backend/tsconfig.json ./
+COPY backend/src ./src
 COPY database/migrations ../database/migrations
-COPY backend/src/db/schema src/db/schema/
-CMD ["npx", "drizzle-kit", "migrate", "--config=drizzle.config.ts"]
+CMD ["sh", "-c", "npx drizzle-kit migrate --config=drizzle.config.ts && npx tsx src/scripts/seed-all-workspace-custom-tools.ts"]

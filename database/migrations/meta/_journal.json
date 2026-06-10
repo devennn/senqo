@@ -8,6 +8,27 @@
       "when": 1780540924799,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780540924800,
+      "tag": "0001_workspace_custom_tools",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780540924801,
+      "tag": "0002_ensure_workspace_custom_tools",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780540924802,
+      "tag": "0003_workspace_custom_tool_test_input",
+      "breakpoints": true
     }
   ]
 }

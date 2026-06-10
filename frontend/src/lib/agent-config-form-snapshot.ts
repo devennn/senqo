@@ -1,6 +1,6 @@
 import type {
   AgentConfigRecord,
-  AgentToolDefinitionRecord,
+  WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
   WorkspaceHandoffTopicGroupSummary,
@@ -94,16 +94,14 @@ export function agentAutoAssignSectionDirty(
 export function buildAgentConfigFormBaseline(input: {
   agent: AgentConfigRecord;
   connections: AgentConfigConnectionOption[];
-  availableTools: AgentToolDefinitionRecord[];
+  availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
 }): AgentConfigFormNormalizedSnapshot {
-  const configurableToolKeys = new Set(
-    input.availableTools.filter((t) => t.scope !== "system").map((t) => t.tool_key),
-  );
+  const configurableToolKeys = new Set(input.availableTools.map((t) => t.tool_key));
   const skillKeys = new Set(input.availableSkills.map((s) => s.skill_key));
   const templateGroupIds = new Set(input.responseTemplateGroups.map((g) => g.id));
   const contextGroupIds = new Set(input.workspaceContextGroups.map((g) => g.id));

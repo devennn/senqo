@@ -9,6 +9,8 @@ import { AgentConfigForm } from "@/pages/dashboard/components/agent-config-form"
 import { CreateAgentDialog } from "@/pages/dashboard/components/create-agent-dialog";
 import { AgentSetupTabBar, type AgentSetupTab } from "@/pages/dashboard/components/agent-setup-tab-bar";
 import { SkillsCatalogPanel } from "@/pages/dashboard/skills/components/skills-catalog-panel";
+import { ToolsCatalogPanel } from "@/pages/dashboard/tools/components/tools-catalog-panel";
+import type { ToolsNavConfig } from "@/hooks/useCustomTools";
 import { ResponseTemplatesPanel } from "@/pages/dashboard/components/response-templates-panel";
 import { HandoffTopicGroupsPanel } from "@/pages/dashboard/components/handoff-topic-groups-panel";
 import { ContextGroupsPanel } from "@/pages/dashboard/components/context-groups-panel";
@@ -68,7 +70,9 @@ export default function AgentPage() {
   const tab: AgentSetupTab =
     tabParam === "skills"
       ? "skills"
-      : tabParam === "templates"
+      : tabParam === "tools"
+        ? "tools"
+        : tabParam === "templates"
         ? "templates"
         : tabParam === "handoff"
           ? "handoff"
@@ -109,6 +113,12 @@ export default function AgentPage() {
     return { path: `/${workspaceId}/agent`, fixedSearchParams };
   }, [selectedId, workspaceId]);
 
+  const toolsNavigation = useMemo<ToolsNavConfig>(() => {
+    const fixedSearchParams: Record<string, string> = { tab: "tools" };
+    if (selectedId) fixedSearchParams.agentId = selectedId;
+    return { path: `/${workspaceId}/agent`, fixedSearchParams };
+  }, [selectedId, workspaceId]);
+
   function handleTabChange(next: AgentSetupTab) {
     const p = new URLSearchParams(searchParams);
     if (next === "profile") {
@@ -131,6 +141,10 @@ export default function AgentPage() {
     }
     if (next !== "assets") {
       p.delete("assetGroupId");
+    }
+    if (next !== "tools") {
+      p.delete("toolId");
+      p.delete("mode");
     }
     setSearchParams(p, { replace: true });
   }
@@ -162,6 +176,10 @@ export default function AgentPage() {
             {tab === "skills" ? (
               <div className="mt-6">
                 <SkillsCatalogPanel navigation={skillsNavigation} />
+              </div>
+            ) : tab === "tools" ? (
+              <div className="mt-6">
+                <ToolsCatalogPanel navigation={toolsNavigation} />
               </div>
             ) : tab === "context" ? (
               <div className="mt-6">

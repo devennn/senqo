@@ -35,6 +35,9 @@ export async function ensureProfile(userId: string, email: string | undefined | 
       lastName,
     });
 
+    const { ensureDefaultCustomTools } = await import("../lib/seed-default-custom-tools.js");
+    await ensureDefaultCustomTools(workspaceId);
+
     console.info(`[${scope}/ensureProfile] Success (created): userId=${userId}`);
   } catch (error) {
     console.error(`[${scope}/ensureProfile] Unexpected error: ${String(error)}`);

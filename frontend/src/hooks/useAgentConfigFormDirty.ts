@@ -8,7 +8,7 @@ import {
 } from "react";
 import type {
   AgentConfigRecord,
-  AgentToolDefinitionRecord,
+  WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
   WorkspaceHandoffTopicGroupSummary,
@@ -35,7 +35,7 @@ import {
 type Args = {
   agent: AgentConfigRecord;
   connections: AgentConfigConnectionOption[];
-  availableTools: AgentToolDefinitionRecord[];
+  availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];

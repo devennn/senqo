@@ -62,7 +62,6 @@ export type AgentStepFinishToolResultLog = {
 
 export type AgentToolKey =
   | "load_skills"
-  | "get_weather"
   | "send_whatsapp_message"
   | "create_task"
   | "handoff_to_human"
@@ -76,6 +75,7 @@ export type AgentAssetInstructionGroup = {
 export type AgentSystemPromptInput = {
   dryRun: boolean;
   enabledToolKeys: string[];
+  customToolDescriptions: Record<string, string>;
   workspaceContext: string;
   responseTemplates: string;
   handoffTopics: string;
