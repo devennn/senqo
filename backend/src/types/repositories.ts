@@ -587,7 +587,7 @@ export type WorkspaceSummary = {
   name: string;
   ownerUserId: string;
   createdAt: string;
-  role: "owner" | "member";
+  role: "owner" | "member" | "superadmin";
 };
 
 export type TeamMemberRecord = {

@@ -144,15 +144,19 @@ import {
 import { addMember, listMembers } from "../repositories/team.js";
 import {
   updateProfile,
-  ensureProfile,
   getProfileForSettings,
+  provisionPlatformUser,
 } from "../repositories/profiles.js";
 import {
   getWorkspaceRow,
   isWorkspaceOwner,
   updateWorkspaceNameAsOwner,
   listUserWorkspaces,
+  createWorkspaceForUser,
 } from "../repositories/workspaces.js";
+import { createRegistrationInvite } from "../repositories/registration-invites.js";
+import { getAllowPublicRegistration } from "../repositories/instance-settings.js";
+import { sendRegistrationInviteEmail } from "../services/email.js";
 import { listAgentMessages } from "../repositories/agent-messages.js";
 import {
   scheduleAgentTask,
@@ -188,15 +192,35 @@ type Variables = AuthVariables & WorkspaceVariables;
 const app = new Hono<{ Variables: Variables }>();
 
 app.use("*", authMiddleware);
-app.use("*", workspaceMiddleware);
 
-// ── Workspaces (list) ────────────────────────────────────────────────────────
+// ── Platform (no workspace scope) ───────────────────────────────────────────
 
 app.get("/workspaces", async (c) => {
   const userId = c.get("userId");
   const workspaces = await listUserWorkspaces(userId);
   return c.json({ workspaces });
 });
+
+const createWorkspaceSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+
+const emailSchema = z.object({
+  email: z.string().email(),
+});
+
+app.post("/workspaces", async (c) => {
+  const userId = c.get("userId");
+  const parsed = createWorkspaceSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const result = await createWorkspaceForUser(userId, parsed.data.name);
+  if (!result.ok) return c.json({ error: result.message }, 400);
+
+  return c.json({ ok: true, workspaceId: result.workspaceId });
+});
+
+app.use("*", workspaceMiddleware);
 
 const createApiKeySchema = z.object({
   label: z.string().trim().min(1).max(80),
@@ -1945,10 +1969,47 @@ app.get("/team", async (c) => {
 
 app.post("/team", async (c) => {
   const workspaceId = c.get("workspaceId");
-  const { email } = (await c.req.json()) as { email: string };
-  if (!email) return c.json({ error: "email_required" }, 400);
-  await addMember(workspaceId, email);
+  const userId = c.get("userId");
+  const owner = await isWorkspaceOwner(workspaceId, userId);
+  if (!owner) return c.json({ error: "forbidden" }, 403);
+
+  const parsed = emailSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const result = await addMember(workspaceId, parsed.data.email);
+  if (!result.ok) {
+    const status = result.message === "user_not_found" ? 404 : 409;
+    return c.json({ error: result.message }, status);
+  }
   return c.json({ ok: true });
+});
+
+app.post("/team/registration-invite", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const userId = c.get("userId");
+  const owner = await isWorkspaceOwner(workspaceId, userId);
+  if (!owner) return c.json({ error: "forbidden" }, 403);
+
+  const allowPublicRegistration = await getAllowPublicRegistration();
+  if (allowPublicRegistration) {
+    return c.json({ error: "public_registration_enabled" }, 409);
+  }
+
+  const parsed = emailSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const created = await createRegistrationInvite(parsed.data.email, userId);
+  if (!created.ok) {
+    const status = created.message === "invite_already_pending" ? 409 : 400;
+    return c.json({ error: created.message }, status);
+  }
+
+  const emailed = await sendRegistrationInviteEmail({
+    to: parsed.data.email,
+    inviteToken: created.inviteToken,
+  });
+
+  return c.json({ ok: true, emailSent: emailed.ok });
 });
 
 // ── Profile ───────────────────────────────────────────────────────────────────
@@ -2058,7 +2119,7 @@ app.post("/auth/ensure-profile", async (c) => {
   const userId = c.get("userId");
   const user = await findUserById(userId);
   if (user) {
-    await ensureProfile(user.id, user.email, "");
+    await provisionPlatformUser(user.id, "");
   }
   return c.json({ ok: true });
 });

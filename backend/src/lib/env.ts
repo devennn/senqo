@@ -35,4 +35,8 @@ export const env = {
   apiKeyPepper: requireEnv("API_KEY_PEPPER"),
   /** AES-256-GCM key for workspace secrets (32-byte hex from openssl rand -hex 32). */
   workspaceSecretsKey: requireEnv("WORKSPACE_SECRETS_KEY"),
+  bootstrapAdminEmail: process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase() ?? "",
+  bootstrapAdminPassword: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "",
+  bootstrapWorkspaceName: process.env.BOOTSTRAP_WORKSPACE_NAME?.trim() || "Default Workspace",
+  initialAllowPublicRegistration: process.env.ALLOW_PUBLIC_REGISTRATION !== "false",
 };

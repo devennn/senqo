@@ -15,8 +15,10 @@ import realtimeRoute from "./routes/realtime.js";
 import publicTasksRoute from "./routes/public-tasks.js";
 import healthRoute from "./routes/health.js";
 import authRoute from "./routes/auth.js";
+import adminRoute from "./routes/admin.js";
 import { env } from "./lib/env.js";
 import { startJobQueue, stopJobQueue } from "./lib/job-queue.js";
+import { bootstrapAdminIfNeeded } from "./lib/bootstrap-admin.js";
 
 const app = new Hono();
 
@@ -104,6 +106,7 @@ app.route("/api/realtime", realtimeRoute);
 app.route("/api/tasks", publicTasksRoute);
 app.route("/api/health", healthRoute);
 app.route("/api/auth", authRoute);
+app.route("/api/admin", adminRoute);
 
 app.onError((err, c) => {
   console.error("[GlobalError]", err);
@@ -120,6 +123,7 @@ app.onError((err, c) => {
 const port = Number(process.env.PORT ?? "3001");
 
 async function main(): Promise<void> {
+  await bootstrapAdminIfNeeded();
   await startJobQueue();
 
   serve({ fetch: app.fetch, hostname: "0.0.0.0", port }, (info) => {
