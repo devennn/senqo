@@ -176,10 +176,11 @@ Forbidden:
 | 14 | **Don't test framework/library code** | Don't test that Drizzle inserts rows correctly, that Hono parses headers, that React re-renders on state change, or that Baileys connects to WhatsApp. Trust the library. Test _your_ logic on top of it. |
 | 15 | **E2E: ~3 tests per feature** | Each Playwright spec in `e2e/` targets one feature with **about three tests**: at least one **happy path**, the rest for **critical user-visible behaviour** only. See [E2E (Playwright)](#e2e-playwright) below. |
 | 16 | **Large features: E2E first** | For multi-file or cross-layer work, **start with failing Playwright tests** that describe the intended user flow, then implement until they pass. See [E2E (Playwright)](#e2e-playwright) below. |
+| 17 | **Comment every test** | Each `it(...)` or `test(...)` must have a preceding comment explaining **what** is being tested, the **expected outcome**, and **why** this test exists. Anyone reading the file should understand the test's purpose without deciphering the assertions. |
 
 #### E2E (Playwright)
 
-Playwright specs live in **`e2e/`**. Run with **`npm run test:e2e`** (see `DEVELOPMENT.md` for port / `E2E_BASE_URL`).
+Playwright specs live in **`e2e/`**. Run with **`npm run test:e2e`** (see `README.md` for port / `E2E_BASE_URL`).
 
 **Large features — outside-in workflow:**
 
