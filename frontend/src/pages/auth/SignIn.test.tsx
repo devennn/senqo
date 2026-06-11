@@ -45,28 +45,33 @@ describe("SignInPage", () => {
     ]);
   });
 
+  // Smoke test: the sign-in form must render email and password input fields so users can enter credentials.
   it("renders email and password fields", () => {
     render(<SignInPage />);
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
   });
 
+  // The page must display the "Welcome back" heading to give users clear context on the sign-in page.
   it("shows Welcome back heading", () => {
     render(<SignInPage />);
     expect(screen.getByText("Welcome back")).toBeInTheDocument();
   });
 
+  // The primary call-to-action "Sign in" button must be rendered and accessible by role.
   it("shows Sign in button", () => {
     render(<SignInPage />);
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
+  // The "Create an account" link must point to /sign-up so new users can navigate to registration.
   it('renders New to Senqo? link pointing to /sign-up', () => {
     render(<SignInPage />);
     const link = screen.getByRole("link", { name: "Create an account" });
     expect(link).toHaveAttribute("href", "/sign-up");
   });
 
+  // When redirected with an error query param, the page must display that error message to the user.
   it("shows error message when search params contain error", () => {
     mockUseSearchParams.mockReturnValue([
       new URLSearchParams({ error: "Invalid credentials" }),
@@ -77,6 +82,7 @@ describe("SignInPage", () => {
     expect(screen.getByText("Invalid credentials")).toBeInTheDocument();
   });
 
+  // Full flow: submitting valid credentials calls login, persists tokens, and navigates to the dashboard.
   it("calls login on form submit and navigates on success", async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({ accessToken: "at", refreshToken: "rt" });

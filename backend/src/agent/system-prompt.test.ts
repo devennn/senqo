@@ -6,6 +6,8 @@ import {
 } from "./system-prompt.js";
 
 describe("DEFAULT_TOOL_KEYS", () => {
+  // Verifies the default tool set contains all essential agent capabilities.
+  // Expected: the array includes create_task, load_skills, send_whatsapp_message, handoff_to_human, apply_conversation_labels.
   it("includes all required default tools", () => {
     expect(DEFAULT_TOOL_KEYS).toContain("create_task");
     expect(DEFAULT_TOOL_KEYS).toContain("load_skills");
@@ -16,6 +18,8 @@ describe("DEFAULT_TOOL_KEYS", () => {
 });
 
 describe("resolveEnabledToolKeys", () => {
+  // Merges default and config-provided tools without duplicates.
+  // Expected: output contains both default and extra keys; duplicates appear only once.
   it("returns default tools plus config tools, deduplicated", () => {
     const result = resolveEnabledToolKeys(["get_weather", "create_task"]);
     expect(result).toContain("create_task");
@@ -26,11 +30,15 @@ describe("resolveEnabledToolKeys", () => {
     expect(result.filter((k) => k === "create_task")).toHaveLength(1);
   });
 
+  // When configTools is undefined, only the default tool keys should be returned.
+  // Expected: result equals DEFAULT_TOOL_KEYS.
   it("returns only defaults when configTools is undefined", () => {
     const result = resolveEnabledToolKeys(undefined);
     expect(result).toEqual([...DEFAULT_TOOL_KEYS]);
   });
 
+  // When configTools is an empty array, only the default tool keys should be returned.
+  // Expected: result equals DEFAULT_TOOL_KEYS.
   it("returns only defaults when configTools is empty array", () => {
     const result = resolveEnabledToolKeys([]);
     expect(result).toEqual([...DEFAULT_TOOL_KEYS]);
@@ -51,6 +59,8 @@ const baseInput = {
 };
 
 describe("buildAgentSystemPrompt", () => {
+  // Assembles all configuration sections into a single system prompt string.
+  // Expected: prompt contains profile name, behavior, context, templates, handoff topics, and labels.
   it("merges behaviour, response templates, context groups, handoff topics, and skills", () => {
     const prompt = buildAgentSystemPrompt(baseInput);
     expect(prompt).toContain("WidgetBot");
@@ -61,6 +71,8 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("VIP, New Lead");
   });
 
+  // When dryRun is true, the prompt must instruct the agent not to send real WhatsApp messages.
+  // Expected: dry-run rule is present; live message rule is absent.
   it("includes dry-run WhatsApp rule when dryRun is true", () => {
     const prompt = buildAgentSystemPrompt({ ...baseInput, dryRun: true });
     expect(prompt).toContain(
@@ -71,6 +83,8 @@ describe("buildAgentSystemPrompt", () => {
     );
   });
 
+  // When dryRun is false, the prompt must instruct the agent to send live WhatsApp messages.
+  // Expected: live message rule is present; dry-run rule is absent.
   it("includes live WhatsApp rule when dryRun is false", () => {
     const prompt = buildAgentSystemPrompt({ ...baseInput, dryRun: false });
     expect(prompt).toContain(
@@ -81,11 +95,15 @@ describe("buildAgentSystemPrompt", () => {
     );
   });
 
+  // When no asset groups are configured, the prompt should indicate that clearly.
+  // Expected: prompt contains "(none configured for this agent)".
   it('shows "(none configured)" for empty asset groups', () => {
     const prompt = buildAgentSystemPrompt(baseInput);
     expect(prompt).toContain("(none configured for this agent)");
   });
 
+  // The available tools section lists enabled tool keys with their descriptions.
+  // Expected: prompt lists the tool keys and the custom tool description.
   it("includes available tools section with all enabled tool keys", () => {
     const prompt = buildAgentSystemPrompt({
       ...baseInput,

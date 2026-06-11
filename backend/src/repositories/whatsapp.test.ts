@@ -22,6 +22,7 @@ const { createConnection, bindAgentToWhatsappConnection, updateConnectionMode, d
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("createConnection", () => {
+  // Valid display name and token → insert succeeds returning ok:true with connection id, needed to verify WhatsApp connection creation.
   it("inserts with display name", async () => {
     mockReturning.mockResolvedValue([{ id: "conn-1" }]);
     const result = await createConnection({
@@ -33,6 +34,7 @@ describe("createConnection", () => {
     expect(result.id).toBe("conn-1");
   });
 
+  // Display name exceeds 120 chars → ok:false with display_name_too_long, needed to enforce the length constraint before hitting the DB.
   it("returns error when display name > 120 chars", async () => {
     const longName = "x".repeat(121);
     const result = await createConnection({
@@ -46,6 +48,7 @@ describe("createConnection", () => {
 });
 
 describe("bindAgentToWhatsappConnection", () => {
+  // Valid agent and connection ids → link succeeds with ok:true, needed to verify the agent-to-connection association works.
   it("links agent config to connection", async () => {
     mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     const result = await bindAgentToWhatsappConnection("ws-1", "agent-1", "conn-1");
@@ -54,12 +57,14 @@ describe("bindAgentToWhatsappConnection", () => {
 });
 
 describe("updateConnectionMode", () => {
+  // A valid mode string (testing) is provided → update succeeds with ok:true, needed to confirm mode transitions work.
   it("sets Inactive/Testing/Live mode", async () => {
     mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     const result = await updateConnectionMode("ws-1", "conn-1", "testing");
     expect(result.ok).toBe(true);
   });
 
+  // An unrecognized mode string is passed → ok:false is returned, needed to reject invalid mode values at the repository boundary.
   it("rejects invalid mode", async () => {
     // @ts-expect-error - testing invalid mode input
     const result = await updateConnectionMode("ws-1", "conn-1", "invalid");
@@ -68,6 +73,7 @@ describe("updateConnectionMode", () => {
 });
 
 describe("deleteConnectionByWorkspace", () => {
+  // Connection exists under workspace → row is removed and deleted:true is returned, needed to verify successful connection cleanup.
   it("removes connection row", async () => {
     mockWhere.mockReturnValue({ returning: mockReturning });
     mockReturning.mockResolvedValue([{ id: "conn-1" }]);
@@ -76,6 +82,7 @@ describe("deleteConnectionByWorkspace", () => {
     expect(result.deleted).toBe(true);
   });
 
+  // Connection does not exist → ok:true but deleted:false is returned, needed to handle idempotent deletion gracefully.
   it("returns not found when absent", async () => {
     mockWhere.mockReturnValue({ returning: mockReturning });
     mockReturning.mockResolvedValue([]);

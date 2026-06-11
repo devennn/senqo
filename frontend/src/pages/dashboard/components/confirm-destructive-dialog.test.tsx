@@ -24,6 +24,7 @@ vi.mock("@/components/ui/dialog", () => ({
 import { ConfirmDestructiveDialog } from "./confirm-destructive-dialog";
 
 describe("confirm-destructive-dialog", () => {
+  // When open, the dialog must render the title, description text, and a confirm button with the given label.
   it("opens and shows title and confirm button", () => {
     render(
       <ConfirmDestructiveDialog
@@ -42,6 +43,7 @@ describe("confirm-destructive-dialog", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
   });
 
+  // Clicking the confirm button must invoke the onConfirm callback so the destructive action proceeds.
   it("calls onConfirm when confirm button clicked", async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn().mockResolvedValue(undefined);
@@ -61,6 +63,7 @@ describe("confirm-destructive-dialog", () => {
     expect(onConfirm).toHaveBeenCalled();
   });
 
+  // While confirming (isConfirming=true), the button label switches to the pendingConfirmLabel for user feedback.
   it("shows pendingConfirmLabel when isConfirming is true", () => {
     render(
       <ConfirmDestructiveDialog

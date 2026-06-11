@@ -25,6 +25,7 @@ beforeEach(() => {
 });
 
 describe("workspaceMiddleware", () => {
+  // User is authenticated but not a member of the requested workspace → 403 is returned, needed to enforce workspace-level access control.
   it("returns 403 when user is not a workspace member", async () => {
     mockValidateWorkspaceMembership.mockResolvedValue(false);
     const app = createApp();
@@ -34,6 +35,7 @@ describe("workspaceMiddleware", () => {
     expect(res.status).toBe(403);
   });
 
+  // User is a valid workspace member → workspaceId is set on context and request proceeds with 200, needed to confirm that valid membership grants access.
   it("sets workspaceId when user is a member", async () => {
     mockValidateWorkspaceMembership.mockResolvedValue(true);
     const app = createApp();
@@ -45,6 +47,7 @@ describe("workspaceMiddleware", () => {
     expect(body.workspaceId).toBe("ws-123");
   });
 
+  // X-Workspace-Id header is completely absent → 400 with workspace_id_required error, needed to catch missing scope header early.
   it("returns 400 when X-Workspace-Id header is missing", async () => {
     const app = createApp();
     const res = await app.request("/test");

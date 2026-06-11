@@ -40,6 +40,7 @@ describe("SignUpPage", () => {
     vi.clearAllMocks();
   });
 
+  // Smoke test: the sign-up form must render name, email, and password fields for user registration.
   it("renders name, email, and password fields", () => {
     render(<SignUpPage />);
     expect(screen.getByLabelText("Name")).toBeInTheDocument();
@@ -47,22 +48,26 @@ describe("SignUpPage", () => {
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
   });
 
+  // The page must display the "Create your account" heading to indicate the purpose of the form.
   it("shows Create your account heading", () => {
     render(<SignUpPage />);
     expect(screen.getByText("Create your account")).toBeInTheDocument();
   });
 
+  // The primary "Create account" button must be rendered and accessible for form submission.
   it("shows Create account button", () => {
     render(<SignUpPage />);
     expect(screen.getByRole("button", { name: "Create account" })).toBeInTheDocument();
   });
 
+  // The "Sign in" link for existing users must point to /sign-in for easy navigation.
   it('renders Already have an account? link to /sign-in', () => {
     render(<SignUpPage />);
     const link = screen.getByRole("link", { name: "Sign in" });
     expect(link).toHaveAttribute("href", "/sign-in");
   });
 
+  // Full flow: submitting the registration form calls the register API, saves tokens, and navigates to the dashboard.
   it("calls register on form submit and navigates on success", async () => {
     const user = userEvent.setup();
     mockRegister.mockResolvedValue({ accessToken: "at", refreshToken: "rt" });

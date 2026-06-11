@@ -115,6 +115,7 @@ beforeEach(async () => {
 });
 
 describe("POST /register", () => {
+  // Valid email + password with registration enabled → user created, tokens returned, owner workspace provisioned with 200, needed to verify successful registration flow.
   it("creates user, returns tokens with 200", async () => {
     const res = await app.request("/register", {
       method: "POST",
@@ -133,6 +134,7 @@ describe("POST /register", () => {
     expect(provisionOwnerWorkspaceMock).toHaveBeenCalled();
   });
 
+  // Public registration is off and no valid invite → 403 is returned with registration_disabled, needed to enforce the instance-wide registration gate.
   it("rejects registration when public registration is off and no invite", async () => {
     getAllowPublicRegistrationMock.mockResolvedValue(false);
 
@@ -150,6 +152,7 @@ describe("POST /register", () => {
     expect(body.error).toBe("registration_disabled");
   });
 
+  // Email already exists in the database → 409 is returned with email_already_exists, needed to prevent duplicate user registration.
   it("rejects duplicate email with 409", async () => {
     findUserByEmailMock.mockResolvedValue(mockUser);
 
@@ -167,6 +170,7 @@ describe("POST /register", () => {
     expect(body.error).toBe("email_already_exists");
   });
 
+  // Email format is invalid → 400 with invalid_payload, needed to validate input at the route boundary via Zod schema.
   it("rejects invalid email format with 400", async () => {
     const res = await app.request("/register", {
       method: "POST",
@@ -182,6 +186,7 @@ describe("POST /register", () => {
     expect(body.error).toBe("invalid_payload");
   });
 
+  // Password is too short (<8 chars) → 400 with invalid_payload, needed to enforce minimum password length policy via Zod schema.
   it("rejects short password with 400", async () => {
     const res = await app.request("/register", {
       method: "POST",
@@ -199,6 +204,7 @@ describe("POST /register", () => {
 });
 
 describe("POST /login", () => {
+  // Valid email + password → access token in body, refresh token in body and set-cookie, user object returned with 200, needed to verify successful login flow.
   it("returns access token and sets refresh cookie with 200", async () => {
     findUserByEmailMock.mockResolvedValue(mockUser);
 
@@ -221,6 +227,7 @@ describe("POST /login", () => {
     expect(setCookieHeader).toContain("senqo_refresh");
   });
 
+  // Correct email but wrong password → 401 with invalid_credentials, needed to reject wrong credentials without revealing which field was wrong.
   it("rejects wrong password with 401", async () => {
     findUserByEmailMock.mockResolvedValue(mockUser);
     verifyPasswordMock.mockResolvedValue(false);
@@ -239,6 +246,7 @@ describe("POST /login", () => {
     expect(body.error).toBe("invalid_credentials");
   });
 
+  // Email does not exist in the database → 401 with invalid_credentials, needed to avoid leaking whether an account exists.
   it("rejects unknown email with 401", async () => {
     const res = await app.request("/login", {
       method: "POST",
@@ -256,6 +264,7 @@ describe("POST /login", () => {
 });
 
 describe("POST /refresh", () => {
+  // Valid refresh cookie present with non-disabled user → new access and refresh tokens returned with 200, needed to verify token rotation happy path.
   it("returns new access token from valid refresh cookie with 200", async () => {
     findUserByIdMock.mockResolvedValue(mockUser);
 
@@ -272,6 +281,7 @@ describe("POST /refresh", () => {
     expect(body.refreshToken).toBe("refresh-token-user-1");
   });
 
+  // No refresh cookie in the request → 401 with no_refresh_token, needed to reject requests missing the required cookie.
   it("rejects expired or missing refresh token with 401", async () => {
     const res = await app.request("/refresh", {
       method: "POST",
@@ -282,6 +292,7 @@ describe("POST /refresh", () => {
     expect(body.error).toBe("no_refresh_token");
   });
 
+  // Refresh cookie contains a token that fails JWT verification → 401 with invalid_refresh_token, needed to reject tampered or expired tokens.
   it("rejects invalid refresh token with 401", async () => {
     const res = await app.request("/refresh", {
       method: "POST",
@@ -297,6 +308,7 @@ describe("POST /refresh", () => {
 });
 
 describe("POST /logout", () => {
+  // Request to logout → refresh cookie is cleared and 200 with ok:true, needed to verify the client can reliably end a session.
   it("clears refresh cookie and returns 200 with ok:true", async () => {
     const res = await app.request("/logout", {
       method: "POST",

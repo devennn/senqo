@@ -39,6 +39,8 @@ describe("useAgentConfigFormDirty helpers", () => {
   const rtGroup: WorkspaceResponseTemplateGroupSummary = { id: "rt1" };
   const ctxGroup: WorkspaceContextGroupSummary = { id: "ctx1" };
 
+  // Verifies that agentProfileNameDirty detects when the profile name has changed from baseline.
+  // Enables the inline Save button next to the agent name field when the user edits it.
   it("agentProfileNameDirty returns true when field differs from baseline", () => {
     const baseline = buildAgentConfigFormBaseline({
       agent,
@@ -54,6 +56,8 @@ describe("useAgentConfigFormDirty helpers", () => {
     expect(agentProfileNameDirty(baseline, changed)).toBe(true);
   });
 
+  // Confirms agentProfileNameDirty returns false when profile name matches the baseline exactly.
+  // Prevents showing a stale Save button when no actual changes have been made to the name.
   it("agentProfileNameDirty returns false when field matches baseline", () => {
     const baseline = buildAgentConfigFormBaseline({
       agent,
@@ -68,6 +72,8 @@ describe("useAgentConfigFormDirty helpers", () => {
     expect(agentProfileNameDirty(baseline, { ...baseline })).toBe(false);
   });
 
+  // Verifies that agentProfileBehaviorDirty detects when the behavior text has changed from baseline.
+  // Enables the inline Save button next to the agent behavior field so users can persist edits.
   it("agentProfileBehaviorDirty returns true when behavior differs", () => {
     const baseline = buildAgentConfigFormBaseline({
       agent,

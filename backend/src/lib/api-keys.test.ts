@@ -7,6 +7,8 @@ vi.mock("./env.js", () => ({
 const { generateApiKeyMaterial, hashApiKey, getApiKeyVerificationHashes } = await import("./api-keys.js");
 
 describe("generateApiKeyMaterial", () => {
+  // Generates a fresh API key with the expected prefix, non-empty raw key, hash, and prefix.
+  // Expected: rawKey starts with "sk_senqo_", all fields are non-empty, prefix is first 12 chars.
   it("returns rawKey, keyPrefix, keyHash as non-empty strings", () => {
     const result = generateApiKeyMaterial();
     expect(result.rawKey.length).toBeGreaterThan(0);
@@ -18,6 +20,8 @@ describe("generateApiKeyMaterial", () => {
 });
 
 describe("hashApiKey", () => {
+  // The hash function must be deterministic — same key should produce identical hashes.
+  // Expected: two calls with the same raw key return the exact same hash string.
   it("is deterministic (same input = same output)", () => {
     const key = "sk_senqo_deadbeefcafebabe1234567890abcdef";
     const h1 = hashApiKey(key);
@@ -27,6 +31,8 @@ describe("hashApiKey", () => {
 });
 
 describe("getApiKeyVerificationHashes", () => {
+  // Returns an array of hashes for verification, including current and legacy hash methods.
+  // Expected: at least 2 hashes; the first entry matches the current hashApiKey output.
   it("returns array with current hash plus legacy hashes", () => {
     const key = "sk_senqo_testkey1234567890abcdef123456";
     const hashes = getApiKeyVerificationHashes(key);

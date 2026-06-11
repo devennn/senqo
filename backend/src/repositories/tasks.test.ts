@@ -22,6 +22,7 @@ const { createTask, cancelTaskById, listSchedulableAgents } =
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("createTask", () => {
+  // One-time task with full details including file URL → insert succeeds returning ok:true with task id, needed to verify complete task creation with optional fields.
   it("inserts with schedule, prompt, contact, file URL", async () => {
     mockReturning.mockResolvedValue([{ id: "task-1" }]);
     const result = await createTask({
@@ -42,6 +43,7 @@ describe("createTask", () => {
     expect(result.id).toBe("task-1");
   });
 
+  // Database insert fails → ok:false is returned, needed to surface creation failures to the caller without throwing.
   it("returns ok false on error", async () => {
     mockReturning.mockRejectedValue(new Error("db down"));
     const result = await createTask({
@@ -60,12 +62,14 @@ describe("createTask", () => {
 });
 
 describe("cancelTaskById", () => {
+  // Task exists and update succeeds → true is returned, needed to confirm the cancel operation marks the task cleanly.
   it("marks cancelled and returns true", async () => {
     mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     const result = await cancelTaskById("ws-1", "task-1");
     expect(result).toBe(true);
   });
 
+  // Database update fails → false is returned, needed to signal the caller that cancellation did not complete.
   it("returns false on error", async () => {
     mockSet.mockReturnValue({ where: vi.fn().mockRejectedValue(new Error("fail")) });
     const result = await cancelTaskById("ws-1", "task-1");
@@ -74,6 +78,7 @@ describe("cancelTaskById", () => {
 });
 
 describe("listSchedulableAgents", () => {
+  // Agents are directly attached to a WhatsApp connection → they are returned with profile_name, needed to verify the join-based query works.
   it("returns agents attached to a WhatsApp connection", async () => {
     const innerJoin = vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
@@ -88,6 +93,7 @@ describe("listSchedulableAgents", () => {
     expect(result[0].profile_name).toBe("Bot");
   });
 
+  // An authorized WhatsApp connection exists but no agent is directly attached → all workspace agents are still returned, needed to cover the fallback path where any authorized connection makes all agents schedulable.
   it("returns workspace agents when authorized WhatsApp exists without attachment", async () => {
     const innerJoin = vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({

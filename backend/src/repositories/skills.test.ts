@@ -28,6 +28,7 @@ const { createWorkspaceSkill, listActiveWorkspaceSkills, listWorkspaceSkills } =
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("createWorkspaceSkill", () => {
+  // Valid skill data with content is provided → content is uploaded to storage, row is inserted, and ok:true with skillId is returned, needed to verify the full create flow.
   it("inserts with storage-backed content key and returns ok true", async () => {
     mockStorageUpload.mockResolvedValue({ error: null });
     mockReturning.mockResolvedValue([{ id: "skill-1" }]);
@@ -41,6 +42,7 @@ describe("createWorkspaceSkill", () => {
     expect(result.skillId).toBe("skill-1");
   });
 
+  // displayName is empty → ok:false with validation message, needed to catch invalid input before hitting the database.
   it("fails with invalid skill name (empty displayName)", async () => {
     const result = await createWorkspaceSkill({
       workspaceId: "ws-1",
@@ -54,6 +56,7 @@ describe("createWorkspaceSkill", () => {
 });
 
 describe("listActiveWorkspaceSkills", () => {
+  // Only active skills exist for the workspace → they are returned filtered by isActive:true, needed to ensure the caller receives only usable skills.
   it("returns only active skills filtered by isActive true", async () => {
     const rows = [{ id: "s1", workspaceId: "ws-1", skillKey: "my_skill", displayName: "My Skill", description: "", storagePath: "", isActive: true, createdAt: new Date(), updatedAt: new Date() }];
     mockFrom.mockReturnValue({ where: mockWhere.mockReturnValue({ orderBy: mockOrderBy }) });
@@ -65,6 +68,7 @@ describe("listActiveWorkspaceSkills", () => {
 });
 
 describe("listWorkspaceSkills", () => {
+  // Both active and inactive skills exist → all are returned without filtering, needed to confirm the admin listing includes deactivated skills too.
   it("returns all skills with no isActive filter", async () => {
     const rows = [
       { id: "s1", workspaceId: "ws-1", skillKey: "active", displayName: "Active", description: "", storagePath: "", isActive: true, createdAt: new Date(), updatedAt: new Date() },

@@ -10,6 +10,7 @@ describe("getPublicTasksApiUrl", () => {
     vi.unstubAllGlobals();
   });
 
+  // In production (app.senqo.app), the public tasks API URL must point to the dedicated api.senqo.app host.
   it("returns production API host when app runs on senqo.app", () => {
     vi.stubGlobal("window", {
       location: {
@@ -22,6 +23,7 @@ describe("getPublicTasksApiUrl", () => {
     expect(getPublicTasksApiUrl()).toBe("https://api.senqo.app/api/tasks");
   });
 
+  // In local dev (localhost), the URL must be same-origin so it works without CORS issues.
   it("returns same-origin API path for local development", () => {
     vi.stubGlobal("window", {
       location: {
@@ -36,6 +38,7 @@ describe("getPublicTasksApiUrl", () => {
 });
 
 describe("buildCreateTaskRequestBody", () => {
+  // The request body must include all fields required by the API: message, sender, recipient, schedule type, timestamp, and timezone.
   it("includes one_time schedule fields required by the API", () => {
     expect(
       buildCreateTaskRequestBody({
@@ -57,6 +60,7 @@ describe("buildCreateTaskRequestBody", () => {
 });
 
 describe("buildCreateTaskCurlExample", () => {
+  // The generated curl example must contain the resolved API URL, the API key header, and the scheduleType payload.
   it("embeds the resolved URL and API key in a copy-ready curl command", () => {
     vi.stubGlobal("window", {
       location: {

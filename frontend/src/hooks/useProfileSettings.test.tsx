@@ -25,6 +25,8 @@ function wrapper() {
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("useProfileSettings", () => {
+  // Verifies the hook fetches user and workspace profile data and sets loading=false when done.
+  // Ensures the settings page can display user info and workspace name after fetch completes.
   it("fetches and returns profile data", async () => {
     mockGet.mockResolvedValue({
       user: { id: "u1", email: "a@b.com", firstName: "John", lastName: "Doe" },

@@ -32,6 +32,8 @@ beforeEach(() => {
 });
 
 describe("useDashboardThread", () => {
+  // Verifies that conversations and labels are fetched from the API on initial render.
+  // Ensures the hook triggers both conversation and label endpoints immediately.
   it("fetches conversations on mount", async () => {
     mockGet.mockImplementation((url: string) => {
       if (url.startsWith("/api/user/conversation-labels")) {
@@ -63,12 +65,16 @@ describe("useDashboardThread", () => {
     );
   });
 
+  // Confirms that loadingConversations starts as true before any fetch completes.
+  // Guarantees the UI can show a loading state immediately on mount.
   it("returns loadingConversations initially as true", () => {
     const { result } = renderDashboardThreadHook();
 
     expect(result.current.loadingConversations).toBe(true);
   });
 
+  // Ensures loadingConversations is set to false after both API calls resolve.
+  // Prevents the UI from showing an infinite loading state when data is available.
   it("sets loadingConversations to false after fetch completes", async () => {
     mockGet.mockImplementation((url: string) => {
       if (url.startsWith("/api/user/conversation-labels")) {
@@ -87,6 +93,8 @@ describe("useDashboardThread", () => {
     expect(result.current.loadingConversations).toBe(false);
   });
 
+  // Verifies that the hook subscribes to SSE realtime updates for the current workspace.
+  // Critical for live conversation updates without manual page refreshes.
   it("subscribes to realtime updates for the active workspace", () => {
     mockGet.mockResolvedValue({ labels: [], conversations: [] });
 

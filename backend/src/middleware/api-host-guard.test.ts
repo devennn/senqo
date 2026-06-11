@@ -17,6 +17,7 @@ function mockContext(host: string | null, forwardedHost: string | null = null) {
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("apiHostGuardMiddleware", () => {
+  // Host matches allowed list → middleware calls next() without blocking the request, needed to ensure valid API hosts are not rejected.
   it("allows when host matches PUBLIC_API_ALLOWED_HOSTS", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("PUBLIC_API_ALLOWED_HOSTS", "api.example.com");
@@ -26,6 +27,7 @@ describe("apiHostGuardMiddleware", () => {
     expect(next).toHaveBeenCalled();
   });
 
+  // Host is not in the allow list → middleware returns 403 and stops the request, needed to verify unauthorized hosts are blocked in production.
   it("denies (403) when host not allowed in production", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("PUBLIC_API_ALLOWED_HOSTS", "api.example.com");

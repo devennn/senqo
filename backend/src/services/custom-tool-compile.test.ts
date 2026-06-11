@@ -9,6 +9,7 @@ const unionInputSource = `export async function execute(
 }`;
 
 describe("compileCustomToolSource → accepts string literal union input types", () => {
+  // Input parameter uses a string literal union ("alpha" | "beta") → the resulting JSON schema includes enum with both values and required fields, needed to verify union types are properly compiled into schema constraints.
   it("returns metadata with enum schema for union properties", async () => {
     const result = await compileCustomToolSource(unionInputSource);
     expect(result.ok).toBe(true);

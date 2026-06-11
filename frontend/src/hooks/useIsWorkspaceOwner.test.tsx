@@ -25,6 +25,8 @@ function wrapper() {
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("useIsWorkspaceOwner", () => {
+  // Verifies that isOwner is true when the workspace API returns role "owner".
+  // Used to gate owner-only UI elements like workspace settings.
   it("returns true for owner role", async () => {
     mockGet.mockResolvedValue({ workspace: { role: "owner" } });
     const { result } = renderHook(() => useIsWorkspaceOwner(), { wrapper: wrapper() });
@@ -32,6 +34,8 @@ describe("useIsWorkspaceOwner", () => {
     expect(result.current.isOwner).toBe(true);
   });
 
+  // Verifies that isOwner is false when the workspace API returns a non-owner role.
+  // Ensures members cannot access owner-restricted functionality.
   it("returns false for member role", async () => {
     mockGet.mockResolvedValue({ workspace: { role: "member" } });
     const { result } = renderHook(() => useIsWorkspaceOwner(), { wrapper: wrapper() });

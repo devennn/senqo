@@ -20,6 +20,7 @@ beforeEach(() => {
 });
 
 describe("scheduleInboundAiDebounced", () => {
+  // Inbound conversation event triggers debounced AI scheduling → the underlying job scheduler is called with the correct conversation input, needed to verify the debounce layer delegates to the job queue correctly.
   it("schedules debounced inbound via job queue", async () => {
     await scheduleInboundAiDebounced(input);
 

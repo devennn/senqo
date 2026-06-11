@@ -36,6 +36,8 @@ afterEach(() => {
 
 describe("api client", () => {
   describe("Token handling", () => {
+    // Confirms the API client sends the access token in the Authorization header.
+    // Ensures every request is authenticated and the backend can identify the caller.
     it("attaches Authorization: Bearer header", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
@@ -49,6 +51,8 @@ describe("api client", () => {
       expect(headers.Authorization).toBe("Bearer valid-token");
     });
 
+    // Confirms the API client sends the active workspace ID in the X-Workspace-Id header.
+    // Critical for multi-workspace scoping so the backend serves the correct workspace data.
     it("attaches X-Workspace-Id header", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
@@ -64,6 +68,8 @@ describe("api client", () => {
   });
 
   describe("Token refresh on 401", () => {
+    // Verifies that a 401 response triggers a token refresh and retries the original request.
+    // Prevents users from being kicked out mid-session when their access token expires.
     it("auto-refreshes token on 401 and retries", async () => {
       mockFetch
         .mockResolvedValueOnce({
@@ -85,6 +91,8 @@ describe("api client", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
+    // Verifies that when both access and refresh tokens are invalid/null, the user is redirected to sign-in.
+    // Ensures the security boundary holds: no stale sessions linger after full token expiry.
     it("redirects to sign-in when both tokens are invalid", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -102,6 +110,8 @@ describe("api client", () => {
   });
 
   describe("FormData handling", () => {
+    // Confirms that Content-Type is not set when sending FormData, letting the browser set it with the boundary.
+    // Prevents malformed multipart uploads that would fail on the server side.
     it("does not set Content-Type for FormData requests", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
@@ -119,6 +129,8 @@ describe("api client", () => {
   });
 
   describe("workspaceId override", () => {
+    // Verifies that a per-request workspaceId override takes precedence over the active workspace.
+    // Needed for cross-workspace operations like admin tools that target a different workspace.
     it("uses provided workspaceId override", async () => {
       mockFetch.mockResolvedValue({
         ok: true,

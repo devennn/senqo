@@ -23,6 +23,8 @@ beforeEach(() => {
 
 describe("auth-refresh-request", () => {
   describe("readRefreshTokenFromRequest", () => {
+    // Parses the "senqo_refresh" cookie from the request header to extract the token value.
+    // Expected: returns the token value from the cookie string.
     it("extracts refresh token from cookie header", async () => {
       const { readRefreshTokenFromRequest } = await getAuthRefreshRequest();
       const c = {
@@ -35,6 +37,8 @@ describe("auth-refresh-request", () => {
       expect(result).toBe("test-token-123");
     });
 
+    // When no cookie is present, falls back to reading refreshToken from the JSON body.
+    // Expected: returns the token from the JSON body field.
     it("extracts refresh token from JSON body when no cookie", async () => {
       const { readRefreshTokenFromRequest } = await getAuthRefreshRequest();
       const c = {
@@ -47,6 +51,8 @@ describe("auth-refresh-request", () => {
       expect(result).toBe("body-token-456");
     });
 
+    // When neither cookie nor body has a token, returns null without error.
+    // Expected: returns null.
     it("returns null when no token in cookie or body", async () => {
       const { readRefreshTokenFromRequest } = await getAuthRefreshRequest();
       const c = {

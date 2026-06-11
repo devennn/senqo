@@ -205,6 +205,7 @@ async function mockAdminApi(page: Page) {
 }
 
 test.describe("Instance auth", () => {
+  // Happy path: user with invite token signs up, sees empty workspace chooser, creates a workspace, lands on its dashboard.
   test("registration invite signup → empty chooser → create workspace", async ({ page }) => {
     const workspaceState = { workspaces: [] as WorkspaceListItem[] };
 
@@ -237,6 +238,7 @@ test.describe("Instance auth", () => {
     await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
   });
 
+  // When public registration is off and no invite is provided, the sign-up page must show a blocked-state message and disable inputs.
   test("open sign-up blocked when public registration is off and no invite", async ({ page }) => {
     await mockAuthApi(page, { allowPublicRegistration: false });
 
@@ -247,6 +249,7 @@ test.describe("Instance auth", () => {
     await expect(page.getByLabel("Email")).toBeDisabled();
   });
 
+  // A superadmin user must see the Instance admin link on the workspace chooser, navigate to it, and see admin panel content.
   test("superadmin opens Instance admin from Workspaces page", async ({ page }) => {
     await seedAuthTokens(page);
     await mockAuthApi(page, { isInstanceAdmin: true });
