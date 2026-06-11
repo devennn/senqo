@@ -18,11 +18,13 @@ cp .env.example .env
 
 Open `.env` and fill it in. Do this before `docker compose up`.
 
-**Secrets** — run `openssl rand -hex 32` three times and paste into:
+**Secrets** — run `openssl rand -hex 32` five times and paste into:
 
 - `JWT_SECRET`
 - `API_KEY_PEPPER`
 - `WORKSPACE_SECRETS_KEY`
+- `WHATSAPP_SERVICE_API_KEY`
+- `WHATSAPP_WEBHOOK_AUTHORIZATION`
 
 **API keys:**
 
