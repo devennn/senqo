@@ -276,14 +276,14 @@ Internal-only assets (logs, emails not shown in-app, etc.) are out of scope unle
 
 ---
 
-# Product features document (`README.md`)
+# Product features document (`FEATURES.md`)
 
-- The repo root **`README.md`** describes **what the product features are** and **how they work** from a product/developer orientation.
-- When a change **materially alters** a documented feature—or adds/removes/renames one—**update `README.md` in the same change** (or immediately after if split across PRs) so it matches shipped behavior.
+- The repo root **`FEATURES.md`** describes **what the product features are** and **how they work** from a product/developer orientation. **`README.md`** links to it for setup and contribution context.
+- When a change **materially alters** a documented feature—or adds/removes/renames one—**update `FEATURES.md` in the same change** (or immediately after if split across PRs) so it matches shipped behavior.
 - **Update when** user-visible behavior, workflows, limits, integrations, or feature boundaries change; naming or positioning of a capability in-product should stay consistent with the doc where it applies.
 - **Skip** updates for purely internal refactors, renames only in code, or fixes that restore previously documented behavior.
 
-If unsure whether copy belongs in `README.md` vs implementation-only comments: prefer **`README.md`** for durable “what this feature is / does” descriptions.
+If unsure whether copy belongs in `FEATURES.md` vs implementation-only comments: prefer **`FEATURES.md`** for durable “what this feature is / does” descriptions.
 
 ---
 

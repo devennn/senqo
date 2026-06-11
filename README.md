@@ -6,7 +6,7 @@ Senqo is an open-source, self-hosted platform that connects WhatsApp Business nu
 
 ## Get started
 
-Everything runs in Docker — Postgres and the app in one command. File storage uses Cloudflare R2 (free tier; set up once).
+Run everything with Docker. You need Cloudflare R2 for file storage (free tier).
 
 ### 1. Clone and configure
 
@@ -16,45 +16,36 @@ cd senqo
 cp .env.example .env
 ```
 
-Use the repo-root `.env` only — Docker Compose reads it for variable substitution and service config. **Finish this entire step before `docker compose up`.**
+Open `.env` and fill it in. Do this before `docker compose up`.
 
-**Production mode and HTTPS.** `.env.example` sets `NODE_ENV=production`. In that mode the backend only accepts browser API calls over **HTTPS** from origins listed in `ALLOWED_PRODUCTION_ORIGINS`. If you open `http://<vps-ip>:8080` from your laptop, the page may load but **login will silently fail** (CORS blocks the API; refresh cookies need `AUTH_COOKIE_SECURE=true` over HTTPS). Remote access needs the public-access vars below plus [Caddy in step 3](#3-expose-the-app-publicly-caddy).
+**Secrets** — run `openssl rand -hex 32` three times and paste into:
 
-Set at least:
+- `JWT_SECRET`
+- `API_KEY_PEPPER`
+- `WORKSPACE_SECRETS_KEY`
 
-- `JWT_SECRET` — `openssl rand -hex 32`; signs and verifies login access and refresh tokens
-- `API_KEY_PEPPER` — `openssl rand -hex 32`; server-side pepper for hashing workspace API keys at rest (do not change after keys are issued)
-- `WORKSPACE_SECRETS_KEY` — `openssl rand -hex 32`; encrypts workspace secrets used by custom agent tools
-- `OPENROUTER_API_KEY` — [openrouter.ai](https://openrouter.ai) (AI agent; backend won't start without it)
-- `RESEND_API_KEY` — [resend.com](https://resend.com) (registration invite email)
-- `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` — object storage for media (see [Storage](#storage-cloudflare-r2) below)
+**API keys:**
 
-**Instance auth (production VPS — set before first `docker compose up`):**
+- `OPENROUTER_API_KEY` — get one at [openrouter.ai](https://openrouter.ai)
+- `RESEND_API_KEY` — get one at [resend.com](https://resend.com)
+- `S3_*` — see [Storage](#storage-cloudflare-r2) below
 
-- `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` — first superadmin (required when `ALLOW_PUBLIC_REGISTRATION=false`)
-- `BOOTSTRAP_WORKSPACE_NAME` — optional initial workspace name
-- `ALLOW_PUBLIC_REGISTRATION=false` — invite-only platform signup (toggle anytime from **Instance admin** on the Workspaces page)
+**First admin login:**
 
-**Public access** (required if anyone opens Senqo from another machine — replace `<VPS_PUBLIC_IP>` with your server's public IPv4):
+- `BOOTSTRAP_ADMIN_EMAIL`
+- `BOOTSTRAP_ADMIN_PASSWORD`
 
-- `FRONTEND_URL` — `https://<VPS_PUBLIC_IP>` (invite links and auth redirects)
-- `AUTH_COOKIE_SECURE` — `true`
-- `ALLOWED_PRODUCTION_ORIGINS` — `<VPS_PUBLIC_IP>` (hostname only, no `https://`)
+**If you use Senqo from another computer** — set `AUTH_COOKIE_SECURE=true` and match [step 3](#3-expose-the-app-publicly-caddy) (IP or domain):
 
-Bundled Compose values (usually leave as in `.env.example`):
-
-- `DB_PASSWORD` — Postgres password for the `postgres` service (Compose builds `DATABASE_URL` from it)
-- `WHATSAPP_WEBHOOK_AUTHORIZATION` — shared secret for webhook `?token=` validation
-- `WHATSAPP_SERVICE_API_KEY` — shared `x-api-key` between backend and `whatsapp` service
+- `FRONTEND_URL=https://<VPS_PUBLIC_IP>` or `https://<YOUR_DOMAIN>`
+- `ALLOWED_PRODUCTION_ORIGINS=<VPS_PUBLIC_IP>` or `<YOUR_DOMAIN>` (hostname only, no `https://`)
 
 ### Storage (Cloudflare R2)
 
-The `S3_*` vars in step 1 point at an S3-compatible bucket. R2's free tier (10 GB) is enough to run Senqo. This section is only how to obtain the values (see `.env.example` for the variable names). The bucket stays private; Senqo serves files via presigned URLs.
-
-1. [dash.cloudflare.com](https://dash.cloudflare.com) → **R2 Object Storage** → create a bucket (e.g. `senqo-wa`) → **`S3_BUCKET`**
-2. R2 overview → copy **Account ID** → **`S3_ENDPOINT`** = `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
-3. **`S3_REGION`** — `auto`
-4. **Manage R2 API Tokens** → token with **Object Read & Write** scoped to that bucket → **`S3_ACCESS_KEY`** (Access Key ID) and **`S3_SECRET_KEY`** (Secret Access Key)
+1. Go to [dash.cloudflare.com](https://dash.cloudflare.com) → **R2** → create a bucket → set `S3_BUCKET`
+2. Copy **Account ID** → set `S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
+3. Set `S3_REGION=auto`
+4. Create an R2 API token → set `S3_ACCESS_KEY` and `S3_SECRET_KEY`
 
 ### 2. Start
 
@@ -62,33 +53,30 @@ The `S3_*` vars in step 1 point at an S3-compatible bucket. R2's free tier (10 G
 docker compose up -d --build
 ```
 
-First start builds images, starts Postgres, applies Drizzle migrations (`database/migrations/`), then starts the app. Expect a minute or two on first run. Rebuild after code or dependency changes with the same command.
+First run takes a minute or two. Run the same command again after you change code.
 
-| Service | Port | Role |
-|---------|------|------|
-| `frontend` | 8080 | React SPA + nginx proxy to `/api` |
-| `backend` | 3001 | Hono API |
-| `whatsapp` | 3002 | Baileys session manager |
-| `postgres` | 5432 | PostgreSQL |
+| Service | Port |
+|---------|------|
+| `frontend` | 8080 |
+| `backend` | 3001 |
+| `whatsapp` | 3002 |
+| `postgres` | 5432 |
 
 ### 3. Expose the app publicly (Caddy)
 
-Caddy terminates HTTPS on the VPS and proxies to the `frontend` container on `127.0.0.1:8080`. The frontend nginx already proxies `/api` to the backend — you do **not** expose port 3001 publicly.
+Skip this if you only use Senqo on the server itself (`http://127.0.0.1:8080`).
 
-**1. Open port 443 on the host and cloud firewall**
+Caddy adds HTTPS so you can open Senqo from other computers.
 
-On the VPS (Ubuntu/Debian with `ufw`):
+**Open port 443** on the VPS and in your cloud provider's firewall (Hetzner, AWS, etc.):
 
 ```bash
 sudo ufw allow OpenSSH
 sudo ufw allow 443/tcp
 sudo ufw enable
-sudo ufw status
 ```
 
-Also allow inbound **TCP 443** in your provider's panel if you use one — e.g. Hetzner **Firewalls**, AWS **Security Groups**, GCP **VPC firewall rules**, DigitalOcean **Cloud Firewalls**. Without this, Caddy listens but the internet cannot reach it.
-
-**2. Install Caddy**
+**Install Caddy:**
 
 ```bash
 sudo apt update
@@ -98,9 +86,14 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo 
 sudo apt update && sudo apt install -y caddy
 ```
 
-**3. Configure the Caddyfile**
+Pick one:
 
-Public CAs (Let's Encrypt) do not issue certificates for bare IP addresses, so Caddy uses a self-signed cert (`tls internal`). The connection is still encrypted; the browser just cannot verify the issuer.
+**Option A — IP address**
+
+Replace `<VPS_PUBLIC_IP>` with your server IP. In `.env`:
+
+- `FRONTEND_URL=https://<VPS_PUBLIC_IP>`
+- `ALLOWED_PRODUCTION_ORIGINS=<VPS_PUBLIC_IP>`
 
 ```bash
 sudo tee /etc/caddy/Caddyfile <<'EOF'
@@ -111,107 +104,45 @@ https://<VPS_PUBLIC_IP> {
 EOF
 ```
 
-Replace `<VPS_PUBLIC_IP>` in the file, then reload:
+Your browser may warn about the certificate. Click **Advanced** → **Proceed**. That's normal for an IP address.
+
+**Option B — Domain name**
+
+Point your domain's **A record** to your server IP. Replace `<YOUR_DOMAIN>` with something like `app.example.com`. In `.env`:
+
+- `FRONTEND_URL=https://<YOUR_DOMAIN>`
+- `ALLOWED_PRODUCTION_ORIGINS=<YOUR_DOMAIN>`
+
+```bash
+sudo tee /etc/caddy/Caddyfile <<'EOF'
+<YOUR_DOMAIN> {
+    reverse_proxy 127.0.0.1:8080
+}
+EOF
+```
+
+Caddy gets a real certificate. No browser warning.
+
+**Finish:**
 
 ```bash
 sudo systemctl reload caddy
-sudo systemctl status caddy
-```
-
-**4. Apply `.env` changes (if you edited public-access vars after step 2)**
-
-`FRONTEND_URL` and related vars are read by the **backend** at runtime — no frontend image rebuild is needed:
-
-```bash
 docker compose up -d backend
 ```
 
-**5. Browser TLS warning**
-
-Open `https://<VPS_PUBLIC_IP>`. Chrome/Firefox show **"Your connection is not private"** because the certificate is self-signed. Click **Advanced**, then **Proceed to … (unsafe)** (wording varies by browser). You only do this once per browser profile; the session is still encrypted.
-
 ### 4. Open the app
 
-```
-https://<VPS_PUBLIC_IP>
-```
+Go to `https://<VPS_PUBLIC_IP>` or `https://<YOUR_DOMAIN>` and log in with your bootstrap admin email and password.
 
-Sign in as the bootstrap admin. Use **Instance admin** on the Workspaces page (`/admin`) to toggle public registration, manage users, and delete workspaces.
+**Add teammates** (when public signup is off):
 
-**Team workflow (registration off):**
+1. Click **Invite to Senqo** — sends them a signup link
+2. They sign up and create or join a workspace
+3. Go to **Settings → Team** → **Add to workspace**
 
-1. **Invite to Senqo** — sends a platform signup link (account only; no workspace yet).
-2. Teammate signs up → empty Workspaces page → may **Create workspace** or wait to be added.
-3. **Add to workspace** (Settings → Team) — adds an existing Senqo user to your project.
+Go to **Connect** and scan the WhatsApp QR code to link a number.
 
-Superadmins see and can enter all workspaces. Open **Connect** and scan the WhatsApp QR code to link a number.
-
-On the VPS itself only, `http://127.0.0.1:8080` works for a quick smoke test without Caddy.
-
-## Features
-
-### Inbox & conversations
-
-- Unified inbox — sidebar with search, filters (label, WhatsApp line, human-handling-only), and per-line routing
-- Thread view — message history with infinite scroll, AI reasoning insights, timeline-style handoff markers
-- Manual replies — compose text and media; outbound sends show delivery confirmation
-- AI / Human toggle — per-conversation control over automated vs manual replies
-- Conversation labels — apply workspace labels; filter inbox by label
-- Delete conversation — permanently remove thread, messages, and AI history (CRM contact preserved)
-
-### AI agents
-
-- Agent profiles — create, rename, and archive configurable agents with custom behavior instructions
-- Multi-model — powered by OpenRouter; plug in any supported LLM
-- Inline saves — per-section save buttons when settings change; transient success feedback
-- Operator insights — dashboard-only explanation of what grounded each AI reply
-- Per-connection attach — bind an agent to a WhatsApp line; Inactive / Testing / Live modes
-- Inbound processing — debounced AI runs per conversation; only text and images reach the model
-- Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`
-- Workspace secrets — Settings → Secrets stores encrypted env values as `ctx.env` at tool runtime
-- Built-in tools — platform tools (send WhatsApp, schedule tasks, handoff, labels, load skills) always on
-- Demo tool — new workspaces get a seeded `get_weather` custom tool (Open-Meteo, no API key)
-
-### Knowledge base (agent)
-
-- Workspace context — structured factual snippets organized into groups
-- Response templates — canned Q&A pairs used as authoritative replies
-- Handoff topics — escalation definitions for when to transfer to a human
-- Skills — markdown playbooks for specialized workflows
-- Asset groups — sendable files (images, video, audio, documents) the agent reasons about
-- Auto-assign labels — agent can classify conversations with workspace labels
-
-### Contacts (CRM)
-
-- Contact directory — paginated table with name, phone, notes/metadata
-- Search & filters — by name, phone, additional info, test contacts only
-- Add / delete — create contacts; cascading delete removes conversations and agent history
-- Test contact toggle — mark contacts as Test for Testing AI mode
-
-### WhatsApp connections
-
-- Connection manager — cards per session with live status, display name, phone
-- First-party Baileys — lightweight Node service on Baileys v7 (no headless browser)
-- QR pairing — scan QR to link a number; sessions persist across restarts
-- AI reply mode — per-connection: Inactive, Testing (test contacts only), or Live
-- Activity sheet — recent connection/disconnection events
-- LID resolution — WhatsApp privacy identifiers resolved to phone-number JIDs
-
-### Scheduled tasks
-
-- Task list — paginated table with status, search, and filters
-- One-time schedules — local datetime + timezone, converted to UTC
-- Targeting — one CRM contact, contactless batch, or via agent tools
-- Manual stop — cancel active tasks; pending pg-boss jobs cancelled
-- Public API — server-to-server `POST /api/tasks` with API key auth and host guard
-
-### Team & settings
-
-- Workspace profile — display name, storage usage breakdown, 10 GB default quota
-- API keys — create, list, delete workspace API keys with optional expiry
-- Workspace secrets — encrypted key/value pairs for custom tool `requiredEnv`
-- Team management — invite platform signup, add existing users to a workspace, list members
-- User profile — name fields; password change
+See **[FEATURES.md](FEATURES.md)** for what Senqo can do.
 
 ## Local development
 
