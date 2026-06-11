@@ -6,6 +6,7 @@ export async function scheduleInboundAiDebounced(input: {
   workspaceId: string;
   conversationId: string;
   agentConfigId: string;
+  whatsappConnectionId: string;
 }): Promise<void> {
   await scheduleInboundAiDebouncedJob(input);
 }

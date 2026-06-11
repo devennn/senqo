@@ -78,6 +78,7 @@ describe("scheduleInboundAiDebouncedJob", () => {
       workspaceId: "ws-1",
       conversationId: "conv-1",
       agentConfigId: "agent-1",
+      whatsappConnectionId: "conn-testing-1",
     });
 
     expect(mockCancel).toHaveBeenCalledWith("inbound-ai", "job-old-1");

@@ -30,6 +30,7 @@ export type ScheduleInboundAiDebouncedInput = {
   workspaceId: string;
   conversationId: string;
   agentConfigId: string;
+  whatsappConnectionId: string;
 };
 
 function buildTaskExecutePayload(input: ScheduleAgentTaskInput): TaskExecutePayload {
@@ -112,6 +113,7 @@ export async function scheduleInboundAiDebouncedJob(
     workspaceId: input.workspaceId,
     conversationId: input.conversationId,
     agentConfigId: input.agentConfigId,
+    whatsappConnectionId: input.whatsappConnectionId,
   };
 
   try {

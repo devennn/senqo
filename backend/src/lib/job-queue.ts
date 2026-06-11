@@ -11,6 +11,8 @@ export type InboundAiJobData = {
   workspaceId: string;
   conversationId: string;
   agentConfigId: string;
+  /** Line that received the inbound; omitted on jobs queued before multi-connection scoping. */
+  whatsappConnectionId?: string;
 };
 
 let boss: PgBoss | null = null;
