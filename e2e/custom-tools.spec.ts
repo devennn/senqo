@@ -221,6 +221,7 @@ async function openToolEditor(page: Page) {
 }
 
 test.describe("Custom tools catalog", () => {
+  // Happy path: opening a tool in the editor shows the tool name, description, and a disabled Save button (clean state).
   test("opens selected tool in editor with clean save state", async ({ page }) => {
     const toolState = { current: createToolDetail() };
     await seedSession(page);
@@ -233,6 +234,7 @@ test.describe("Custom tools catalog", () => {
     await expect(fields.nth(1)).toHaveValue("Demo tool for E2E");
   });
 
+  // Save button must be disabled initially, enabled after edits, and disabled again after a successful save with cleared dirty state.
   test("enables Save changes only after edits and clears dirty after save", async ({ page }) => {
     const toolState = { current: createToolDetail() };
     await seedSession(page);
@@ -250,6 +252,7 @@ test.describe("Custom tools catalog", () => {
     await expect(page.getByRole("textbox").nth(1)).toHaveValue("Updated description");
   });
 
+  // Editing the test input JSON must enable Save, and the edited value must persist in the UI after saving.
   test("treats test input JSON edits as unsaved until Save changes", async ({ page }) => {
     const toolState = { current: createToolDetail() };
     await seedSession(page);

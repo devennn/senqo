@@ -34,6 +34,7 @@ beforeEach(() => {
 });
 
 describe("sendManualConversationMessage", () => {
+  // Valid target, message, and all sub-operations succeed → ok:true with WhatsApp message id, needed to verify the full manual send pipeline works end-to-end.
   it("persists message, mirrors to agent transcript, and returns ok on success", async () => {
     mockGetManualWhatsappSendTarget.mockResolvedValue(mockTarget);
     mockSendTextMessage.mockResolvedValue({ messageId: "wa-msg-1" });
@@ -62,6 +63,7 @@ describe("sendManualConversationMessage", () => {
     expect(mockPersistHumanOutboundText).toHaveBeenCalled();
   });
 
+  // Conversation has no active WhatsApp target → ok:false with "not connected" error, needed to prevent sending to unreachable recipients.
   it("returns error when getManualWhatsappSendTarget returns null", async () => {
     mockGetManualWhatsappSendTarget.mockResolvedValue(null);
 
@@ -78,6 +80,7 @@ describe("sendManualConversationMessage", () => {
     expect(mockSendTextMessage).not.toHaveBeenCalled();
   });
 
+  // Message is only whitespace → ok:false with validation error, needed to catch empty input before attempting send.
   it("returns error when message is empty", async () => {
     const result = await sendManualConversationMessage({
       workspaceId: "ws-1",
@@ -92,6 +95,7 @@ describe("sendManualConversationMessage", () => {
     expect(mockGetManualWhatsappSendTarget).not.toHaveBeenCalled();
   });
 
+  // WhatsApp send succeeds but persisting the conversation message fails → ok:false with save error, needed to surface partial failures after send.
   it("returns error when createConversationMessage fails", async () => {
     mockGetManualWhatsappSendTarget.mockResolvedValue(mockTarget);
     mockSendTextMessage.mockResolvedValue({ messageId: "wa-msg-1" });
@@ -109,6 +113,7 @@ describe("sendManualConversationMessage", () => {
     }
   });
 
+  // Message has leading/trailing whitespace → it is trimmed before being saved and sent, needed to ensure clean content is stored and delivered.
   it("trims whitespace from message before sending", async () => {
     mockGetManualWhatsappSendTarget.mockResolvedValue(mockTarget);
     mockSendTextMessage.mockResolvedValue({ messageId: "wa-msg-2" });

@@ -17,6 +17,7 @@ function createApp() {
 }
 
 describe("authMiddleware", () => {
+  // No Authorization header is sent → 401 Unauthorized is returned, needed to confirm the middleware blocks unauthenticated requests.
   it("returns 401 when no Bearer token is present", async () => {
     const app = createApp();
     const res = await app.request("/protected/hello");
@@ -25,6 +26,7 @@ describe("authMiddleware", () => {
     expect(body.error).toBe("Unauthorized");
   });
 
+  // An invalid Bearer token is sent (verifyToken returns null) → 401 is returned, needed to ensure malformed/expired tokens are rejected.
   it("returns 401 when token is invalid", async () => {
     verifyTokenMock.mockResolvedValue(null);
     const app = createApp();
@@ -34,6 +36,7 @@ describe("authMiddleware", () => {
     expect(res.status).toBe(401);
   });
 
+  // A valid Bearer token is verified and userId is set in context → 200 and the userId are returned to downstream handler, needed to confirm auth injects correct user identity.
   it("sets userId on context and calls next for valid token", async () => {
     verifyTokenMock.mockResolvedValue({ userId: "user-123" });
     const app = createApp();

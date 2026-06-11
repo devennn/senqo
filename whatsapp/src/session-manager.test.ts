@@ -42,12 +42,14 @@ const { getOrCreate, startSession, removeSession, get } = await import("../src/s
 
 describe("session-manager", () => {
   describe("getOrCreate", () => {
+    // Calling getOrCreate twice with the same connectionId must return the identical session instance.
     it("returns same instance for same connectionId", () => {
       const s1 = getOrCreate("conn-1");
       const s2 = getOrCreate("conn-1");
       expect(s1).toBe(s2);
     });
 
+    // Calling getOrCreate with two different connectionIds must return distinct session instances.
     it("creates new instance for new connectionId", () => {
       const s1 = getOrCreate("conn-1");
       const s2 = getOrCreate("conn-2");
@@ -56,12 +58,14 @@ describe("session-manager", () => {
   });
 
   describe("startSession", () => {
+    // Calling startSession twice for the same connectionId must be safe (idempotent) and not throw.
     it("is idempotent when called twice", async () => {
       mockStart.mockResolvedValue(undefined);
       await startSession("conn-start");
       await startSession("conn-start");
     });
 
+    // startSession must return the session object after creating and starting it.
     it("returns the session after starting", async () => {
       mockStart.mockResolvedValue(undefined);
       const session = await startSession("conn-start-2");
@@ -70,6 +74,7 @@ describe("session-manager", () => {
   });
 
   describe("removeSession", () => {
+    // removeSession must call destroy on the session and then delete it from the internal map.
     it("calls destroy and removes from map", async () => {
       mockDestroy.mockResolvedValue(undefined);
       getOrCreate("conn-rm");
@@ -80,6 +85,7 @@ describe("session-manager", () => {
   });
 
   describe("get", () => {
+    // Getting a connectionId that was never created must return undefined rather than throwing.
     it("returns undefined for unknown connectionId", () => {
       expect(get("nonexistent")).toBeUndefined();
     });

@@ -39,6 +39,8 @@ const mockContext: AgentToolRuntimeContext = {
 };
 
 describe("getAgentTools", () => {
+  // All builtin and custom tool keys are resolved into tool instances in one map.
+  // Expected: 6 tools returned, including builtins and one custom key.
   it("returns builtin and custom tools when keys enabled", async () => {
     const tools = await getAgentTools(mockContext, [
       "create_task",
@@ -56,11 +58,15 @@ describe("getAgentTools", () => {
     expect(keys).toContain("load_skills");
   });
 
+  // No tools should be returned when the enabled list is empty.
+  // Expected: empty object with no keys.
   it("returns empty object when enabledToolKeys is empty", async () => {
     const tools = await getAgentTools(mockContext, []);
     expect(Object.keys(tools)).toHaveLength(0);
   });
 
+  // Non-builtin keys are loaded as custom tools alongside builtins.
+  // Expected: both the builtin key and the custom key appear in the result.
   it("loads custom tools for non-builtin keys", async () => {
     const tools = await getAgentTools(mockContext, ["create_task", "my_custom_tool"]);
     const keys = Object.keys(tools);
@@ -68,6 +74,8 @@ describe("getAgentTools", () => {
     expect(keys).toContain("my_custom_tool");
   });
 
+  // A null/undefined tool keys list should be handled gracefully without crashing.
+  // Expected: empty object returned, no error thrown.
   it("returns empty object when enabledToolKeys is not an array", async () => {
     const tools = await getAgentTools(mockContext, null as unknown as string[]);
     expect(Object.keys(tools)).toHaveLength(0);

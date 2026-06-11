@@ -12,12 +12,16 @@ describe("getAppVersion", () => {
     }
   });
 
+  // When APP_VERSION env var is set, the function should return that value directly.
+  // Expected: returns "1.2.3" as the version string.
   it("returns APP_VERSION when set", async () => {
     process.env.APP_VERSION = "1.2.3";
     const { getAppVersion } = await import("./app-version.js");
     expect(getAppVersion()).toBe("1.2.3");
   });
 
+  // When APP_VERSION is not set, it should fall back to reading package.json.
+  // Expected: returns the version from package.json (mocked as "0.1.0").
   it("falls back to package.json version when APP_VERSION is unset", async () => {
     delete process.env.APP_VERSION;
     const { getAppVersion } = await import("./app-version.js");

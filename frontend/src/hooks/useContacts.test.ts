@@ -9,6 +9,8 @@ const { useContacts } = await import("@/hooks/useContacts");
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("useContacts", () => {
+  // Verifies paginated contacts are fetched, returning the items array and total count.
+  // Essential for the contacts table to render rows and pagination controls.
   it("fetches paginated contacts, returns items and total", async () => {
     mockGet.mockResolvedValue({
       contacts: [

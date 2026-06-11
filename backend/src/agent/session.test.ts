@@ -24,6 +24,8 @@ beforeEach(() => {
 });
 
 describe("resolveSessionId", () => {
+  // Creates a new conversation then a new session when no sessionId is provided.
+  // Expected: returns the new session ID and calls both creation repos.
   it("creates new session when none exists", async () => {
     createAgentConversationMock.mockResolvedValue("conv-1");
     createAgentSessionMock.mockResolvedValue({ id: "sess-1" } as never);
@@ -42,6 +44,8 @@ describe("resolveSessionId", () => {
     });
   });
 
+  // Skips creating new resources when an existing sessionId is found in the DB.
+  // Expected: returns the existing session ID; no conversation/session creation.
   it("reuses existing session when sessionId provided and found", async () => {
     findAgentSessionMock.mockResolvedValue({ id: "existing-sess" } as never);
 
@@ -52,6 +56,8 @@ describe("resolveSessionId", () => {
     expect(createAgentConversationMock).not.toHaveBeenCalled();
   });
 
+  // In dry-run mode no DB writes should happen; a synthetic UUID is returned.
+  // Expected: result is a 36-char UUID string, no repo calls made.
   it("skips DB writes in dry-run mode", async () => {
     const result = await resolveSessionId("ws-1", true);
 
@@ -62,6 +68,8 @@ describe("resolveSessionId", () => {
     expect(findAgentSessionMock).not.toHaveBeenCalled();
   });
 
+  // If conversation creation fails (returns null), the whole flow should abort.
+  // Expected: returns null and does not attempt to create a session.
   it("returns null when createAgentConversation fails", async () => {
     createAgentConversationMock.mockResolvedValue(null);
 

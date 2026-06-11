@@ -38,6 +38,7 @@ beforeEach(() => {
 });
 
 describe("scheduleAgentTask", () => {
+  // oneTimeAt is in the future → sendAfter is called to delay task execution, needed to verify that future-dated tasks are scheduled with the correct delay.
   it("enqueues delayed task with sendAfter when oneTimeAt is in the future", async () => {
     const future = new Date(Date.now() + 60_000).toISOString();
     const result = await scheduleAgentTask({
@@ -55,11 +56,13 @@ describe("scheduleAgentTask", () => {
 });
 
 describe("cancelScheduledTask", () => {
+  // Payload has a valid jobId → the corresponding job is cancelled, needed to verify that pg-boss cancel is called for trackable jobs.
   it("cancels job when jobId is present in payload", async () => {
     await cancelScheduledTask({ jobId: "job-1", queue: "task-execute" });
     expect(mockCancel).toHaveBeenCalledWith("task-execute", "job-1");
   });
 
+  // Payload lacks jobId (legacy qstash format) → no cancel is attempted, needed to handle legacy payloads that aren't tracked by pg-boss job ids.
   it("no-ops when jobId is missing (legacy qstash payload)", async () => {
     await cancelScheduledTask({ response: { messageId: "old-qstash" } });
     expect(mockCancel).not.toHaveBeenCalled();
@@ -67,6 +70,7 @@ describe("cancelScheduledTask", () => {
 });
 
 describe("scheduleInboundAiDebouncedJob", () => {
+  // A previous pending job exists for the conversation → it is cancelled before scheduling a new one, the new job is sent with debounce delay, and the pending record is upserted, needed to verify the full debounce loop: cancel-old, send-new, track.
   it("cancels previous pending job before scheduling a new one", async () => {
     mockGetPendingJobId.mockResolvedValue("job-old-1");
 

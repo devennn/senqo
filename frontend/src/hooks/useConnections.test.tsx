@@ -23,6 +23,8 @@ function wrapper() {
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("useConnections", () => {
+  // Confirms the hook fetches the connections list from the API and exposes them in state.
+  // Ensures the channels page can display all WhatsApp/other connections for the workspace.
   it("fetches connection list", async () => {
     mockGet.mockResolvedValue({
       connections: [{ id: "conn-1", display_name: "My WA", agent_config_id: null, mode: "inactive", status: "pending_qr" }],

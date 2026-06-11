@@ -11,6 +11,8 @@ describe("jsonSchemaToZod → validates string enum properties", () => {
     required: ["mode"],
   });
 
+  // Values listed in the enum must parse successfully.
+  // Expected: schema.parse accepts both "alpha" and "beta" (with optional count).
   it("accepts allowed enum values", () => {
     expect(schema.parse({ mode: "alpha" })).toEqual({ mode: "alpha" });
     expect(schema.parse({ mode: "beta", count: 10 })).toEqual({
@@ -19,6 +21,8 @@ describe("jsonSchemaToZod → validates string enum properties", () => {
     });
   });
 
+  // Values not in the enum must throw a Zod validation error.
+  // Expected: schema.parse throws when mode is "gamma".
   it("rejects values outside the enum", () => {
     expect(() => schema.parse({ mode: "gamma" })).toThrow();
   });

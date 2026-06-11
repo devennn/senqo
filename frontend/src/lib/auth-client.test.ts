@@ -34,6 +34,7 @@ afterEach(() => {
 
 describe("auth-client", () => {
   describe("getAccessToken", () => {
+    // Verifies that saveAuthTokens persists access and refresh tokens to localStorage so getAccessToken can retrieve them later.
     it("reads tokens from localStorage", async () => {
       const { saveAuthTokens, getAccessToken } = await import("../lib/auth-client.js");
 
@@ -48,6 +49,7 @@ describe("auth-client", () => {
   });
 
   describe("saveAuthTokens", () => {
+    // Ensures both accessToken and refreshToken are written to localStorage under the senqo_auth key.
     it("writes access token to localStorage", async () => {
       const { saveAuthTokens } = await import("../lib/auth-client.js");
       saveAuthTokens("access-123", "refresh-456");
@@ -58,6 +60,7 @@ describe("auth-client", () => {
       expect(parsed.refreshToken).toBe("refresh-456");
     });
 
+    // Key behaviour: calling saveAuthTokens with only an access token must not wipe the already-stored refresh token.
     it("preserves existing refresh token when only passed access token", async () => {
       const { saveAuthTokens } = await import("../lib/auth-client.js");
       saveAuthTokens("access-123", "refresh-456");
@@ -71,6 +74,7 @@ describe("auth-client", () => {
   });
 
   describe("removeAuthTokens", () => {
+    // Verifies that removeAuthTokens deletes the entire senqo_auth entry from localStorage, clearing all session data.
     it("clears localStorage", async () => {
       const { saveAuthTokens, removeAuthTokens } = await import("../lib/auth-client.js");
       saveAuthTokens("access-123", "refresh-456");
@@ -81,6 +85,7 @@ describe("auth-client", () => {
   });
 
   describe("login", () => {
+    // Happy path: a successful login response returns accessToken, refreshToken, and user object from the API.
     it("returns auth payload on success", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
@@ -100,6 +105,7 @@ describe("auth-client", () => {
       expect(result.user.id).toBe("user-1");
     });
 
+    // Error path: when the API returns ok:false with an error message, login must throw with that message.
     it("throws on error response", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -112,6 +118,7 @@ describe("auth-client", () => {
   });
 
   describe("register", () => {
+    // Happy path: registering with email, password, and name returns tokens and user info from the backend.
     it("sends registration data and returns tokens", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
@@ -130,6 +137,7 @@ describe("auth-client", () => {
       expect(result.user.email).toBe("new@example.com");
     });
 
+    // Error path: a failed registration (e.g. duplicate email) must throw the error message from the API.
     it("throws on registration error", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -144,6 +152,7 @@ describe("auth-client", () => {
   });
 
   describe("logout", () => {
+    // Verifies that logout removes the auth tokens from localStorage after calling the logout API endpoint.
     it("clears tokens after calling logout endpoint", async () => {
       mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
       const { saveAuthTokens, logout } = await import("../lib/auth-client.js");

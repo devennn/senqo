@@ -28,6 +28,7 @@ vi.mock("../src/logger.js", () => ({
 const { shouldIngestBaileysMessage } = await import("./message-ingest.js");
 
 describe("shouldIngestBaileysMessage", () => {
+  // Channel (newsletter) messages must not be ingested since they are not user conversations.
   it("returns false for channel messages", () => {
     expect(
       shouldIngestBaileysMessage({
@@ -37,6 +38,7 @@ describe("shouldIngestBaileysMessage", () => {
     ).toBe(false);
   });
 
+  // Direct user messages from s.whatsapp.net must be ingested for conversation tracking.
   it("returns true for direct user messages", () => {
     expect(
       shouldIngestBaileysMessage({

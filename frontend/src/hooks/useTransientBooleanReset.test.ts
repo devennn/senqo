@@ -7,6 +7,8 @@ beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe("useTransientBooleanReset", () => {
+  // Verifies that setting the flag to true auto-resets it to false after the specified timeout.
+  // Ensures transient success banners and flash messages dismiss automatically instead of persisting.
   it("toggles and auto-resets after timeout", () => {
     const { result } = renderHook(() => {
       const [flag, setFlag] = useState(false);

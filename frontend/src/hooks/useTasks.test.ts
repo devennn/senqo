@@ -37,6 +37,8 @@ afterEach(() => {
 });
 
 describe("useTasks", () => {
+  // Verifies tasks are fetched with pagination parameters and returned with total count.
+  // Critical for the tasks table to display rows and page controls correctly.
   it("fetches tasks with pagination", async () => {
     const query = { page: 1, search: "" };
     const { result } = renderHook(() => useTasks(query));
@@ -46,6 +48,8 @@ describe("useTasks", () => {
     expect(result.current.total).toBe(1);
   });
 
+  // Verifies that the hook silently polls for task status updates without showing a loading spinner.
+  // Ensures run status changes (e.g. pending → success) appear in the table without disruptive reloads.
   it("polls task list silently so run status updates without reloading the table", async () => {
     vi.useFakeTimers();
     const query = { page: 1, search: "" };

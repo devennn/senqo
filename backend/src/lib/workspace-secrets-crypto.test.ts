@@ -15,6 +15,8 @@ describe("workspace-secrets-crypto", () => {
     process.env.WORKSPACE_SECRETS_KEY = original;
   });
 
+  // Encrypting and then decrypting a plaintext should return the original value.
+  // Expected: decrypted value matches the input; valueHint shows the last 4 masked chars.
   it("encryptWorkspaceSecret → decryptWorkspaceSecret round-trips plaintext", () => {
     const encrypted = encryptWorkspaceSecret("super-secret-value");
     const decrypted = decryptWorkspaceSecret(encrypted);

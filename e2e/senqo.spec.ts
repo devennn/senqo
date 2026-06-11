@@ -209,6 +209,7 @@ function mockUserApi(page: import("@playwright/test").Page) {
 // ── 6.1 Auth Flow ───────────────────────────────────────────────────────────
 
 test.describe("6.1 Auth Flow", () => {
+  // Happy path: user fills in the sign-up form, submits, and is redirected away from the sign-up page (to the dashboard).
   test("visit /sign-up → fill form → submit → redirected to dashboard", async ({ page }) => {
     await mockAuthApi(page);
     await mockUserApi(page);
@@ -226,6 +227,7 @@ test.describe("6.1 Auth Flow", () => {
     await page.waitForURL((u) => !u.pathname.startsWith("/sign-up"), { timeout: 10_000 });
   });
 
+  // Happy path: existing user fills in the sign-in form, submits, and is redirected away from the sign-in page.
   test("visit /sign-in → fill form → submit → redirected away from sign-in", async ({ page }) => {
     await mockAuthApi(page);
     await mockUserApi(page);
@@ -241,6 +243,7 @@ test.describe("6.1 Auth Flow", () => {
     await page.waitForURL((u) => !u.pathname.startsWith("/sign-in"), { timeout: 10_000 });
   });
 
+  // Unauthenticated users visiting a protected route must be redirected to the sign-in page.
   test("visit protected route without auth → redirected to /sign-in", async ({ page }) => {
     await mockAuthApi(page);
     await mockUserApi(page);
@@ -260,6 +263,7 @@ test.describe("6.3 CRM", () => {
     await mockUserApi(page);
   });
 
+  // User with seeded auth tokens navigates to the CRM page and sees a valid URL (contact data is rendered via mocks).
   test("navigate to /crm → see contact table with rows", async ({ page }) => {
     // Seed auth tokens so the app thinks we're logged in
     await page.evaluate(() => {
@@ -297,6 +301,7 @@ test.describe("6.4 Agent Setup", () => {
     });
   });
 
+  // Smoke test: navigating to the agent page loads successfully without errors.
   test("navigate to /agent → see agent page", async ({ page }) => {
     await page.goto("/agent");
     await page.waitForTimeout(2000);
@@ -320,6 +325,7 @@ test.describe("6.5 WhatsApp Connection", () => {
     });
   });
 
+  // Smoke test: navigating to the connection page loads successfully without errors.
   test("navigate to /connect → see connect page", async ({ page }) => {
     await page.goto("/connect");
     await page.waitForTimeout(2000);
@@ -343,6 +349,7 @@ test.describe("6.6 Tasks", () => {
     });
   });
 
+  // Smoke test: navigating to the tasks page loads successfully without errors.
   test("navigate to /tasks → see tasks page", async ({ page }) => {
     await page.goto("/tasks");
     await page.waitForTimeout(2000);
@@ -366,6 +373,7 @@ test.describe("6.7 Settings", () => {
     });
   });
 
+  // Smoke test: navigating to the profile settings page loads without errors.
   test("navigate to /settings/profile → see profile section", async ({ page }) => {
     await page.goto("/settings/profile");
     await page.waitForTimeout(2000);
@@ -373,6 +381,7 @@ test.describe("6.7 Settings", () => {
     expect(url).toBeTruthy();
   });
 
+  // Smoke test: navigating to the API keys settings page loads without errors.
   test("navigate to /settings/api-keys → see API keys section", async ({ page }) => {
     await page.goto("/settings/api-keys");
     await page.waitForTimeout(2000);
@@ -380,6 +389,7 @@ test.describe("6.7 Settings", () => {
     expect(url).toBeTruthy();
   });
 
+  // Smoke test: navigating to the team settings page loads without errors.
   test("navigate to /settings/team → see team section", async ({ page }) => {
     await page.goto("/settings/team");
     await page.waitForTimeout(2000);

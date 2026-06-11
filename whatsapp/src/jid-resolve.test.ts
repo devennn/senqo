@@ -26,6 +26,7 @@ vi.mock("../src/logger.js", () => ({
 }));
 
 describe("jid resolution", () => {
+  // When a messageKey provides remoteJidAlt, the LID must resolve to the phone-number JID from remoteJidAlt.
   it("resolves LID to phone-number JID when remoteJidAlt is available", async () => {
     const { learnFromMessageKey, resolveToPn, clearConnectionLidState } = await import("../src/jid.js");
     clearConnectionLidState("conn-jid");
@@ -37,6 +38,7 @@ describe("jid resolution", () => {
     expect(result.jid).toBe("1234567890@s.whatsapp.net");
   });
 
+  // When a contact roster entry provides lid and phoneNumber, the LID must resolve via the contact's phone number.
   it("resolves LID via contact roster lookup", async () => {
     const { learnFromContact, resolveToPn, clearConnectionLidState } = await import("../src/jid.js");
     clearConnectionLidState("conn-contact");
@@ -50,6 +52,7 @@ describe("jid resolution", () => {
     expect(result.jid).toBe("9876543210@s.whatsapp.net");
   });
 
+  // When no mapping exists for a LID, the function must fall back to returning the LID itself as the JID.
   it("falls back to LID-only chatId when no mapping exists", async () => {
     const { resolveToPn, clearConnectionLidState } = await import("../src/jid.js");
     clearConnectionLidState("conn-nomap");

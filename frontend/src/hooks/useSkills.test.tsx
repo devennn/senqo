@@ -25,6 +25,8 @@ function wrapper() {
 beforeEach(() => { vi.clearAllMocks(); });
 
 describe("useSkills", () => {
+  // Confirms the hook fetches the skills list from the API and exposes it in the returned state.
+  // Ensures the agent setup page can display available workspace skills.
   it("fetches skills list", async () => {
     mockGet.mockResolvedValue({
       skills: [{ id: "s1", display_name: "My Skill", skill_key: "my_skill", description: "", is_active: true, storage_path: "", created_at: "2025-01-01", updated_at: "2025-01-01" }],

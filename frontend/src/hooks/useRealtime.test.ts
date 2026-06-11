@@ -51,6 +51,8 @@ afterEach(() => {
 });
 
 describe("useRealtime", () => {
+  // Verifies that an EventSource is opened with the correct workspaceId and token query params.
+  // Ensures SSE connections are scoped to the current workspace so only relevant events arrive.
   it("subscribes to SSE when workspaceId is provided", async () => {
     const onEvent = vi.fn();
 
@@ -65,6 +67,8 @@ describe("useRealtime", () => {
     expect(es.url).toContain("token=test-token");
   });
 
+  // Confirms that no EventSource is created when workspaceId is null/falsy.
+  // Prevents SSE connections from being opened before a workspace is selected.
   it("does not subscribe when workspaceId is null", () => {
     const onEvent = vi.fn();
 
@@ -73,6 +77,8 @@ describe("useRealtime", () => {
     expect(eventSourceInstances.length).toBe(0);
   });
 
+  // Verifies that the onEvent callback is invoked with parsed JSON when an SSE event arrives.
+  // Critical for live message updates: new messages must trigger UI refresh without page reload.
   it("calls onEvent when a 'message.created' SSE event arrives", async () => {
     const onEvent = vi.fn();
 
@@ -94,6 +100,8 @@ describe("useRealtime", () => {
     });
   });
 
+  // Confirms that the EventSource is closed when the component using the hook unmounts.
+  // Prevents memory leaks and dangling connections that could exhaust server resources.
   it("cleans up EventSource on unmount", async () => {
     const onEvent = vi.fn();
     const closeSpy = vi.spyOn(MockEventSource.prototype, "close");
