@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { apiHostGuardMiddleware } = await import("../middleware/api-host-guard.js");
 
@@ -14,28 +14,80 @@ function mockContext(host: string | null, forwardedHost: string | null = null) {
   return { req: { header }, json } as unknown as Parameters<typeof apiHostGuardMiddleware>[0];
 }
 
-beforeEach(() => { vi.clearAllMocks(); });
-
 describe("apiHostGuardMiddleware", () => {
-  // Host matches allowed list → middleware calls next() without blocking the request, needed to ensure valid API hosts are not rejected.
-  it("allows when host matches PUBLIC_API_ALLOWED_HOSTS", async () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // API_URL set → matching host passes in production.
+  it("allows when host matches API_URL", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PUBLIC_API_ALLOWED_HOSTS", "api.example.com");
-    const c = mockContext("api.example.com");
+    vi.stubEnv("API_URL", "demo-app.senqo.app");
+    vi.stubEnv("FRONTEND_URL", "https://other.example.com");
+    const c = mockContext("demo-app.senqo.app");
     const next = vi.fn();
     await apiHostGuardMiddleware(c, next);
     expect(next).toHaveBeenCalled();
   });
 
-  // Host is not in the allow list → middleware returns 403 and stops the request, needed to verify unauthorized hosts are blocked in production.
-  it("denies (403) when host not allowed in production", async () => {
+  // API_URL unset → FRONTEND_URL hostname is allowed.
+  it("allows when API_URL is unset and host matches FRONTEND_URL", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("PUBLIC_API_ALLOWED_HOSTS", "api.example.com");
-    const c = mockContext("evil.com");
+    vi.stubEnv("API_URL", "");
+    vi.stubEnv("FRONTEND_URL", "https://demo-app.senqo.app");
+    const c = mockContext("demo-app.senqo.app");
+    const next = vi.fn();
+    await apiHostGuardMiddleware(c, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  // API_URL takes precedence over FRONTEND_URL fallback.
+  it("prefers API_URL over FRONTEND_URL", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("API_URL", "api.example.com");
+    vi.stubEnv("FRONTEND_URL", "https://app.example.com");
+    const c = mockContext("app.example.com");
     const next = vi.fn();
     const response = await apiHostGuardMiddleware(c, next);
     expect(response).toBeDefined();
     expect((response as Response).status).toBe(403);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  // Host not on allow list → 403 forbidden_host.
+  it("denies (403) when host not allowed in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("API_URL", "demo-app.senqo.app");
+    vi.stubEnv("FRONTEND_URL", "https://demo-app.senqo.app");
+    const c = mockContext("evil.com");
+    const next = vi.fn();
+    const response = await apiHostGuardMiddleware(c, next);
+    expect((response as Response).status).toBe(403);
+    await expect((response as Response).json()).resolves.toEqual({
+      ok: false,
+      error: "forbidden_host",
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  // Non-production → host guard is skipped.
+  it("allows any host when NODE_ENV is not production", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("API_URL", "");
+    vi.stubEnv("FRONTEND_URL", "");
+    const c = mockContext("evil.com");
+    const next = vi.fn();
+    await apiHostGuardMiddleware(c, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  // Reverse proxy forwards public host via x-forwarded-host.
+  it("uses x-forwarded-host when present", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("API_URL", "demo-app.senqo.app");
+    const c = mockContext("internal", "demo-app.senqo.app");
+    const next = vi.fn();
+    await apiHostGuardMiddleware(c, next);
+    expect(next).toHaveBeenCalled();
   });
 });
