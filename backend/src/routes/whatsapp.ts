@@ -611,6 +611,7 @@ async function handleIncomingMessageReceived(
         workspaceId: input.connection.workspace_id,
         conversationId,
         agentConfigId: input.connection.agent_config_id,
+        whatsappConnectionId: input.connection.id,
       });
     } else {
       const skipReason =

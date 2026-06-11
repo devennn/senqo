@@ -12,6 +12,7 @@ const input = {
   workspaceId: "ws-1",
   conversationId: "conv-1",
   agentConfigId: "agent-1",
+  whatsappConnectionId: "conn-testing-1",
 };
 
 beforeEach(() => {

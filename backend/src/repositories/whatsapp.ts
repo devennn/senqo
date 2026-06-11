@@ -996,14 +996,78 @@ export async function resolveWhatsappConnectionForConversationAgentOutbound(
   }
 }
 
-/** Connection mode for inbound AI gating: prefers the thread's line when `whatsapp_connection_id` is set. */
+const WHATSAPP_CONNECTION_ID_IN_METADATA_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Latest inbound/outbound line on the thread from message metadata (legacy rows). */
+async function getLatestWhatsappConnectionIdFromMessageMetadata(
+  workspaceId: string,
+  conversationId: string,
+): Promise<string | null> {
+  try {
+    const rows = await db
+      .select({ metadata: messages.metadata })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.workspaceId, workspaceId),
+          eq(messages.conversationId, conversationId),
+        ),
+      )
+      .orderBy(desc(messages.createdAt))
+      .limit(250);
+
+    for (const row of rows) {
+      const meta = row.metadata as Record<string, unknown> | null;
+      if (!meta || typeof meta !== "object") continue;
+      const raw = meta.whatsappConnectionId;
+      const idStr = typeof raw === "string" ? raw.trim() : "";
+      if (idStr && WHATSAPP_CONNECTION_ID_IN_METADATA_RE.test(idStr)) {
+        return idStr;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error(
+      `[${scope}/getLatestWhatsappConnectionIdFromMessageMetadata] Unexpected error: ${String(error)}`,
+    );
+    return null;
+  }
+}
+
+async function resolveWhatsappConnectionModeById(
+  workspaceId: string,
+  connectionId: string,
+): Promise<WhatsappConnectionMode | null> {
+  const trimmedId = connectionId.trim();
+  if (!trimmedId) return null;
+  const row = await getWhatsappConnectionRowById(workspaceId, trimmedId);
+  return row?.mode ?? null;
+}
+
+/**
+ * Connection mode for inbound AI gating.
+ * Prefers the line that received the message, then the thread row, then recent message metadata.
+ */
 export async function getWhatsappConnectionModeForInboundAi(
   workspaceId: string,
   conversationId: string,
   agentConfigId: string,
+  preferredWhatsappConnectionId?: string,
 ): Promise<WhatsappConnectionMode> {
   const trimmedAgent = agentConfigId.trim();
   try {
+    const preferredId = preferredWhatsappConnectionId?.trim() ?? "";
+    if (preferredId.length > 0) {
+      const preferredMode = await resolveWhatsappConnectionModeById(workspaceId, preferredId);
+      if (preferredMode) {
+        console.info(
+          `[${scope}/getWhatsappConnectionModeForInboundAi] Success: preferred userId=${workspaceId}`,
+        );
+        return preferredMode;
+      }
+    }
+
     const convData = await db
       .select({ whatsappConnectionId: conversations.whatsappConnectionId })
       .from(conversations)
@@ -1021,10 +1085,27 @@ export async function getWhatsappConnectionModeForInboundAi(
         ? conv.whatsappConnectionId.trim()
         : "";
     if (scopedId.length > 0) {
-      const row = await getWhatsappConnectionRowById(workspaceId, scopedId);
-      if (row) {
+      const scopedMode = await resolveWhatsappConnectionModeById(workspaceId, scopedId);
+      if (scopedMode) {
         console.info(`[${scope}/getWhatsappConnectionModeForInboundAi] Success: scoped userId=${workspaceId}`);
-        return row.mode;
+        return scopedMode;
+      }
+    }
+
+    const metadataConnectionId = await getLatestWhatsappConnectionIdFromMessageMetadata(
+      workspaceId,
+      conversationId,
+    );
+    if (metadataConnectionId) {
+      const metadataMode = await resolveWhatsappConnectionModeById(
+        workspaceId,
+        metadataConnectionId,
+      );
+      if (metadataMode) {
+        console.info(
+          `[${scope}/getWhatsappConnectionModeForInboundAi] Success: metadata userId=${workspaceId}`,
+        );
+        return metadataMode;
       }
     }
 
@@ -1132,8 +1213,12 @@ export async function findOrCreateConversationByWhatsappChatId(
 ): Promise<string | null> {
   try {
     const title = `${contactDisplayName} - WhatsApp`;
+    const incomingConnectionId = whatsappConnectionId.trim();
     const existing = await db
-      .select({ id: conversations.id })
+      .select({
+        id: conversations.id,
+        whatsappConnectionId: conversations.whatsappConnectionId,
+      })
       .from(conversations)
       .where(
         and(
@@ -1145,6 +1230,21 @@ export async function findOrCreateConversationByWhatsappChatId(
     const existingRow = existing[0] ?? null;
 
     if (existingRow?.id) {
+      const currentConnectionId = existingRow.whatsappConnectionId?.trim() ?? "";
+      if (
+        incomingConnectionId.length > 0 &&
+        currentConnectionId !== incomingConnectionId
+      ) {
+        await db
+          .update(conversations)
+          .set({ whatsappConnectionId: incomingConnectionId })
+          .where(
+            and(
+              eq(conversations.workspaceId, workspaceId),
+              eq(conversations.id, existingRow.id),
+            ),
+          );
+      }
       console.info(`[${scope}/findOrCreateConversationByWhatsappChatId] Success: userId=${workspaceId}`);
       return existingRow.id;
     }

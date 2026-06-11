@@ -16,8 +16,25 @@ const mockDb = {
 
 vi.mock("../db/index.js", () => ({ db: mockDb }));
 
-const { createConnection, bindAgentToWhatsappConnection, updateConnectionMode, deleteConnectionByWorkspace } =
-  await vi.importActual("../repositories/whatsapp.js") as typeof import("../repositories/whatsapp.js");
+const {
+  createConnection,
+  bindAgentToWhatsappConnection,
+  updateConnectionMode,
+  deleteConnectionByWorkspace,
+  findOrCreateConversationByWhatsappChatId,
+  getWhatsappConnectionModeForInboundAi,
+} = await vi.importActual("../repositories/whatsapp.js") as typeof import("../repositories/whatsapp.js");
+
+function mockSelectLimitRows(rows: unknown[], options?: { orderBy?: boolean }) {
+  const mockLimit = vi.fn().mockResolvedValue(rows);
+  const mockWhereSelect = options?.orderBy
+    ? vi.fn().mockReturnValue({
+        orderBy: vi.fn().mockReturnValue({ limit: mockLimit }),
+      })
+    : vi.fn().mockReturnValue({ limit: mockLimit });
+  const mockFrom = vi.fn().mockReturnValue({ where: mockWhereSelect });
+  mockDb.select.mockReturnValueOnce({ from: mockFrom });
+}
 
 beforeEach(() => { vi.clearAllMocks(); });
 
@@ -69,6 +86,122 @@ describe("updateConnectionMode", () => {
     // @ts-expect-error - testing invalid mode input
     const result = await updateConnectionMode("ws-1", "conn-1", "invalid");
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("getWhatsappConnectionModeForInboundAi", () => {
+  // Debounce job passes the line that received the inbound → testing mode is returned even when the thread row still points at an inactive line, needed to fix multi-connection AI gating.
+  it("returns preferred connection mode before the conversation row", async () => {
+    mockSelectLimitRows([
+      {
+        id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        mode: "testing",
+        status: "authorized",
+        agentConfigId: "agent-1",
+      },
+    ]);
+
+    const mode = await getWhatsappConnectionModeForInboundAi(
+      "ws-1",
+      "conv-1",
+      "agent-1",
+      "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    );
+
+    expect(mode).toBe("testing");
+    expect(mockDb.select).toHaveBeenCalledTimes(1);
+  });
+
+  // Thread row still references an inactive line and no preferred id was queued → inactive is returned, needed to keep inactive lines from running AI when scoping is missing.
+  it("returns inactive when conversation is scoped to an inactive line", async () => {
+    mockSelectLimitRows([{ whatsappConnectionId: "conn-inactive" }]);
+    mockSelectLimitRows([
+      {
+        id: "conn-inactive",
+        mode: "inactive",
+        status: "authorized",
+        agentConfigId: "agent-1",
+      },
+    ]);
+
+    const mode = await getWhatsappConnectionModeForInboundAi("ws-1", "conv-1", "agent-1");
+
+    expect(mode).toBe("inactive");
+  });
+
+  // Legacy thread has no connection id on the row → latest message metadata supplies the testing line, needed for older conversations before connection scoping was persisted.
+  it("falls back to message metadata when conversation connection id is missing", async () => {
+    mockSelectLimitRows([{ whatsappConnectionId: null }]);
+    mockSelectLimitRows(
+      [
+        {
+          metadata: {
+            whatsappConnectionId: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+          },
+        },
+      ],
+      { orderBy: true },
+    );
+    mockSelectLimitRows([
+      {
+        id: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+        mode: "testing",
+        status: "authorized",
+        agentConfigId: "agent-1",
+      },
+    ]);
+
+    const mode = await getWhatsappConnectionModeForInboundAi("ws-1", "conv-1", "agent-1");
+
+    expect(mode).toBe("testing");
+  });
+});
+
+describe("findOrCreateConversationByWhatsappChatId", () => {
+  // Existing thread was opened on another line → whatsapp_connection_id is updated to the inbound line, needed so multi-connection workspaces gate AI on the active line.
+  it("updates whatsapp_connection_id when reusing an existing conversation on a different line", async () => {
+    const mockLimit = vi.fn().mockResolvedValue([
+      { id: "conv-1", whatsappConnectionId: "conn-inactive" },
+    ]);
+    const mockWhereSelect = vi.fn().mockReturnValue({ limit: mockLimit });
+    const mockFrom = vi.fn().mockReturnValue({ where: mockWhereSelect });
+    mockDb.select.mockReturnValue({ from: mockFrom });
+    mockSet.mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const conversationId = await findOrCreateConversationByWhatsappChatId(
+      "ws-1",
+      "conn-testing",
+      "contact-1",
+      "Test User",
+      "60123456789@s.whatsapp.net",
+    );
+
+    expect(conversationId).toBe("conv-1");
+    expect(mockDb.update).toHaveBeenCalled();
+    expect(mockSet).toHaveBeenCalledWith({ whatsappConnectionId: "conn-testing" });
+  });
+
+  // Thread already belongs to the inbound line → no redundant update is issued, needed to avoid needless writes on every message.
+  it("does not update whatsapp_connection_id when the line already matches", async () => {
+    const mockLimit = vi.fn().mockResolvedValue([
+      { id: "conv-1", whatsappConnectionId: "conn-testing" },
+    ]);
+    const mockWhereSelect = vi.fn().mockReturnValue({ limit: mockLimit });
+    const mockFrom = vi.fn().mockReturnValue({ where: mockWhereSelect });
+    mockDb.select.mockReturnValue({ from: mockFrom });
+
+    const conversationId = await findOrCreateConversationByWhatsappChatId(
+      "ws-1",
+      "conn-testing",
+      "contact-1",
+      "Test User",
+      "60123456789@s.whatsapp.net",
+    );
+
+    expect(conversationId).toBe("conv-1");
+    expect(mockDb.update).not.toHaveBeenCalled();
   });
 });
 

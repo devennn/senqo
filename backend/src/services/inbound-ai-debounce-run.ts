@@ -34,6 +34,7 @@ export type InboundDebouncedRunInput = {
   workspaceId: string;
   conversationId: string;
   agentConfigId: string;
+  whatsappConnectionId?: string;
 };
 
 /**
@@ -51,6 +52,7 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
       input.workspaceId,
       input.conversationId,
       input.agentConfigId,
+      input.whatsappConnectionId,
     ),
   );
   const normalizedHandling = handlingMode ?? "ai";
