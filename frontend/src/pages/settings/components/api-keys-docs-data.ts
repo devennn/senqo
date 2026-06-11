@@ -47,7 +47,7 @@ export const createTaskBodyParams = [
 export const createTaskErrorCodes = [
   { http: "401", error: "invalid_api_key", meaning: "API key missing or invalid." },
   { http: "401", error: "api_key_expired", meaning: "API key exists but expired." },
-  { http: "403", error: "forbidden_host", meaning: "Production requests must use api.senqo.app." },
+  { http: "403", error: "forbidden_host", meaning: "Production requests must use the configured API host (API_URL or FRONTEND_URL)." },
   { http: "400", error: "invalid_payload", meaning: "Body fields are missing or invalid." },
   { http: "400", error: "invalid_file_url", meaning: "fileUrl must be a public HTTPS URL." },
   { http: "422", error: "unsupported_schedule_type", meaning: "Only one_time is supported." },

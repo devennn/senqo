@@ -1,6 +1,3 @@
-const PRODUCTION_APP_DOMAIN = "senqo.app";
-const PRODUCTION_PUBLIC_API_HOST = "api.senqo.app";
-
 export type CreateTaskApiExampleInput = {
   apiKey?: string;
   message?: string;
@@ -11,18 +8,52 @@ export type CreateTaskApiExampleInput = {
   fileUrl?: string;
 };
 
-export function getPublicTasksApiUrl(): string {
-  if (typeof window === "undefined") {
-    return `https://${PRODUCTION_PUBLIC_API_HOST}/api/tasks`;
+function normalizeConfiguredApiHost(raw: string): string {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) {
+    return "";
   }
 
-  const hostname = window.location.hostname.toLowerCase();
-  if (
-    hostname === PRODUCTION_APP_DOMAIN ||
-    hostname.endsWith(`.${PRODUCTION_APP_DOMAIN}`)
-  ) {
-    const protocol = window.location.protocol === "http:" ? "http:" : "https:";
-    return `${protocol}//${PRODUCTION_PUBLIC_API_HOST}/api/tasks`;
+  try {
+    if (trimmed.includes("://")) {
+      return new URL(trimmed).hostname;
+    }
+  } catch {
+    // Fall through to hostname-only parsing.
+  }
+
+  const withoutPort = trimmed.split(":")[0]?.trim() ?? "";
+  if (!withoutPort) {
+    return "";
+  }
+  return withoutPort.endsWith(".") ? withoutPort.slice(0, -1) : withoutPort;
+}
+
+function configuredPublicApiHost(): string | null {
+  const raw = (import.meta.env as Record<string, string | undefined>).VITE_API_URL?.trim();
+  if (!raw) {
+    return null;
+  }
+  const host = normalizeConfiguredApiHost(raw);
+  return host || null;
+}
+
+function publicApiProtocolForHost(host: string): "http:" | "https:" {
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    return "http:";
+  }
+  return "https:";
+}
+
+export function getPublicTasksApiUrl(): string {
+  const configuredHost = configuredPublicApiHost();
+  if (configuredHost) {
+    const protocol = publicApiProtocolForHost(configuredHost);
+    return `${protocol}//${configuredHost}/api/tasks`;
+  }
+
+  if (typeof window === "undefined") {
+    return "https://localhost/api/tasks";
   }
 
   return `${window.location.origin}/api/tasks`;

@@ -1,30 +1,48 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  buildCreateTaskCurlExample,
-  buildCreateTaskRequestBody,
-  getPublicTasksApiUrl,
-} from "./public-tasks-api";
+
+async function loadPublicTasksApi() {
+  vi.resetModules();
+  return import("./public-tasks-api.js");
+}
 
 describe("getPublicTasksApiUrl", () => {
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
-  // In production (app.senqo.app), the public tasks API URL must point to the dedicated api.senqo.app host.
-  it("returns production API host when app runs on senqo.app", () => {
+  // VITE_API_URL set → docs and curl examples use the configured public API host.
+  it("returns VITE_API_URL host when configured", async () => {
+    vi.stubEnv("VITE_API_URL", "https://demo-app.senqo.app");
     vi.stubGlobal("window", {
       location: {
-        hostname: "app.senqo.app",
+        hostname: "demo-app.senqo.app",
         protocol: "https:",
-        origin: "https://app.senqo.app",
+        origin: "https://demo-app.senqo.app",
       },
     });
-
-    expect(getPublicTasksApiUrl()).toBe("https://api.senqo.app/api/tasks");
+    const { getPublicTasksApiUrl } = await loadPublicTasksApi();
+    expect(getPublicTasksApiUrl()).toBe("https://demo-app.senqo.app/api/tasks");
   });
 
-  // In local dev (localhost), the URL must be same-origin so it works without CORS issues.
-  it("returns same-origin API path for local development", () => {
+  // VITE_API_URL unset → same-origin URL works for single-domain VPS deployments.
+  it("returns same-origin API path when VITE_API_URL is unset", async () => {
+    vi.stubEnv("VITE_API_URL", "");
+    vi.stubGlobal("window", {
+      location: {
+        hostname: "demo-app.senqo.app",
+        protocol: "https:",
+        origin: "https://demo-app.senqo.app",
+      },
+    });
+    const { getPublicTasksApiUrl } = await loadPublicTasksApi();
+    expect(getPublicTasksApiUrl()).toBe("https://demo-app.senqo.app/api/tasks");
+  });
+
+  // Local dev uses same-origin so examples work behind the Vite proxy without CORS.
+  it("returns same-origin API path for local development", async () => {
+    vi.stubEnv("VITE_API_URL", "");
     vi.stubGlobal("window", {
       location: {
         hostname: "localhost",
@@ -32,14 +50,15 @@ describe("getPublicTasksApiUrl", () => {
         origin: "http://localhost:5173",
       },
     });
-
+    const { getPublicTasksApiUrl } = await loadPublicTasksApi();
     expect(getPublicTasksApiUrl()).toBe("http://localhost:5173/api/tasks");
   });
 });
 
 describe("buildCreateTaskRequestBody", () => {
   // The request body must include all fields required by the API: message, sender, recipient, schedule type, timestamp, and timezone.
-  it("includes one_time schedule fields required by the API", () => {
+  it("includes one_time schedule fields required by the API", async () => {
+    const { buildCreateTaskRequestBody } = await loadPublicTasksApi();
     expect(
       buildCreateTaskRequestBody({
         message: "Ping",
@@ -60,8 +79,15 @@ describe("buildCreateTaskRequestBody", () => {
 });
 
 describe("buildCreateTaskCurlExample", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
   // The generated curl example must contain the resolved API URL, the API key header, and the scheduleType payload.
-  it("embeds the resolved URL and API key in a copy-ready curl command", () => {
+  it("embeds the resolved URL and API key in a copy-ready curl command", async () => {
+    vi.stubEnv("VITE_API_URL", "");
     vi.stubGlobal("window", {
       location: {
         hostname: "localhost",
@@ -69,7 +95,7 @@ describe("buildCreateTaskCurlExample", () => {
         origin: "http://localhost:5173",
       },
     });
-
+    const { buildCreateTaskCurlExample } = await loadPublicTasksApi();
     const curl = buildCreateTaskCurlExample({
       apiKey: "sk_test_key",
       scheduleAt: "2026-12-31T23:00:00",
