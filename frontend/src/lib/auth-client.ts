@@ -115,7 +115,26 @@ export function removeAuthTokens(): void {
 export type AuthUser = {
   id: string;
   email: string;
+  isInstanceAdmin?: boolean;
 };
+
+export type AuthConfig = {
+  allowPublicRegistration: boolean;
+};
+
+export async function getAuthConfig(): Promise<AuthConfig> {
+  const res = await fetch(`${getApiBase()}/api/auth/config`);
+  if (!res.ok) {
+    return { allowPublicRegistration: true };
+  }
+  return res.json() as Promise<AuthConfig>;
+}
+
+export async function getInvitePreview(token: string): Promise<{ email: string } | null> {
+  const res = await fetch(`${getApiBase()}/api/auth/invite?token=${encodeURIComponent(token)}`);
+  if (!res.ok) return null;
+  return res.json() as Promise<{ email: string }>;
+}
 
 export async function login(email: string, password: string): Promise<AuthTokenPayload> {
   const res = await fetch(`${getApiBase()}/api/auth/login`, {
@@ -135,11 +154,12 @@ export async function register(
   email: string,
   password: string,
   fullName: string,
+  inviteToken?: string,
 ): Promise<AuthTokenPayload> {
   const res = await fetch(`${getApiBase()}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, fullName }),
+    body: JSON.stringify({ email, password, fullName, inviteToken }),
     credentials: "include",
   });
   if (!res.ok) {
@@ -185,8 +205,11 @@ export async function getSession(): Promise<AuthUser | null> {
       clearTokens();
       return null;
     }
-    const data = (await res.json()) as { user: AuthUser };
-    return data.user;
+    const data = (await res.json()) as { user: AuthUser; isInstanceAdmin?: boolean };
+    return {
+      ...data.user,
+      isInstanceAdmin: data.isInstanceAdmin ?? data.user.isInstanceAdmin ?? false,
+    };
   } catch {
     return null;
   }

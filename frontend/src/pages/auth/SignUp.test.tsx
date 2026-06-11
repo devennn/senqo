@@ -6,15 +6,19 @@ const {
   mockNavigate,
   mockRegister,
   mockSaveAuthTokens,
+  mockUseSearchParams,
 } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   mockRegister: vi.fn(),
   mockSaveAuthTokens: vi.fn(),
+  mockUseSearchParams: vi.fn(() => [new URLSearchParams() as URLSearchParams, vi.fn()] as const),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
   register: mockRegister,
   saveAuthTokens: mockSaveAuthTokens,
+  getAuthConfig: vi.fn().mockResolvedValue({ allowPublicRegistration: true }),
+  getInvitePreview: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -25,6 +29,7 @@ vi.mock("react-router-dom", async () => {
       <a href={to as string} {...props}>{children as React.ReactNode}</a>
     ),
     useNavigate: () => mockNavigate,
+    useSearchParams: () => mockUseSearchParams(),
   };
 });
 
@@ -69,7 +74,7 @@ describe("SignUpPage", () => {
     await user.type(screen.getByLabelText("Password"), "password123");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(mockRegister).toHaveBeenCalledWith("jane@example.com", "password123", "Jane Doe");
+    expect(mockRegister).toHaveBeenCalledWith("jane@example.com", "password123", "Jane Doe", undefined);
     expect(mockSaveAuthTokens).toHaveBeenCalledWith("at", "rt");
     expect(mockNavigate).toHaveBeenCalledWith("/");
   });

@@ -19,6 +19,7 @@ const {
 vi.mock("@/lib/auth-client", () => ({
   login: mockLogin,
   saveAuthTokens: mockSaveAuthTokens,
+  getAuthConfig: vi.fn().mockResolvedValue({ allowPublicRegistration: true }),
 }));
 
 vi.mock("react-router-dom", async () => {

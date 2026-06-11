@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { register, saveAuthTokens } from "@/lib/auth-client";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { getAuthConfig, getInvitePreview, register, saveAuthTokens } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,11 +14,35 @@ import { Label } from "@/components/ui/label";
 
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("invite")?.trim() ?? "";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState<string | null>(null);
+  const [allowPublicRegistration, setAllowPublicRegistration] = useState(true);
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  useEffect(() => {
+    void getAuthConfig().then((config) => {
+      setAllowPublicRegistration(config.allowPublicRegistration);
+      setConfigLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!inviteToken) return;
+    void getInvitePreview(inviteToken).then((preview) => {
+      setInviteEmail(preview?.email ?? null);
+    });
+  }, [inviteToken]);
+
+  const registrationBlocked =
+    configLoaded && !allowPublicRegistration && !inviteToken;
 
   async function handleEmailSignUp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (registrationBlocked) return;
+
     setLoading(true);
     setError(null);
 
@@ -28,7 +52,12 @@ export default function SignUpPage() {
     const password = String(data.get("password") ?? "");
 
     try {
-      const result = await register(email, password, fullName);
+      const result = await register(
+        email,
+        password,
+        fullName,
+        inviteToken || undefined,
+      );
       saveAuthTokens(result.accessToken, result.refreshToken);
       navigate("/");
     } catch (err) {
@@ -51,12 +80,21 @@ export default function SignUpPage() {
         <Card className="shadow-elevated">
           <CardHeader>
             <CardTitle className="text-xl sm:text-2xl">Create your account</CardTitle>
-            <CardDescription>Start your Senqo workspace</CardDescription>
+            <CardDescription>
+              {inviteToken
+                ? "Complete signup with your invitation"
+                : "Start on Senqo"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            {registrationBlocked ? (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                Registration is closed. Ask your admin for an invite link.
+              </p>
+            ) : null}
             {error && (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
+                {error.replace(/_/g, " ")}
               </p>
             )}
             <form onSubmit={handleEmailSignUp} className="space-y-4">
@@ -67,6 +105,7 @@ export default function SignUpPage() {
                   name="fullName"
                   placeholder="Your name"
                   required
+                  disabled={registrationBlocked}
                 />
               </div>
               <div className="space-y-2">
@@ -77,6 +116,9 @@ export default function SignUpPage() {
                   type="email"
                   placeholder="you@company.com"
                   required
+                  defaultValue={inviteEmail ?? undefined}
+                  readOnly={!!inviteEmail}
+                  disabled={registrationBlocked}
                 />
               </div>
               <div className="space-y-2">
@@ -87,29 +129,17 @@ export default function SignUpPage() {
                   type="password"
                   minLength={8}
                   required
+                  disabled={registrationBlocked}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || registrationBlocked}
+              >
                 {loading ? "Creating account…" : "Create account"}
               </Button>
             </form>
-            <p className="text-sm text-muted-foreground">
-              Continuing means you acknowledge our{" "}
-              <Link
-                to="/terms-of-service"
-                className="font-medium text-primary hover:underline"
-              >
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link
-                to="/privacy-policy"
-                className="font-medium text-primary hover:underline"
-              >
-                Privacy Policy
-              </Link>
-              .
-            </p>
             <p className="text-center text-sm text-muted-foreground sm:text-base">
               Already have an account?{" "}
               <Link
