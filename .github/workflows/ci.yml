@@ -15,6 +15,24 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Validate branch name
+        if: github.event_name == 'pull_request'
+        run: |
+          branch="${{ github.head_ref }}"
+          if [[ "$branch" =~ ^(dependabot|renovate)/ ]]; then
+            echo "Skipping branch name check for bot branch: $branch"
+            exit 0
+          fi
+          pattern='^(feat|fix|test|task|chore|docs|refactor)/[a-z0-9]+(-[a-z0-9]+)*$'
+          if [[ "$branch" =~ $pattern ]]; then
+            echo "Branch name OK: $branch"
+            exit 0
+          fi
+          echo "::error::Branch name must be <type>/<short-description> (see .github/BRANCH_NAMING.md)"
+          echo "Allowed types: feat, fix, test, task, chore, docs, refactor"
+          echo "Example: feat/agent-inline-save"
+          exit 1
+
       - name: Disallow skipped or todo tests
         run: |
           if grep -rE 'it\.todo|test\.skip' backend/src frontend/src whatsapp/src --include='*.test.*'; then

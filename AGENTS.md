@@ -10,6 +10,16 @@ npm run build          # backend + frontend
 
 Run the stack: see root `README.md` (`docker compose up -d`).
 
+## Pull requests
+
+**Branch names** (enforced in CI): `<type>/<short-description>` in lowercase kebab-case.
+
+Types: `feat` · `fix` · `test` · `task` · `chore` · `docs` · `refactor` — see **`.github/BRANCH_NAMING.md`**.
+
+Examples: `feat/custom-tools-ui`, `fix/contact-pagination`, `test/custom-tools-e2e`.
+
+When creating a PR, fill out **`.github/pull_request_template.md`**: what & why, user impact, migrations, tests, README, and how to verify.
+
 ## Stack
 
 | Layer | Technology |
