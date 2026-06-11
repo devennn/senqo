@@ -63,11 +63,22 @@ function mockAuthApi(page: import("@playwright/test").Page) {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
       return;
     }
+    if (url.endsWith("/config") && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ allowPublicRegistration: true }),
+      });
+      return;
+    }
     if (url.endsWith("/session") && method === "GET") {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ user: { id: SEED_USER.id, email: SEED_USER.email } }),
+        body: JSON.stringify({
+          user: { id: SEED_USER.id, email: SEED_USER.email },
+          isInstanceAdmin: false,
+        }),
       });
       return;
     }
