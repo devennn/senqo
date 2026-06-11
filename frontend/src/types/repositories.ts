@@ -1,7 +1,7 @@
 export type WorkspaceSummary = {
   id: string;
   name: string;
-  role: "owner" | "member";
+  role: "owner" | "member" | "superadmin";
 };
 
 export type TeamMemberRecord = {

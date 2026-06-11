@@ -14,7 +14,8 @@ export default function TeamPage() {
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
   const success = searchParams.get("success");
   const error = searchParams.get("error");
 
@@ -46,16 +47,33 @@ export default function TeamPage() {
 
   async function handleAddMember(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
+    setAddLoading(true);
     const data = new FormData(e.currentTarget);
     try {
       await api.post("/api/user/team", { email: String(data.get("email") ?? "") });
       await loadMembers();
-      setSearchParams({ success: "member_invited" });
-    } catch (e) {
-      setSearchParams({ error: String((e as Error).message) });
+      setSearchParams({ success: "member_added" });
+      e.currentTarget.reset();
+    } catch (err) {
+      setSearchParams({ error: String((err as Error).message) });
     }
-    setLoading(false);
+    setAddLoading(false);
+  }
+
+  async function handleRegistrationInvite(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setInviteLoading(true);
+    const data = new FormData(e.currentTarget);
+    try {
+      await api.post("/api/user/team/registration-invite", {
+        email: String(data.get("inviteEmail") ?? ""),
+      });
+      setSearchParams({ success: "invite_sent" });
+      e.currentTarget.reset();
+    } catch (err) {
+      setSearchParams({ error: String((err as Error).message) });
+    }
+    setInviteLoading(false);
   }
 
   if (loadingMembers) {
@@ -65,7 +83,9 @@ export default function TeamPage() {
   return (
     <section className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
       <h1 className="text-2xl font-extrabold tracking-tight">Team</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Invite colleagues and see who has access.</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Invite people to Senqo or add existing users to this workspace.
+      </p>
 
       {loadError ? (
         <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -86,22 +106,54 @@ export default function TeamPage() {
       <div className="mt-6 flex w-full max-w-xl flex-col gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Invite member</CardTitle>
+            <CardTitle>Invite to Senqo</CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Send a signup link when public registration is off.
+            </p>
+            <form onSubmit={handleRegistrationInvite} className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="inviteEmail">Email address</Label>
+                <Input
+                  id="inviteEmail"
+                  name="inviteEmail"
+                  type="email"
+                  placeholder="colleague@company.com"
+                  required
+                />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" className="w-full sm:w-auto" disabled={inviteLoading}>
+                  Send invite
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Add to workspace</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-sm text-muted-foreground">
+              User must already have a Senqo account.
+            </p>
             <form onSubmit={handleAddMember} className="flex flex-col gap-3 sm:flex-row">
               <div className="flex-1 space-y-2">
                 <Label htmlFor="email">Email address</Label>
                 <Input id="email" name="email" type="email" placeholder="colleague@company.com" required />
               </div>
               <div className="flex items-end">
-                <Button type="submit" className="w-full sm:w-auto" disabled={loading}>
-                  Invite
+                <Button type="submit" className="w-full sm:w-auto" disabled={addLoading}>
+                  Add member
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Members</CardTitle>

@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { LayoutGrid, List, Loader2, LogOut, Search } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { LayoutGrid, List, Loader2, LogOut, Plus, Search, Settings2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AppVersionLabel } from "@/components/layout/app-version-footer";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSummary } from "@/types/repositories";
@@ -20,13 +27,22 @@ export default function WorkspaceChooserPage() {
   const [entering, setEntering] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function reloadWorkspaces() {
+    setLoading(true);
     api
       .get<{ workspaces: WorkspaceSummary[] }>("/api/user/workspaces")
       .then(({ workspaces: list }) => setWorkspaces(list))
       .catch(() => setWorkspaces([]))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    reloadWorkspaces();
   }, []);
 
   async function handleSignOut() {
@@ -38,6 +54,24 @@ export default function WorkspaceChooserPage() {
     if (entering) return;
     setEntering(id);
     navigate(`/${id}/dashboard`);
+  }
+
+  async function handleCreateWorkspace(e: React.FormEvent) {
+    e.preventDefault();
+    const name = createName.trim();
+    if (!name) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await api.post<{ workspaceId: string }>("/api/user/workspaces", { name });
+      setCreateOpen(false);
+      setCreateName("");
+      reloadWorkspaces();
+      enterWorkspace(res.workspaceId);
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Could not create workspace");
+    }
+    setCreating(false);
   }
 
   const filtered = useMemo(() => {
@@ -74,6 +108,23 @@ export default function WorkspaceChooserPage() {
         </div>
 
         <div className="flex items-center gap-2 sm:ml-auto">
+          {user?.isInstanceAdmin ? (
+            <Button variant="outline" className="gap-2" render={<Link to="/admin" />}>
+              <Settings2 className="size-4" />
+              Instance admin
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            className="gap-2"
+            onClick={() => {
+              setCreateError(null);
+              setCreateOpen(true);
+            }}
+          >
+            <Plus className="size-4" />
+            Create workspace
+          </Button>
           <div className="flex rounded-lg border border-border/60 bg-card">
             <button
               type="button"
@@ -110,10 +161,17 @@ export default function WorkspaceChooserPage() {
         {loading ? (
           <p className="text-base text-muted-foreground">Loading…</p>
         ) : filtered.length === 0 ? (
-          <div className="card-surface p-10 text-center text-base text-muted-foreground">
-            {search
-              ? "No workspaces match your search."
-              : "No workspaces found. Contact your workspace owner."}
+          <div className="card-surface space-y-4 p-10 text-center text-base text-muted-foreground">
+            <p>
+              {search
+                ? "No workspaces match your search."
+                : "No workspaces yet. Create one or ask to be added to a project."}
+            </p>
+            {!search ? (
+              <Button type="button" onClick={() => setCreateOpen(true)}>
+                Create workspace
+              </Button>
+            ) : null}
           </div>
         ) : view === "grid" ? (
           <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -141,6 +199,32 @@ export default function WorkspaceChooserPage() {
           </ul>
         )}
       </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create workspace</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateWorkspace} className="space-y-4">
+            {createError ? (
+              <p className="text-sm text-destructive">{createError.replace(/_/g, " ")}</p>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="workspace-name">Name</Label>
+              <Input
+                id="workspace-name"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="My project"
+                required
+              />
+            </div>
+            <Button type="submit" disabled={creating || !createName.trim()}>
+              {creating ? "Creating…" : "Create"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <div className="mt-10 flex items-center justify-between gap-4 border-t border-border/60 pt-6 sm:mt-12 md:mt-16">

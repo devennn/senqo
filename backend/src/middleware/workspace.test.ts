@@ -2,14 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 
 const mockValidateWorkspaceMembership = vi.fn();
-const mockGetProfileForSettings = vi.fn();
 
 vi.mock("../repositories/workspaces.js", () => ({
   validateWorkspaceMembership: (...args: unknown[]) => mockValidateWorkspaceMembership(...args),
-}));
-
-vi.mock("../repositories/profiles.js", () => ({
-  getProfileForSettings: (...args: unknown[]) => mockGetProfileForSettings(...args),
 }));
 
 import { workspaceMiddleware } from "../middleware/workspace.js";
@@ -50,21 +45,11 @@ describe("workspaceMiddleware", () => {
     expect(body.workspaceId).toBe("ws-123");
   });
 
-  it("sets workspaceId from profile when X-Workspace-Id header is missing", async () => {
-    mockGetProfileForSettings.mockResolvedValue({ workspace_id: "profile-ws-456" });
+  it("returns 400 when X-Workspace-Id header is missing", async () => {
     const app = createApp();
     const res = await app.request("/test");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.workspaceId).toBe("profile-ws-456");
-  });
-
-  it("falls back to userId when no header and no profile", async () => {
-    mockGetProfileForSettings.mockResolvedValue(null);
-    const app = createApp();
-    const res = await app.request("/test");
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.workspaceId).toBe("user-123");
+    expect(body.error).toBe("workspace_id_required");
   });
 });

@@ -17,8 +17,30 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash"),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  isInstanceAdmin: boolean("is_instance_admin").notNull().default(false),
+  disabledAt: timestamp("disabled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const instanceSettings = pgTable("instance_settings", {
+  id: text("id").primaryKey(),
+  allowPublicRegistration: boolean("allow_public_registration").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const registrationInvites = pgTable(
+  "registration_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    inviteToken: text("invite_token").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("registration_invites_email_idx").on(t.email)],
+);
 
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey(),

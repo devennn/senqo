@@ -22,6 +22,7 @@ import WorkspacePage from "@/pages/settings/Workspace";
 import TeamPage from "@/pages/settings/Team";
 import ApiKeysPage from "@/pages/settings/ApiKeys";
 import SecretsPage from "@/pages/settings/Secrets";
+import InstanceAdminPage from "@/pages/admin/InstanceAdmin";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicy";
 import TermsOfServicePage from "@/pages/TermsOfService";
 import NotFoundPage from "@/pages/NotFound";
@@ -59,6 +60,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<AuthGate><WorkspaceChooserPage /></AuthGate>} />
+            <Route path="/admin" element={<AuthGate><InstanceAdminPage /></AuthGate>} />
             <Route path="/sign-in" element={<PublicOnlyRoute><SignInPage /></PublicOnlyRoute>} />
             <Route path="/sign-up" element={<PublicOnlyRoute><SignUpPage /></PublicOnlyRoute>} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />

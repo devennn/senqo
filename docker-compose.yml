@@ -33,7 +33,9 @@ services:
     environment:
       PORT: 3001
       APP_URL: http://backend:3001
-      FRONTEND_URL: http://localhost:8080
+      NODE_ENV: ${NODE_ENV:-production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      ALLOWED_PRODUCTION_ORIGINS: ${ALLOWED_PRODUCTION_ORIGINS:-}
       DATABASE_URL: postgresql://senqo:${DB_PASSWORD:-senqo}@postgres:5432/senqo
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
@@ -52,6 +54,10 @@ services:
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
       API_KEY_PEPPER: ${API_KEY_PEPPER}
       WORKSPACE_SECRETS_KEY: ${WORKSPACE_SECRETS_KEY:-dev-workspace-secrets-key-change-in-production-32b}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_WORKSPACE_NAME: ${BOOTSTRAP_WORKSPACE_NAME:-Default Workspace}
+      ALLOW_PUBLIC_REGISTRATION: ${ALLOW_PUBLIC_REGISTRATION:-true}
       NODE_OPTIONS: --no-node-snapshot
     depends_on:
       migrate:

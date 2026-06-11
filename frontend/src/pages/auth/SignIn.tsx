@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { login, saveAuthTokens } from "@/lib/auth-client";
+import { getAuthConfig, login, saveAuthTokens } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +17,13 @@ export default function SignInPage() {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(searchParams.get("error"));
+  const [allowPublicRegistration, setAllowPublicRegistration] = useState(true);
+
+  useEffect(() => {
+    void getAuthConfig().then((config) => {
+      setAllowPublicRegistration(config.allowPublicRegistration);
+    });
+  }, []);
 
   async function handleEmailSignIn(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -55,12 +62,7 @@ export default function SignInPage() {
           <CardContent className="space-y-5">
             {error && (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            {searchParams.get("success") === "confirm_email" && (
-              <p className="rounded-md border border-primary/40 bg-secondary px-3 py-2 text-sm text-secondary-foreground">
-                Check your email to confirm your account.
+                {error.replace(/_/g, " ")}
               </p>
             )}
             <form onSubmit={handleEmailSignIn} className="space-y-4">
@@ -82,32 +84,21 @@ export default function SignInPage() {
                 {loading ? "Signing in…" : "Sign in"}
               </Button>
             </form>
-            <p className="text-sm text-muted-foreground">
-              Continuing means you acknowledge our{" "}
-              <Link
-                to="/terms-of-service"
-                className="font-medium text-primary hover:underline"
-              >
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link
-                to="/privacy-policy"
-                className="font-medium text-primary hover:underline"
-              >
-                Privacy Policy
-              </Link>
-              .
-            </p>
-            <p className="text-center text-sm text-muted-foreground sm:text-base">
-              New to Senqo?{" "}
-              <Link
-                to="/sign-up"
-                className="font-semibold text-primary hover:underline"
-              >
-                Create an account
-              </Link>
-            </p>
+            {allowPublicRegistration ? (
+              <p className="text-center text-sm text-muted-foreground sm:text-base">
+                New to Senqo?{" "}
+                <Link
+                  to="/sign-up"
+                  className="font-semibold text-primary hover:underline"
+                >
+                  Create an account
+                </Link>
+              </p>
+            ) : (
+              <p className="text-center text-sm text-muted-foreground">
+                New accounts require an invitation from your admin.
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,21 +1,72 @@
-import { desc, eq, sql, and } from "drizzle-orm";
+import { desc, eq, sql, and, count } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   workspaces,
   workspaceMembers,
-  profiles,
   users,
-  agentAssets,
 } from "../db/schema/index.js";
-import { findUserById } from "./auth-users.js";
+import { findUserById, findUserByEmail, isInstanceAdmin } from "./auth-users.js";
 import type { WorkspaceSummary, TeamMemberRecord } from "../types/repositories.js";
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
 
 const scope = "WorkspaceRepository";
 
+export type AdminWorkspaceRecord = {
+  id: string;
+  name: string;
+  owner_user_id: string;
+  owner_email: string | null;
+  created_at: string;
+  member_count: number;
+};
+
+export async function listAllWorkspaces(): Promise<AdminWorkspaceRecord[]> {
+  try {
+    const rows = await db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        ownerUserId: workspaces.ownerUserId,
+        createdAt: workspaces.createdAt,
+        ownerEmail: users.email,
+        memberCount: sql<number>`(
+          select count(*)::int from ${workspaceMembers}
+          where ${workspaceMembers.workspaceId} = ${workspaces.id}
+        )`,
+      })
+      .from(workspaces)
+      .innerJoin(users, eq(workspaces.ownerUserId, users.id))
+      .orderBy(desc(workspaces.createdAt));
+
+    console.info(`[${scope}/listAllWorkspaces] Success: count=${rows.length}`);
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      owner_user_id: r.ownerUserId,
+      owner_email: r.ownerEmail,
+      created_at: r.createdAt.toISOString(),
+      member_count: Number(r.memberCount ?? 0),
+    }));
+  } catch (error) {
+    console.error(`[${scope}/listAllWorkspaces] Unexpected error: ${String(error)}`);
+    return [];
+  }
+}
+
 export async function listWorkspacesForUser(userId: string): Promise<WorkspaceSummary[]> {
   try {
+    if (await isInstanceAdmin(userId)) {
+      const all = await listAllWorkspaces();
+      return all.map((w) => ({
+        id: w.id,
+        name: w.name,
+        ownerUserId: w.owner_user_id,
+        createdAt: w.created_at,
+        role: "superadmin" as const,
+      }));
+    }
+
     const rows = await db
       .select({
         id: workspaces.id,
@@ -31,32 +82,72 @@ export async function listWorkspacesForUser(userId: string): Promise<WorkspaceSu
       )
       .orderBy(desc(workspaces.createdAt));
 
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      ownerUserId: r.ownerUserId,
-      createdAt: r.createdAt.toISOString(),
-      role: r.role as WorkspaceSummary["role"],
-    }));
+    const seen = new Set<string>();
+    const result: WorkspaceSummary[] = [];
+    for (const r of rows) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      result.push({
+        id: r.id,
+        name: r.name,
+        ownerUserId: r.ownerUserId,
+        createdAt: r.createdAt.toISOString(),
+        role: r.role as WorkspaceSummary["role"],
+      });
+    }
+
+    console.info(`[${scope}/listWorkspacesForUser] Success: userId=${userId} count=${result.length}`);
+    return result;
   } catch (error) {
     console.error(`[${scope}/listWorkspacesForUser] Unexpected error: ${String(error)}`);
     return [];
   }
 }
 
-export async function createWorkspaceForNewUser(userId: string): Promise<string | null> {
+export async function createWorkspaceForUser(
+  userId: string,
+  name: string,
+): Promise<{ ok: true; workspaceId: string } | { ok: false; message: string }> {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return { ok: false, message: "name_required" };
+  }
+
   try {
-    const id = crypto.randomUUID();
+    const workspaceId = crypto.randomUUID();
     await db.insert(workspaces).values({
-      id,
-      name: "Default Workspace",
+      id: workspaceId,
+      name: trimmed,
       ownerUserId: userId,
     });
-    console.info(`[${scope}/createWorkspaceForNewUser] Success: userId=${userId}`);
-    return id;
+
+    const { ensureDefaultCustomTools } = await import("../lib/seed-default-custom-tools.js");
+    await ensureDefaultCustomTools(workspaceId);
+
+    console.info(`[${scope}/createWorkspaceForUser] Success: userId=${userId} workspaceId=${workspaceId}`);
+    return { ok: true, workspaceId };
   } catch (error) {
-    console.error(`[${scope}/createWorkspaceForNewUser] Unexpected error: ${String(error)}`);
-    return null;
+    console.error(`[${scope}/createWorkspaceForUser] Unexpected error: ${String(error)}`);
+    return { ok: false, message: "unexpected_error" };
+  }
+}
+
+export async function deleteWorkspace(
+  workspaceId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const [row] = await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, workspaceId));
+    if (!row) {
+      console.info(`[${scope}/deleteWorkspace] Failed query: not found`);
+      return { ok: false, message: "workspace_not_found" };
+    }
+
+    await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+    console.info(`[${scope}/deleteWorkspace] Success: workspaceId=${workspaceId}`);
+    return { ok: true };
+  } catch (error) {
+    console.error(`[${scope}/deleteWorkspace] Unexpected error: ${String(error)}`);
+    return { ok: false, message: "unexpected_error" };
   }
 }
 
@@ -92,6 +183,11 @@ export async function validateWorkspaceMembership(
   userId: string,
 ): Promise<boolean> {
   try {
+    if (await isInstanceAdmin(userId)) {
+      const [ws] = await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, workspaceId));
+      return !!ws;
+    }
+
     const [ws] = await db
       .select({ id: workspaces.id })
       .from(workspaces)
@@ -99,15 +195,13 @@ export async function validateWorkspaceMembership(
 
     if (!ws) return false;
 
-    if (ws.id && ws.id) {
-      const [owner] = await db
-        .select({ id: workspaces.id })
-        .from(workspaces)
-        .where(
-          sql`${workspaces.id} = ${workspaceId} and ${workspaces.ownerUserId} = ${userId}`,
-        );
-      if (owner) return true;
-    }
+    const [owner] = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
+      .where(
+        sql`${workspaces.id} = ${workspaceId} and ${workspaces.ownerUserId} = ${userId}`,
+      );
+    if (owner) return true;
 
     const [member] = await db
       .select({ id: workspaceMembers.id })
@@ -164,7 +258,11 @@ export async function addWorkspaceMember(
   try {
     const targetUser = await findUserByEmail(inviteEmail);
     if (!targetUser) {
-      return { ok: false, message: "User with that email not found" };
+      return { ok: false, message: "user_not_found" };
+    }
+
+    if (targetUser.disabledAt) {
+      return { ok: false, message: "user_disabled" };
     }
 
     const [existing] = await db
@@ -175,21 +273,30 @@ export async function addWorkspaceMember(
       );
 
     if (existing) {
-      return { ok: false, message: "User is already a member of this workspace" };
+      return { ok: false, message: "already_member" };
+    }
+
+    const [owner] = await db
+      .select({ ownerUserId: workspaces.ownerUserId })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId));
+
+    if (owner?.ownerUserId === targetUser.id) {
+      return { ok: false, message: "already_owner" };
     }
 
     await db.insert(workspaceMembers).values({
       workspaceId,
       userId: targetUser.id,
-      inviteEmail,
+      inviteEmail: inviteEmail.toLowerCase().trim(),
       role: "member",
     });
 
     console.info(`[${scope}/addWorkspaceMember] Success: workspaceId=${workspaceId}`);
-    return { ok: true, message: "Member added" };
+    return { ok: true, message: "member_added" };
   } catch (error) {
     console.error(`[${scope}/addWorkspaceMember] Unexpected error: ${String(error)}`);
-    return { ok: false, message: "Unexpected error" };
+    return { ok: false, message: "unexpected_error" };
   }
 }
 
@@ -228,15 +335,15 @@ export async function isWorkspaceOwner(workspaceId: string, userId: string): Pro
   }
 }
 
-export async function findUserByEmail(email: string): Promise<{ id: string; email: string } | null> {
+export async function countWorkspacesOwnedByUser(userId: string): Promise<number> {
   try {
-    const [user] = await db
-      .select({ id: users.id, email: users.email })
-      .from(users)
-      .where(eq(users.email, email.toLowerCase().trim()));
-    return user ?? null;
+    const [row] = await db
+      .select({ value: count() })
+      .from(workspaces)
+      .where(eq(workspaces.ownerUserId, userId));
+    return Number(row?.value ?? 0);
   } catch (error) {
-    console.error(`[${scope}/findUserByEmail] Unexpected error: ${String(error)}`);
-    return null;
+    console.error(`[${scope}/countWorkspacesOwnedByUser] Unexpected error: ${String(error)}`);
+    return 0;
   }
 }

@@ -23,8 +23,50 @@ function formatDisconnectTime(value?: string | null): string {
   if (!value) return "the webhook was received";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "the webhook was received";
-  // dateStyle/timeStyle cannot be combined with timeZoneName in some Node ICU builds.
   return `${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date)} UTC`;
+}
+
+type RegistrationInviteEmailInput = {
+  to: string;
+  inviteToken: string;
+};
+
+export async function sendRegistrationInviteEmail(input: RegistrationInviteEmailInput): Promise<{ ok: boolean }> {
+  if (!env.resendApiKey) {
+    console.error(`[${scope}/sendRegistrationInviteEmail] Failed query: RESEND_API_KEY is not configured`);
+    return { ok: false };
+  }
+
+  const signupUrl = `${env.frontendUrl.replace(/\/$/, "")}/sign-up?invite=${encodeURIComponent(input.inviteToken)}`;
+  const text = [
+    "You have been invited to join Senqo.",
+    "",
+    `Create your account: ${signupUrl}`,
+    "",
+    "This link expires in 7 days.",
+  ].join("\n");
+
+  try {
+    const resend = new Resend(env.resendApiKey);
+    const { error } = await resend.emails.send({
+      from: env.resendFromEmail,
+      to: input.to,
+      subject: "You're invited to join Senqo",
+      text,
+      html: `<p>You have been invited to join Senqo.</p><p><a href="${escapeHtml(signupUrl)}">Create your account</a></p><p>This link expires in 7 days.</p>`,
+    });
+
+    if (error) {
+      console.error(`[${scope}/sendRegistrationInviteEmail] Failed query: ${error.message}`);
+      return { ok: false };
+    }
+
+    console.info(`[${scope}/sendRegistrationInviteEmail] Success: to=${input.to}`);
+    return { ok: true };
+  } catch (error) {
+    console.error(`[${scope}/sendRegistrationInviteEmail] Unexpected error: ${String(error)}`);
+    return { ok: false };
+  }
 }
 
 export async function sendWhatsappDisconnectEmail(input: WhatsappDisconnectEmailInput): Promise<{ ok: boolean }> {

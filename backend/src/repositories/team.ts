@@ -1,9 +1,8 @@
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
-import {
-  workspaceMembers,
-} from "../db/schema/index.js";
+import { workspaceMembers } from "../db/schema/index.js";
 import { findUserById } from "./auth-users.js";
+import { addWorkspaceMember } from "./workspaces.js";
 import type { TeamMemberRecord } from "../types/repositories.js";
 
 const scope = "TeamRepository";
@@ -24,12 +23,8 @@ export async function listMembers(workspaceId: string): Promise<TeamMemberRecord
 
     const members = await Promise.all(
       rows.map(async (row) => {
-        const inviteEmail = String(row.inviteEmail ?? "").trim();
-        let email = inviteEmail;
-        if (!email) {
-          const user = await findUserById(String(row.userId));
-          email = user?.email ?? "";
-        }
+        const user = await findUserById(String(row.userId));
+        const email = user?.email ?? String(row.inviteEmail ?? "").trim();
         return {
           id: String(row.id),
           email,
@@ -47,18 +42,10 @@ export async function listMembers(workspaceId: string): Promise<TeamMemberRecord
   }
 }
 
-export async function addMember(workspaceId: string, email: string): Promise<{ ok: boolean; message: string }> {
-  try {
-    await db.insert(workspaceMembers).values({
-      workspaceId,
-      userId: crypto.randomUUID(),
-      role: "member",
-      inviteEmail: email,
-    });
-    console.info(`[${scope}/addMember] Success: workspaceId=${workspaceId}`);
-    return { ok: true, message: "Invitation created" };
-  } catch (error) {
-    console.error(`[${scope}/addMember] Unexpected error: ${String(error)}`);
-    return { ok: false, message: "Unexpected error" };
-  }
+export async function addMember(
+  workspaceId: string,
+  email: string,
+): Promise<{ ok: boolean; message: string }> {
+  const result = await addWorkspaceMember(workspaceId, email);
+  return { ok: result.ok, message: result.message };
 }
