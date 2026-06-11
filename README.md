@@ -57,10 +57,10 @@ docker compose up -d --build
 
 First run takes a minute or two. Run the same command again after you change code.
 
-| Service | Port |
-|---------|------|
+| Service    | Port |
+| ---------- | ---- |
 | `frontend` | 8080 |
-| `backend` | 3001 |
+| `backend`  | 3001 |
 | `whatsapp` | 3002 |
 | `postgres` | 5432 |
 
@@ -92,10 +92,12 @@ Pick one:
 
 **Option A — IP address**
 
-Replace `<VPS_PUBLIC_IP>` with your server IP. In `.env`:
+Replace `<VPS_PUBLIC_IP>` with your server IP.
 
-- `FRONTEND_URL=https://<VPS_PUBLIC_IP>`
-- `ALLOWED_PRODUCTION_ORIGINS=<VPS_PUBLIC_IP>`
+1. In `.env`:
+   - `FRONTEND_URL=https://<VPS_PUBLIC_IP>`
+   - `ALLOWED_PRODUCTION_ORIGINS=<VPS_PUBLIC_IP>`
+2. Write the Caddyfile:
 
 ```bash
 sudo tee /etc/caddy/Caddyfile <<'EOF'
@@ -106,14 +108,17 @@ https://<VPS_PUBLIC_IP> {
 EOF
 ```
 
-Your browser may warn about the certificate. Click **Advanced** → **Proceed**. That's normal for an IP address.
+3. Your browser may warn about the certificate. Click **Advanced** → **Proceed**. That's normal for an IP address.
 
 **Option B — Domain name**
 
-Point your domain's **A record** to your server IP. Replace `<YOUR_DOMAIN>` with something like `app.example.com`. In `.env`:
+Replace `<YOUR_DOMAIN>` with something like `app.example.com`.
 
-- `FRONTEND_URL=https://<YOUR_DOMAIN>`
-- `ALLOWED_PRODUCTION_ORIGINS=<YOUR_DOMAIN>`
+1. Point your domain's **A record** to your server IP.
+2. In `.env`:
+   - `FRONTEND_URL=https://<YOUR_DOMAIN>`
+   - `ALLOWED_PRODUCTION_ORIGINS=<YOUR_DOMAIN>`
+3. Write the Caddyfile:
 
 ```bash
 sudo tee /etc/caddy/Caddyfile <<'EOF'
@@ -123,9 +128,9 @@ sudo tee /etc/caddy/Caddyfile <<'EOF'
 EOF
 ```
 
-Caddy gets a real certificate. No browser warning.
+4. Caddy gets a real certificate. No browser warning.
 
-**Finish:**
+**After option A or B** — run once:
 
 ```bash
 sudo systemctl reload caddy
@@ -169,12 +174,12 @@ docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml u
 
 ### Repo layout
 
-| Package | Role |
-|---------|------|
+| Package     | Role                                                                         |
+| ----------- | ---------------------------------------------------------------------------- |
 | `frontend/` | Vite + React 19 SPA — talks to backend over HTTP (`frontend/src/lib/api.ts`) |
-| `backend/` | Hono API, Drizzle ORM → PostgreSQL, JWT auth, S3 storage |
-| `whatsapp/` | Baileys session manager (REST in, webhooks → backend) |
-| `database/` | Drizzle SQL migrations (`database/migrations/`) and ops scripts |
+| `backend/`  | Hono API, Drizzle ORM → PostgreSQL, JWT auth, S3 storage                     |
+| `whatsapp/` | Baileys session manager (REST in, webhooks → backend)                        |
+| `database/` | Drizzle SQL migrations (`database/migrations/`) and ops scripts              |
 
 WhatsApp sessions persist under `whatsapp/sessions/` (host bind mount, gitignored). Service logs: `whatsapp/logs/whatsapp.log`.
 
@@ -213,14 +218,14 @@ cd backend && npm test
 
 ## Tech stack
 
-| Layer | Technology |
-|-------|------------|
+| Layer    | Technology                                        |
+| -------- | ------------------------------------------------- |
 | Frontend | Vite, React 19, React Router, Tailwind 4, Base UI |
-| Backend | Hono (Node), Drizzle ORM, PostgreSQL |
-| WhatsApp | First-party Baileys v7 service |
-| Auth | JWT (access + refresh tokens) |
-| Files | S3-compatible storage (R2, MinIO, AWS) |
-| Jobs | pg-boss, Resend, OpenRouter |
+| Backend  | Hono (Node), Drizzle ORM, PostgreSQL              |
+| WhatsApp | First-party Baileys v7 service                    |
+| Auth     | JWT (access + refresh tokens)                     |
+| Files    | S3-compatible storage (R2, MinIO, AWS)            |
+| Jobs     | pg-boss, Resend, OpenRouter                       |
 
 ```
 Browser → frontend (nginx :8080)
