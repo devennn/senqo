@@ -21,7 +21,7 @@ type ViewMode = "grid" | "list";
 
 export default function WorkspaceChooserPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [entering, setEntering] = useState<string | null>(null);
@@ -47,6 +47,7 @@ export default function WorkspaceChooserPage() {
 
   async function handleSignOut() {
     await logout();
+    setUser(null);
     navigate("/sign-in");
   }
 

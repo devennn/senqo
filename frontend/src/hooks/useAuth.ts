@@ -1,22 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
-import { getSession, getAccessToken, type AuthUser } from "@/lib/auth-client";
+import { useCallback } from "react";
+import { getAccessToken } from "@/lib/auth-client";
+import { useAuthContext, type AuthState } from "@/context/auth";
 
-export type AuthState = {
-  user: AuthUser | null;
-  loading: boolean;
-};
+export type { AuthState };
 
 export function useAuth(): AuthState {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getSession()
-      .then((u) => setUser(u))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return { user, loading };
+  return useAuthContext();
 }
 
 export function useAuthToken() {

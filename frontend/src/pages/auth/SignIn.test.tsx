@@ -19,6 +19,7 @@ const {
 vi.mock("@/lib/auth-client", () => ({
   login: mockLogin,
   saveAuthTokens: mockSaveAuthTokens,
+  getSession: vi.fn().mockResolvedValue(null),
   getAuthConfig: vi.fn().mockResolvedValue({ allowPublicRegistration: true }),
 }));
 
@@ -34,7 +35,16 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+import { AuthProvider } from "@/context/auth";
 import SignInPage from "./SignIn";
+
+function renderSignIn() {
+  return render(
+    <AuthProvider>
+      <SignInPage />
+    </AuthProvider>,
+  );
+}
 
 describe("SignInPage", () => {
   beforeEach(() => {
@@ -47,26 +57,26 @@ describe("SignInPage", () => {
 
   // Smoke test: the sign-in form must render email and password input fields so users can enter credentials.
   it("renders email and password fields", () => {
-    render(<SignInPage />);
+    renderSignIn();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
   });
 
   // The page must display the "Welcome back" heading to give users clear context on the sign-in page.
   it("shows Welcome back heading", () => {
-    render(<SignInPage />);
+    renderSignIn();
     expect(screen.getByText("Welcome back")).toBeInTheDocument();
   });
 
   // The primary call-to-action "Sign in" button must be rendered and accessible by role.
   it("shows Sign in button", () => {
-    render(<SignInPage />);
+    renderSignIn();
     expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
   // The "Create an account" link must point to /sign-up so new users can navigate to registration.
   it('renders New to Senqo? link pointing to /sign-up', () => {
-    render(<SignInPage />);
+    renderSignIn();
     const link = screen.getByRole("link", { name: "Create an account" });
     expect(link).toHaveAttribute("href", "/sign-up");
   });
@@ -78,16 +88,20 @@ describe("SignInPage", () => {
       mockSetSearchParams,
     ]);
 
-    render(<SignInPage />);
+    renderSignIn();
     expect(screen.getByText("Invalid credentials")).toBeInTheDocument();
   });
 
   // Full flow: submitting valid credentials calls login, persists tokens, and navigates to the dashboard.
   it("calls login on form submit and navigates on success", async () => {
     const user = userEvent.setup();
-    mockLogin.mockResolvedValue({ accessToken: "at", refreshToken: "rt" });
+    mockLogin.mockResolvedValue({
+      accessToken: "at",
+      refreshToken: "rt",
+      user: { id: "u1", email: "user@example.com" },
+    });
 
-    render(<SignInPage />);
+    renderSignIn();
 
     await user.type(screen.getByLabelText("Email"), "user@example.com");
     await user.type(screen.getByLabelText("Password"), "password123");

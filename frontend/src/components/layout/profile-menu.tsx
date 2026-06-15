@@ -32,13 +32,15 @@ export function ProfileMenu({
   className?: string;
 }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading, setUser } = useAuth();
   const { wsPath } = useWorkspace();
-  const email = user?.email ?? "Account";
+  const email = user?.email ?? (loading ? "" : "Account");
+  const initials = user?.email ? userInitials(user.email) : loading ? "" : "?";
 
   async function handleSignOut() {
     onNavigate?.();
     await logout();
+    setUser(null);
     navigate("/sign-in");
   }
 
@@ -60,7 +62,7 @@ export function ProfileMenu({
       >
         <Avatar size="sm" className="size-8 shrink-0">
           <AvatarFallback className="bg-sidebar-accent text-xs text-sidebar-accent-foreground">
-            {userInitials(user?.email)}
+            {initials}
           </AvatarFallback>
         </Avatar>
         {expanded ? (

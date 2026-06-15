@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { GlobalErrorToastListeners } from "@/components/global-error-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { AuthProvider } from "@/context/auth";
 import { WorkspaceProvider } from "@/context/workspace";
 
 import WorkspaceChooserPage from "@/pages/WorkspaceChooser";
@@ -58,6 +59,7 @@ export default function App() {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <GlobalErrorToastListeners />
         <BrowserRouter>
+          <AuthProvider>
           <Routes>
             <Route path="/" element={<AuthGate><WorkspaceChooserPage /></AuthGate>} />
             <Route path="/admin" element={<AuthGate><InstanceAdminPage /></AuthGate>} />
@@ -87,6 +89,7 @@ export default function App() {
 
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          </AuthProvider>
         </BrowserRouter>
         <Toaster />
       </ThemeProvider>

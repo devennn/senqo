@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getAuthConfig, login, saveAuthTokens } from "@/lib/auth-client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,6 +15,7 @@ import { Label } from "@/components/ui/label";
 
 export default function SignInPage() {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(searchParams.get("error"));
@@ -36,6 +38,7 @@ export default function SignInPage() {
         String(data.get("password") ?? ""),
       );
       saveAuthTokens(result.accessToken, result.refreshToken);
+      setUser(result.user);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed");

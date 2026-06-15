@@ -1,15 +1,16 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getSession } from "@/lib/auth-client";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
+  const { refresh } = useAuth();
 
   useEffect(() => {
-    getSession().then(() => {
+    void refresh().then(() => {
       navigate("/", { replace: true });
     });
-  }, [navigate]);
+  }, [navigate, refresh]);
 
   return (
     <div className="flex h-screen items-center justify-center text-muted-foreground">

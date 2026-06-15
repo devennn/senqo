@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { AuthProvider } from "@/context/auth";
 
-const mockGetSession = vi.fn();
+const { mockGetSession } = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+}));
+
 vi.mock("@/lib/auth-client", () => ({
   getSession: mockGetSession,
   getAccessToken: vi.fn().mockResolvedValue(null),
@@ -11,10 +15,16 @@ vi.mock("@/lib/auth-client", () => ({
 const { useAuth } = await import("@/hooks/useAuth");
 
 function wrapper({ children }: { children: React.ReactNode }) {
-  return <MemoryRouter>{children}</MemoryRouter>;
+  return (
+    <MemoryRouter>
+      <AuthProvider>{children}</AuthProvider>
+    </MemoryRouter>
+  );
 }
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("useAuth", () => {
   // Confirms that when getSession returns a user object, the hook exposes it and sets loading=false.
@@ -22,7 +32,9 @@ describe("useAuth", () => {
   it("returns user when authenticated", async () => {
     mockGetSession.mockResolvedValue({ id: "u1", email: "a@b.com" });
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => Promise.resolve());
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(result.current.user).toEqual({ id: "u1", email: "a@b.com" });
     expect(result.current.loading).toBe(false);
   });
@@ -32,7 +44,9 @@ describe("useAuth", () => {
   it("returns user null when not authenticated", async () => {
     mockGetSession.mockResolvedValue(null);
     const { result } = renderHook(() => useAuth(), { wrapper });
-    await act(() => Promise.resolve());
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(result.current.user).toBeNull();
     expect(result.current.loading).toBe(false);
   });

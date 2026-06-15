@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getAuthConfig, getInvitePreview, register, saveAuthTokens } from "@/lib/auth-client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,6 +15,7 @@ import { Label } from "@/components/ui/label";
 
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("invite")?.trim() ?? "";
   const [loading, setLoading] = useState(false);
@@ -59,6 +61,7 @@ export default function SignUpPage() {
         inviteToken || undefined,
       );
       saveAuthTokens(result.accessToken, result.refreshToken);
+      setUser(result.user);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign up failed");
