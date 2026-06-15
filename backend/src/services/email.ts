@@ -1,5 +1,5 @@
-import { Resend } from "resend";
 import { env } from "../lib/env.js";
+import { sendEmail } from "../lib/email.js";
 
 const scope = "EmailService";
 
@@ -31,80 +31,53 @@ type RegistrationInviteEmailInput = {
   inviteToken: string;
 };
 
-export async function sendRegistrationInviteEmail(input: RegistrationInviteEmailInput): Promise<{ ok: boolean }> {
-  if (!env.resendApiKey) {
-    console.error(`[${scope}/sendRegistrationInviteEmail] Failed query: RESEND_API_KEY is not configured`);
-    return { ok: false };
-  }
-
+export async function sendRegistrationInviteEmail(
+  input: RegistrationInviteEmailInput,
+): Promise<{ ok: boolean }> {
   const signupUrl = `${env.frontendUrl.replace(/\/$/, "")}/sign-up?invite=${encodeURIComponent(input.inviteToken)}`;
-  const text = [
-    "You have been invited to join Senqo.",
-    "",
-    `Create your account: ${signupUrl}`,
-    "",
-    "This link expires in 7 days.",
-  ].join("\n");
 
   try {
-    const resend = new Resend(env.resendApiKey);
-    const { error } = await resend.emails.send({
-      from: env.resendFromEmail,
+    await sendEmail({
       to: input.to,
       subject: "You're invited to join Senqo",
-      text,
       html: `<p>You have been invited to join Senqo.</p><p><a href="${escapeHtml(signupUrl)}">Create your account</a></p><p>This link expires in 7 days.</p>`,
     });
-
-    if (error) {
-      console.error(`[${scope}/sendRegistrationInviteEmail] Failed query: ${error.message}`);
-      return { ok: false };
-    }
-
-    console.info(`[${scope}/sendRegistrationInviteEmail] Success: to=${input.to}`);
+    console.info(
+      `[${scope}/sendRegistrationInviteEmail] Success: to=${input.to}`,
+    );
     return { ok: true };
   } catch (error) {
-    console.error(`[${scope}/sendRegistrationInviteEmail] Unexpected error: ${String(error)}`);
+    console.error(
+      `[${scope}/sendRegistrationInviteEmail] Unexpected error: ${String(error)}`,
+    );
     return { ok: false };
   }
 }
 
-export async function sendWhatsappDisconnectEmail(input: WhatsappDisconnectEmailInput): Promise<{ ok: boolean }> {
-  if (!env.resendApiKey) {
-    console.error(`[${scope}/sendWhatsappDisconnectEmail] Failed query: RESEND_API_KEY is not configured`);
-    return { ok: false };
-  }
-
-  const connectionLabel = input.displayName?.trim() || input.phoneNumber?.trim() || "your WhatsApp connection";
+export async function sendWhatsappDisconnectEmail(
+  input: WhatsappDisconnectEmailInput,
+): Promise<{ ok: boolean }> {
+  const connectionLabel =
+    input.displayName?.trim() ||
+    input.phoneNumber?.trim() ||
+    "your WhatsApp connection";
   const disconnectedAt = formatDisconnectTime(input.disconnectedAt);
-  const text = [
-    `WhatsApp disconnected: ${connectionLabel}`,
-    "",
-    "We detected that this WhatsApp account is no longer connected, so the active connection was removed from the Connect page.",
-    `Time: ${disconnectedAt}`,
-    "",
-    "You can view the recent activity feed on the Connect page for the audit trail and reconnect when you are ready.",
-  ].join("\n");
 
   try {
-    const resend = new Resend(env.resendApiKey);
-    const { error } = await resend.emails.send({
-      from: env.resendFromEmail,
+    await sendEmail({
       to: input.to,
       subject: `WhatsApp disconnected: ${connectionLabel}`,
-      text,
       html: `<p>We detected that this WhatsApp account is no longer connected, so the active connection <strong>${escapeHtml(connectionLabel)}</strong> was removed from the Connect page.</p><p>Time: ${escapeHtml(disconnectedAt)}</p><p>You can view the recent activity feed on the Connect page for the audit trail and reconnect when you are ready.</p>`,
     });
 
-    if (error) {
-      console.error(`[${scope}/sendWhatsappDisconnectEmail] Failed query: ${error.message}`);
-      return { ok: false };
-    }
-
-    console.info(`[${scope}/sendWhatsappDisconnectEmail] Success: userId=${input.to}`);
+    console.info(
+      `[${scope}/sendWhatsappDisconnectEmail] Success: userId=${input.to}`,
+    );
     return { ok: true };
   } catch (error) {
-    console.error(`[${scope}/sendWhatsappDisconnectEmail] Unexpected error: ${String(error)}`);
+    console.error(
+      `[${scope}/sendWhatsappDisconnectEmail] Unexpected error: ${String(error)}`,
+    );
     return { ok: false };
   }
 }

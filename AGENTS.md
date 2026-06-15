@@ -28,7 +28,7 @@ When creating a PR, fill out **`.github/pull_request_template.md`**: what & why,
 | Backend | Hono (Node), Drizzle ORM, PostgreSQL |
 | Auth | JWT issued by backend (`backend/src/routes/auth.ts`, middleware) |
 | Files | S3-compatible storage (MinIO / R2 / AWS) via `backend/src/lib/storage.ts` |
-| Jobs | pg-boss, Resend, OpenRouter (see `README.md`) |
+| Jobs | pg-boss, SMTP (nodemailer), OpenRouter (see `README.md`) |
 
 | Package | Role |
 |---------|------|

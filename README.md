@@ -29,7 +29,7 @@ Open `.env` and fill it in. Do this before `docker compose up`.
 **API keys:**
 
 - `OPENROUTER_API_KEY` — get one at [openrouter.ai](https://openrouter.ai)
-- `RESEND_API_KEY` — get one at [resend.com](https://resend.com)
+- `SMTP_*` — outbound email (invites, WhatsApp disconnect alerts); see `.env.example`
 - `S3_*` — see [Storage](#storage-cloudflare-r2) below
 
 **First admin login:**
@@ -225,7 +225,7 @@ cd backend && npm test
 | WhatsApp | First-party Baileys v7 service                    |
 | Auth     | JWT (access + refresh tokens)                     |
 | Files    | S3-compatible storage (R2, MinIO, AWS)            |
-| Jobs     | pg-boss, Resend, OpenRouter                       |
+| Jobs     | pg-boss, SMTP (nodemailer), OpenRouter            |
 
 ```
 Browser → frontend (nginx :8080)
@@ -235,7 +235,7 @@ Browser → frontend (nginx :8080)
               │              ├─ Cloudflare R2 (S3-compatible)
               │              ├─ OpenRouter (AI)
               │              ├─ pg-boss (job queue, in-process)
-              │              └─ Resend (email)
+              │              └─ SMTP (email)
               │
               └─ static files (React SPA)
 
