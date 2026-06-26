@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ApiKeyCreateResponse, ApiKeyListItem } from "@/types/repositories";
+import type {
+  ApiKeyCreateResponse,
+  ApiKeyListItem,
+} from "@/types/repositories";
 
 type Props = {
   items: ApiKeyListItem[];
@@ -12,7 +15,10 @@ type Props = {
   revokingId: string | null;
   createResult: ApiKeyCreateResponse | null;
   clearCreateResult: () => void;
-  onCreate: (input: { label: string; expiresAt: string | null }) => Promise<void>;
+  onCreate: (input: {
+    label: string;
+    expiresAt: string | null;
+  }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
 
@@ -37,7 +43,10 @@ export function ApiKeysManagerCard({
     return date.toISOString();
   }
 
-  async function handleCreate(input: { label: string; expiresAt: string | null }) {
+  async function handleCreate(input: {
+    label: string;
+    expiresAt: string | null;
+  }) {
     try {
       await onCreate(input);
       toast.success("API key created");
@@ -62,7 +71,10 @@ export function ApiKeysManagerCard({
   async function handleCreateSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canSubmit || creating) return;
-    await handleCreate({ label: label.trim(), expiresAt: toIsoOrNull(expiresAtInput) });
+    await handleCreate({
+      label: label.trim(),
+      expiresAt: toIsoOrNull(expiresAtInput),
+    });
     setLabel("");
     setExpiresAtInput("");
   }
@@ -95,21 +107,28 @@ export function ApiKeysManagerCard({
               <div className="space-y-3">
                 <div className="rounded-md border border-primary/40 bg-secondary px-3 py-2">
                   <p className="text-sm font-medium text-secondary-foreground">
-                    API key created. Copy it now; it will not be shown again after you close this
-                    section.
+                    API key created. Copy it now; it will not be shown again
+                    after you close this section.
                   </p>
                 </div>
                 <pre className="overflow-x-auto rounded-md border border-border/70 bg-muted/40 p-3 text-xs text-foreground">
                   {createResult.apiKey}
                 </pre>
                 <div className="flex justify-end">
-                  <Button type="button" variant="outline" onClick={handleHideCreatePanel}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleHideCreatePanel}
+                  >
                     Close
                   </Button>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleCreateSubmit} className="grid gap-3 md:grid-cols-3">
+              <form
+                onSubmit={handleCreateSubmit}
+                className="grid gap-3 md:grid-cols-3"
+              >
                 <div className="space-y-2 md:col-span-1">
                   <Label htmlFor="apiKeyLabelInline">Label</Label>
                   <Input
@@ -122,7 +141,9 @@ export function ApiKeysManagerCard({
                   />
                 </div>
                 <div className="space-y-2 md:col-span-1">
-                  <Label htmlFor="apiKeyExpiresAtInline">Expires at (optional)</Label>
+                  <Label htmlFor="apiKeyExpiresAtInline">
+                    Expires at (optional)
+                  </Label>
                   <Input
                     id="apiKeyExpiresAtInline"
                     type="datetime-local"
@@ -134,7 +155,11 @@ export function ApiKeysManagerCard({
                   <Button type="submit" disabled={!canSubmit || creating}>
                     {creating ? "Creating..." : "Create API key"}
                   </Button>
-                  <Button type="button" variant="outline" onClick={handleHideCreatePanel}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleHideCreatePanel}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -144,7 +169,9 @@ export function ApiKeysManagerCard({
         ) : null}
         <div className="space-y-2">
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No API keys created yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No API keys created yet.
+            </p>
           ) : (
             items.map((item) => (
               <div
@@ -155,7 +182,9 @@ export function ApiKeysManagerCard({
                   <p className="truncate text-sm font-medium">{item.label}</p>
                   <p className="text-xs text-muted-foreground">
                     Prefix: {item.keyPrefix} • Expires:{" "}
-                    {item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "Never"}
+                    {item.expiresAt
+                      ? new Date(item.expiresAt).toLocaleString()
+                      : "Never"}
                   </p>
                 </div>
                 <Button

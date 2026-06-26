@@ -24,7 +24,7 @@ export function ConversationHandlingModeToggle({
         className={cn(
           "h-7 rounded-full px-3 text-xs",
           mode === "ai" && "shadow-sm",
-          mode !== "ai" && "text-muted-foreground hover:text-foreground"
+          mode !== "ai" && "text-muted-foreground hover:text-foreground",
         )}
         disabled={saving}
         onClick={() => void onChange("ai")}
@@ -38,7 +38,7 @@ export function ConversationHandlingModeToggle({
         className={cn(
           "h-7 rounded-full px-3 text-xs",
           mode === "human" && "shadow-sm",
-          mode !== "human" && "text-muted-foreground hover:text-foreground"
+          mode !== "human" && "text-muted-foreground hover:text-foreground",
         )}
         disabled={saving}
         onClick={() => void onChange("human")}
