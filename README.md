@@ -11,7 +11,7 @@ Run everything with Docker. You need Cloudflare R2 for file storage (free tier).
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-org/senqo.git
+git clone https://github.com/devennn/senqo.git
 cd senqo
 cp .env.example .env
 ```
