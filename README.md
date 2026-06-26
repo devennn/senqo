@@ -199,22 +199,69 @@ cd backend && npx drizzle-kit generate --name <tag>   # new migration after sche
 
 ### Testing
 
+Three layers of tests — one per package. No database or browser required for integration tests.
+
+#### Integration tests (Vitest)
+
 ```bash
-npm test                   # all packages (backend, frontend, whatsapp)
-npm run test:backend
-npm run test:frontend
-npm run test:whatsapp
-npm run test:e2e           # Playwright (~3 tests per feature spec in e2e/)
+npm test                   # all three packages in sequence
+npm run test:backend       # backend routes + pure-logic unit tests (221 tests)
+npm run test:frontend      # page components + hooks + pure-logic unit tests (125 tests)
+npm run test:whatsapp      # session manager + webhook delivery + JID logic (59 tests)
 ```
 
-E2E defaults to port **5199** (`E2E_DEV_PORT`) or set `E2E_BASE_URL=http://localhost:8080` with Docker Compose.
+Watch mode (any package):
 
-Repository tests hit a real Postgres — start it first:
+```bash
+cd backend && npm run test:watch
+cd frontend && npm run test:watch
+cd whatsapp && npm run test:watch
+```
+
+**What each layer tests:**
+
+| Package | Mock boundary | What it proves |
+|---------|--------------|----------------|
+| `backend/` | Repositories (vi.mock) | Hono routes, middleware, auth, validation |
+| `frontend/` | `@/lib/api` or hooks | Pages render correctly, call the right API |
+| `whatsapp/` | Baileys / fetch | Session lifecycle, webhook delivery, retry |
+
+Repository tests (under `backend/src/repositories/`) hit a **real Postgres** — start it first:
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
 cd backend && npm test
 ```
+
+Route and frontend tests need no server or database.
+
+#### E2E tests (Playwright)
+
+Covers multi-step browser flows that integration tests can't replicate (real navigation, invite tokens, admin panel).
+
+```bash
+npm run test:e2e           # runs ~9 tests across 3 spec files
+```
+
+Playwright auto-starts the frontend dev server on port **5199**. To run against a Docker Compose stack instead:
+
+```bash
+E2E_BASE_URL=http://localhost:8080 npm run test:e2e
+```
+
+Open the HTML report after a run:
+
+```bash
+npx playwright show-report
+```
+
+**Spec files:**
+
+| File | What it covers |
+|------|---------------|
+| `e2e/senqo.spec.ts` | Sign-up, sign-in, unauthenticated redirect |
+| `e2e/custom-tools.spec.ts` | Tool editor save state, dirty detection, test input |
+| `e2e/instance-auth.spec.ts` | Invite signup flow, blocked registration, superadmin panel |
 
 ## Tech stack
 
