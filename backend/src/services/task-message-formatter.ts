@@ -1,12 +1,8 @@
 import { generateText, Output } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
-import { env } from "../lib/env.js";
+import { getFormatterLLM } from "../agent/llm.js";
 
 const scope = "TaskMessageFormatter";
-const openrouter = createOpenRouter({
-  apiKey: env.openRouterApiKey,
-});
 
 const formatterSchema = z.object({
   message: z.string().min(1),
@@ -25,7 +21,7 @@ export async function formatTaskOutboundMessage(input: {
 
   try {
     const result = await generateText({
-      model: openrouter.chat("x-ai/grok-4.1-fast"),
+      model: getFormatterLLM(),
       output: Output.object({
         schema: formatterSchema,
       }),
@@ -48,13 +44,19 @@ export async function formatTaskOutboundMessage(input: {
     const message = result.output.message.replace(/\r\n/g, "\n").trim();
     const fileUrl = result.output.fileUrl?.trim() || null;
     if (!message) {
-      console.error(`[${scope}/formatTaskOutboundMessage] Failed query: empty AI output`);
+      console.error(
+        `[${scope}/formatTaskOutboundMessage] Failed query: empty AI output`,
+      );
       return { message: rawMessage, fileUrl: rawFileUrl };
     }
-    console.info(`[${scope}/formatTaskOutboundMessage] Success: userId=formatter`);
+    console.info(
+      `[${scope}/formatTaskOutboundMessage] Success: userId=formatter`,
+    );
     return { message, fileUrl };
   } catch (error) {
-    console.error(`[${scope}/formatTaskOutboundMessage] Unexpected error: ${String(error)}`);
+    console.error(
+      `[${scope}/formatTaskOutboundMessage] Unexpected error: ${String(error)}`,
+    );
     return { message: rawMessage, fileUrl: rawFileUrl };
   }
 }

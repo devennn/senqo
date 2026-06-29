@@ -15,14 +15,14 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/openai": "^3.0.77",
     "@aws-sdk/client-s3": "^3.1060.0",
     "@aws-sdk/s3-request-presigner": "^3.1060.0",
     "@hono/node-server": "^1.13.7",
     "@openrouter/ai-sdk-provider": "^2.6.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.20.0",
-    "ai": "^6.0.161",
+    "ai": "^6.0.214",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

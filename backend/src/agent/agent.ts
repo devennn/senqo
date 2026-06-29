@@ -1,4 +1,3 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { ToolLoopAgent, Output, type ModelMessage, stepCountIs } from "ai";
 import { z } from "zod";
 import type { RunAgentInput, RunAgentResult } from "../types/agent.js";
@@ -20,37 +19,47 @@ import { buildAgentInstructions } from "../agent/skills-catalog.js";
 import { getAgentTools } from "../agent/tools/index.js";
 import { normalizeStoredContentForModelMessage } from "../lib/agent-multimodal-normalize.js";
 import { BUILTIN_AGENT_TOOL_KEYS } from "../lib/builtin-agent-tool-keys.js";
-import { env } from "../lib/env.js";
-import type { StoredUserImageUrlPart, StoredUserTextPart } from "../types/agent-multimodal.js";
+import type {
+  StoredUserImageUrlPart,
+  StoredUserTextPart,
+} from "../types/agent-multimodal.js";
 import {
   insertAgentMessages,
   listAgentMessages,
 } from "../repositories/agent-messages.js";
-import { getAgentConfigById, markAgentConfigFirstUsed } from "../repositories/agent.js";
+import {
+  getAgentConfigById,
+  markAgentConfigFirstUsed,
+} from "../repositories/agent.js";
 import { touchAgentSession } from "../repositories/agent-sessions.js";
 import { mergeAiReasoningOntoAgentRunMessages } from "../repositories/whatsapp.js";
-
-const openrouter = createOpenRouter({
-  apiKey: env.openRouterApiKey,
-});
+import { getChatLLM } from "./llm.js";
 
 const logScope = "AgentRuntime";
 const agentOutputSchema = z.object({
-  reply: z.string().describe("Final user-facing reply or summary for the agent run."),
+  reply: z
+    .string()
+    .describe("Final user-facing reply or summary for the agent run."),
   num_whatsapp_send: z
     .number()
     .int()
     .min(0)
-    .describe("Number of WhatsApp messages the agent actually sent with the send_whatsapp_message tool."),
-  reasoning_for_operators: z.string().describe(
-    "Dashboard-only: why this run's reply fits the customer and what grounded it (thread, templates, context, skills, behavior, tools). Never customer-facing. Use an empty string when there is nothing to explain.",
-  ),
+    .describe(
+      "Number of WhatsApp messages the agent actually sent with the send_whatsapp_message tool.",
+    ),
+  reasoning_for_operators: z
+    .string()
+    .describe(
+      "Dashboard-only: why this run's reply fits the customer and what grounded it (thread, templates, context, skills, behavior, tools). Never customer-facing. Use an empty string when there is nothing to explain.",
+    ),
 });
 
 const DEFAULT_AGENT_TOOL_KEYS = BUILTIN_AGENT_TOOL_KEYS;
 
 function isMissingToolResultError(messageText: string): boolean {
-  return /Tool result(s)? (is|are) missing for tool call(s)?/i.test(messageText);
+  return /Tool result(s)? (is|are) missing for tool call(s)?/i.test(
+    messageText,
+  );
 }
 
 function isSuccessfulWhatsappToolOutput(value: unknown): boolean {
@@ -62,7 +71,9 @@ function isSuccessfulWhatsappToolOutput(value: unknown): boolean {
 }
 
 function countSuccessfulWhatsappSends(result: {
-  steps?: Array<{ toolResults?: Array<{ toolName?: string; output?: unknown }> }>;
+  steps?: Array<{
+    toolResults?: Array<{ toolName?: string; output?: unknown }>;
+  }>;
 }): number {
   return (result.steps ?? []).reduce((count, step) => {
     const sentInStep = (step.toolResults ?? []).filter(
@@ -79,7 +90,11 @@ export async function runAgentSession(
 ): Promise<RunAgentResult | null> {
   const isDryRun = Boolean(input.dryRun);
   const skipInference = Boolean(input.skipInference);
-  const sessionId = await resolveSessionId(input.workspaceId, isDryRun, input.sessionId);
+  const sessionId = await resolveSessionId(
+    input.workspaceId,
+    isDryRun,
+    input.sessionId,
+  );
   if (!sessionId) {
     return null;
   }
@@ -88,7 +103,10 @@ export async function runAgentSession(
 
   let historyMessages: ModelMessage[] = [];
   if (!isDryRun) {
-    const historicalRows = await listAgentMessages(input.workspaceId, sessionId);
+    const historicalRows = await listAgentMessages(
+      input.workspaceId,
+      sessionId,
+    );
     const rawHistory = historicalRows.map((row) =>
       toModelMessageFromRow({
         role: row.role,
@@ -98,7 +116,7 @@ export async function runAgentSession(
     historyMessages = pruneOrphanedToolCalls(rawHistory);
     if (historyMessages.length < rawHistory.length) {
       console.warn(
-        `[${logScope}] Pruned ${rawHistory.length - historyMessages.length} orphaned tool-call message(s) from history sessionId=${sessionId}`
+        `[${logScope}] Pruned ${rawHistory.length - historyMessages.length} orphaned tool-call message(s) from history sessionId=${sessionId}`,
       );
     } else {
       // Temporary diagnostic: log assistant message content shapes so we can
@@ -113,7 +131,7 @@ export async function runAgentSession(
             .join("+");
         });
       console.info(
-        `[${logScope}] History shape sessionId=${sessionId} rows=${rawHistory.length} assistantContent=[${assistantShapes.join(", ")}]`
+        `[${logScope}] History shape sessionId=${sessionId} rows=${rawHistory.length} assistantContent=[${assistantShapes.join(", ")}]`,
       );
     }
   }
@@ -122,7 +140,10 @@ export async function runAgentSession(
     ? `Incoming message timestamp: ${input.messageTimestamp}\n\n${input.message}`
     : input.message;
   const mediaParts = input.userMediaParts ?? [];
-  const textPart: StoredUserTextPart = { type: "text", text: inboundMessageContent };
+  const textPart: StoredUserTextPart = {
+    type: "text",
+    text: inboundMessageContent,
+  };
   const userContentForDb: Array<StoredUserTextPart | StoredUserImageUrlPart> =
     mediaParts.length > 0 ? [textPart, ...mediaParts] : [textPart];
 
@@ -156,9 +177,10 @@ export async function runAgentSession(
   if (skipInference) {
     if (!isDryRun) {
       await touchAgentSession(input.workspaceId, sessionId);
-      const reason = input.skipInferenceReason?.trim() || "inference skipped by policy";
+      const reason =
+        input.skipInferenceReason?.trim() || "inference skipped by policy";
       console.info(
-        `[${logScope}] Inbound saved to agent session but not processed: sessionId=${sessionId} reason=${reason}`
+        `[${logScope}] Inbound saved to agent session but not processed: sessionId=${sessionId} reason=${reason}`,
       );
     }
     return {
@@ -205,7 +227,7 @@ export async function runAgentSession(
   );
 
   const agent = new ToolLoopAgent({
-    model: openrouter.chat("openai/gpt-4.1"),
+    model: getChatLLM(),
     instructions,
     tools,
     activeTools,
@@ -217,7 +239,9 @@ export async function runAgentSession(
     }),
     stopWhen: stepCountIs(20),
     prepareStep: ({ stepNumber, messages }) => {
-      const lastMessage = messages[messages.length - 1] as ModelMessage | undefined;
+      const lastMessage = messages[messages.length - 1] as
+        | ModelMessage
+        | undefined;
       const action = inferStepAction(lastMessage);
       console.info(
         formatAgentPrepareStepBlock(logScope, {
@@ -232,11 +256,19 @@ export async function runAgentSession(
     onStepFinish: (event) => {
       const textPreview = summarizeText(event.text);
       const toolCalls = Array.isArray(event.toolCalls) ? event.toolCalls : [];
-      const toolResults = Array.isArray(event.toolResults) ? event.toolResults : [];
+      const toolResults = Array.isArray(event.toolResults)
+        ? event.toolResults
+        : [];
       const toolNames =
-        toolCalls.length > 0 ? toolCalls.map((call) => call.toolName).join(", ") : "(none)";
+        toolCalls.length > 0
+          ? toolCalls.map((call) => call.toolName).join(", ")
+          : "(none)";
       const stepAction =
-        toolCalls.length > 0 ? "calling tools" : textPreview ? "drafting response" : "reasoning";
+        toolCalls.length > 0
+          ? "calling tools"
+          : textPreview
+            ? "drafting response"
+            : "reasoning";
 
       console.info(
         formatAgentStepFinishBlock(logScope, {
@@ -272,10 +304,10 @@ export async function runAgentSession(
     const messageText = error instanceof Error ? error.message : String(error);
     if (isMissingToolResultError(messageText)) {
       console.error(
-        `[${logScope}] Failed query: tool-call mismatch, retrying once without tools detail=${messageText}`
+        `[${logScope}] Failed query: tool-call mismatch, retrying once without tools detail=${messageText}`,
       );
       const fallbackAgent = new ToolLoopAgent({
-        model: openrouter.chat("openai/gpt-4.1"),
+        model: getChatLLM(),
         instructions,
         tools: {},
         activeTools: [],
@@ -319,7 +351,9 @@ export async function runAgentSession(
   const structuredOutput = result.output;
   const numWhatsappSend = countSuccessfulWhatsappSends(result);
   const reply = structuredOutput.reply;
-  const reasoningForOperators = (structuredOutput.reasoning_for_operators ?? "").trim();
+  const reasoningForOperators = (
+    structuredOutput.reasoning_for_operators ?? ""
+  ).trim();
 
   if (!isDryRun && agentRunId && reasoningForOperators) {
     const merged = await mergeAiReasoningOntoAgentRunMessages({
@@ -329,7 +363,9 @@ export async function runAgentSession(
       aiReasoning: reasoningForOperators,
     });
     if (!merged.ok) {
-      console.error(`[${logScope}] Failed to persist operator reasoning metadata for conversationId=${sessionId}`);
+      console.error(
+        `[${logScope}] Failed to persist operator reasoning metadata for conversationId=${sessionId}`,
+      );
     }
   }
 

@@ -1,3 +1,6 @@
+import { parseModelProvider } from "./model-provider.js";
+import { loadModelEnv } from "./model-env.js";
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -17,12 +20,18 @@ function clampInt(
   return Math.min(max, Math.max(min, Math.floor(n)));
 }
 
+const modelEnv = loadModelEnv(
+  parseModelProvider(requireEnv("MODEL_PROVIDER")),
+);
+
+export type { ModelProvider } from "./model-provider.js";
+
 export const env = {
   appUrl: process.env.APP_URL ?? "http://localhost:3001",
   frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:5173",
   databaseUrl: requireEnv("DATABASE_URL"),
   jwtSecret: requireEnv("JWT_SECRET"),
-  openRouterApiKey: requireEnv("OPENROUTER_API_KEY"),
+  ...modelEnv,
   /** Quiet period before running the agent on batched WhatsApp inbound (1–60s). */
   inboundAiDebounceSeconds: clampInt(
     process.env.INBOUND_AI_DEBOUNCE_SECONDS,
