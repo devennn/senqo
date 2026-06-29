@@ -1,24 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import TeamPage from "@/pages/settings/Team";
 
-// ── Mocks ─────────────────────────────────────────────────────────────────────
-
-const mockApiGet = vi.hoisted(() => vi.fn());
-const mockApiPost = vi.hoisted(() => vi.fn());
+const mockGet = vi.hoisted(() => vi.fn());
+const mockPost = vi.hoisted(() => vi.fn());
+const mockUseIsWorkspaceOwner = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", () => ({
-  api: { get: mockApiGet, post: mockApiPost },
+  api: {
+    get: mockGet,
+    post: mockPost,
+  },
 }));
 
-vi.mock("@/context/workspace", () => ({
-  useWorkspace: () => ({ workspaceId: "ws-1", wsPath: (p: string) => `/ws-1${p}` }),
+vi.mock("@/hooks/useIsWorkspaceOwner", () => ({
+  useIsWorkspaceOwner: mockUseIsWorkspaceOwner,
 }));
 
-// ── Helper ────────────────────────────────────────────────────────────────────
-
-function renderPage() {
+function renderTeam() {
   return render(
     <MemoryRouter>
       <TeamPage />
@@ -26,55 +27,42 @@ function renderPage() {
   );
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
 describe("Team settings page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockApiGet.mockResolvedValue({ members: [] });
+    mockUseIsWorkspaceOwner.mockReturnValue({ isOwner: true, loading: false });
+    mockGet.mockResolvedValue({ members: [] });
   });
 
-  // All three section cards render — verifies page structure is complete.
-  it("renders invite, add, and members sections", async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText("Invite to Senqo")).toBeInTheDocument());
-    expect(screen.getByText("Add to workspace")).toBeInTheDocument();
-    expect(screen.getByText("Members")).toBeInTheDocument();
-  });
-
-  // Members from API response are displayed in the members list.
-  it("renders members from API response", async () => {
-    mockApiGet.mockResolvedValue({
-      members: [
-        { id: "m1", email: "alice@example.com", role: "owner" },
-        { id: "m2", email: "bob@example.com", role: "member" },
-      ],
-    });
-
-    renderPage();
-    await waitFor(() => expect(screen.getByText("alice@example.com")).toBeInTheDocument());
-    expect(screen.getByText("bob@example.com")).toBeInTheDocument();
-  });
-
-  // Empty member list shows placeholder — prevents blank section.
-  it("shows empty state when no members", async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText("No team members yet.")).toBeInTheDocument());
-  });
-
-  // Invite form input and submit button are visible.
-  it("renders invite email input and send button", async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText("Invite to Senqo")).toBeInTheDocument());
-    expect(screen.getByLabelText("Email address", { selector: "#inviteEmail" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send invite" })).toBeInTheDocument();
-  });
-
-  // Add-to-workspace form input is visible.
-  it("renders add member email input and button", async () => {
-    renderPage();
+  // Add-to-workspace form and members list are visible for workspace owners.
+  it("renders add member form and members section for owners", async () => {
+    renderTeam();
     await waitFor(() => expect(screen.getByText("Add to workspace")).toBeInTheDocument());
-    expect(screen.getByLabelText("Email address", { selector: "#email" })).toBeInTheDocument();
+    expect(screen.getByText("Members")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add member" })).toBeInTheDocument();
+  });
+
+  // Unregistered email → API returns user_not_found and the page shows a clear message.
+  it("shows a clear error when the email has no Senqo account", async () => {
+    mockPost.mockRejectedValue(new Error("user_not_found"));
+    renderTeam();
+    await waitFor(() => expect(screen.getByLabelText("Email address")).toBeInTheDocument());
+
+    await userEvent.type(screen.getByLabelText("Email address"), "unknown@company.com");
+    await userEvent.click(screen.getByRole("button", { name: "Add member" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/No Senqo account exists for this email/i),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  // Members-only view for non-owners: no add form.
+  it("hides add form when the user is not the workspace owner", async () => {
+    mockUseIsWorkspaceOwner.mockReturnValue({ isOwner: false, loading: false });
+    renderTeam();
+    await waitFor(() => expect(screen.getByText("Members")).toBeInTheDocument());
+    expect(screen.queryByText("Add to workspace")).not.toBeInTheDocument();
   });
 });

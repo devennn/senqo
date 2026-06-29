@@ -60,5 +60,5 @@
 - Workspace profile — display name, storage usage breakdown, 10 GB default quota
 - API keys — create, list, delete workspace API keys with optional expiry
 - Workspace secrets — encrypted key/value pairs for custom tool `requiredEnv`
-- Team management — invite platform signup, add existing users to a workspace, list members
+- Team — workspace owners add existing Senqo users to a workspace; unregistered emails are rejected with a clear error
 - User profile — name fields; password change

@@ -44,10 +44,6 @@ vi.mock("../services/tool-sandbox/run.js", () => ({
   runCustomTool: vi.fn(),
 }));
 
-vi.mock("../services/email.js", () => ({
-  sendRegistrationInviteEmail: vi.fn(),
-}));
-
 vi.mock("../services/job-scheduler.js", () => ({
   scheduleAgentTask: vi.fn(),
   cancelScheduledTask: vi.fn(),
@@ -176,11 +172,6 @@ vi.mock("../repositories/api-keys.js", () => ({
   deleteApiKey: vi.fn(),
 }));
 
-vi.mock("../repositories/team.js", () => ({
-  listMembers: vi.fn(),
-  addMember: vi.fn(),
-}));
-
 vi.mock("../repositories/skills.js", () => ({
   listWorkspaceSkills: vi.fn(),
   listActiveWorkspaceSkills: vi.fn().mockResolvedValue([]),
@@ -266,16 +257,6 @@ vi.mock("../repositories/agent-messages.js", () => ({
   listAgentMessages: vi.fn(),
 }));
 
-vi.mock("../repositories/registration-invites.js", () => ({
-  createRegistrationInvite: vi.fn(),
-  getRegistrationInviteByToken: vi.fn(),
-  acceptRegistrationInvite: vi.fn(),
-}));
-
-vi.mock("../repositories/instance-settings.js", () => ({
-  getAllowPublicRegistration: vi.fn().mockResolvedValue(true),
-}));
-
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";
@@ -287,7 +268,6 @@ import { listTasksPage, listSchedulableAgents } from "../repositories/tasks.js";
 import { listConnections, listRecentConnectionEvents } from "../repositories/whatsapp.js";
 import { listWorkspaceSecrets, createWorkspaceSecret, deleteWorkspaceSecret } from "../repositories/workspace-secrets.js";
 import { listApiKeys, createApiKey, deleteApiKey } from "../repositories/api-keys.js";
-import { listMembers } from "../repositories/team.js";
 import { listAgentConfigs, createAgentConfig } from "../repositories/agent.js";
 import { findUserById } from "../repositories/auth-users.js";
 import { getProfileForSettings, updateProfile } from "../repositories/profiles.js";
@@ -313,7 +293,6 @@ const deleteWorkspaceSecretMock = vi.mocked(deleteWorkspaceSecret);
 const listApiKeysMock = vi.mocked(listApiKeys);
 const createApiKeyMock = vi.mocked(createApiKey);
 const deleteApiKeyMock = vi.mocked(deleteApiKey);
-const listMembersMock = vi.mocked(listMembers);
 const listAgentConfigsMock = vi.mocked(listAgentConfigs);
 const createAgentConfigMock = vi.mocked(createAgentConfig);
 const findUserByIdMock = vi.mocked(findUserById);
@@ -768,25 +747,6 @@ describe("PUT /profile", () => {
       first_name: "Bob",
       last_name: "Jones",
     });
-  });
-});
-
-// ── Team ──────────────────────────────────────────────────────────────────────
-
-describe("GET /team", () => {
-  // Returns team members for the workspace.
-  it("returns members list", async () => {
-    listMembersMock.mockResolvedValue([
-      { id: "m1", email: "alice@example.com", role: "owner" },
-      { id: "m2", email: "bob@example.com", role: "member" },
-    ]);
-
-    const res = await app.request("/team", { headers: AUTH });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.members).toHaveLength(2);
-    expect(body.members[0].email).toBe("alice@example.com");
   });
 });
 

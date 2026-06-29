@@ -154,9 +154,6 @@ import {
   listUserWorkspaces,
   createWorkspaceForUser,
 } from "../repositories/workspaces.js";
-import { createRegistrationInvite } from "../repositories/registration-invites.js";
-import { getAllowPublicRegistration } from "../repositories/instance-settings.js";
-import { sendRegistrationInviteEmail } from "../services/email.js";
 import { listAgentMessages } from "../repositories/agent-messages.js";
 import {
   scheduleAgentTask,
@@ -203,10 +200,6 @@ app.get("/workspaces", async (c) => {
 
 const createWorkspaceSchema = z.object({
   name: z.string().trim().min(1).max(120),
-});
-
-const emailSchema = z.object({
-  email: z.string().email(),
 });
 
 app.post("/workspaces", async (c) => {
@@ -1959,6 +1952,10 @@ app.post("/tasks/:id/cancel", async (c) => {
   return c.json({ ok: true });
 });
 
+const emailSchema = z.object({
+  email: z.string().email(),
+});
+
 // ── Team ──────────────────────────────────────────────────────────────────────
 
 app.get("/team", async (c) => {
@@ -1978,38 +1975,15 @@ app.post("/team", async (c) => {
 
   const result = await addMember(workspaceId, parsed.data.email);
   if (!result.ok) {
-    const status = result.message === "user_not_found" ? 404 : 409;
+    const status =
+      result.message === "user_not_found"
+        ? 404
+        : result.message === "user_disabled"
+          ? 403
+          : 409;
     return c.json({ error: result.message }, status);
   }
   return c.json({ ok: true });
-});
-
-app.post("/team/registration-invite", async (c) => {
-  const workspaceId = c.get("workspaceId");
-  const userId = c.get("userId");
-  const owner = await isWorkspaceOwner(workspaceId, userId);
-  if (!owner) return c.json({ error: "forbidden" }, 403);
-
-  const allowPublicRegistration = await getAllowPublicRegistration();
-  if (allowPublicRegistration) {
-    return c.json({ error: "public_registration_enabled" }, 409);
-  }
-
-  const parsed = emailSchema.safeParse(await c.req.json());
-  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
-
-  const created = await createRegistrationInvite(parsed.data.email, userId);
-  if (!created.ok) {
-    const status = created.message === "invite_already_pending" ? 409 : 400;
-    return c.json({ error: created.message }, status);
-  }
-
-  const emailed = await sendRegistrationInviteEmail({
-    to: parsed.data.email,
-    inviteToken: created.inviteToken,
-  });
-
-  return c.json({ ok: true, emailSent: emailed.ok });
 });
 
 // ── Profile ───────────────────────────────────────────────────────────────────

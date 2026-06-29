@@ -70,7 +70,7 @@ export default function WorkspacePage() {
           </Button>
         </div>
       ) : bundle ? (
-        <div className="mt-6 grid w-full max-w-xl grid-cols-1 gap-6">
+        <div className="mt-6 grid w-full grid-cols-1 gap-6">
           <WorkspaceStorageUsageCard storage={bundle.storage} />
           {bundle.workspace ? (
             <ProfileWorkspaceCard workspace={bundle.workspace} loading={busy} onSaveName={handleWorkspaceSave} />

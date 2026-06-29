@@ -35,11 +35,10 @@ No Playwright. No real browser. No real database. Tests run in `< 60 s` per pack
 - [x] `frontend/src/pages/settings/Workspace.test.tsx`
 - [x] `frontend/src/pages/settings/ApiKeys.test.tsx`
 - [x] `frontend/src/pages/settings/Secrets.test.tsx`
-- [x] `frontend/src/pages/settings/Team.test.tsx`
 
 #### Backend integration tests
 - [x] `backend/src/routes/auth.integration.test.ts` (pre-existing — register, login, refresh, logout)
-- [x] `backend/src/routes/user.test.ts` — workspaces, labels, contacts, conversations, tasks, connections, secrets, api-keys, profile, team, agents
+- [x] `backend/src/routes/user.test.ts` — workspaces, labels, contacts, conversations, tasks, connections, secrets, api-keys, profile, agents
 
 #### WhatsApp integration tests
 - [x] `whatsapp/src/session-manager.test.ts` (pre-existing)
@@ -199,13 +198,6 @@ Mock shape: spy on the named export functions in `api.ts` and return canned resp
 | 1 (happy path) | Existing secret visible | Mock `getSecrets` → 1 secret | Secret name visible in monospace |
 | 2 | Create secret — disabled until both fields filled | Mock `createSecret` | Button disabled; fill name + value → enabled |
 | 3 | Delete secret removes row | Mock `deleteSecret` → `{ ok: true }` | Click Delete → confirm → row removed |
-
-### Settings — `frontend/src/pages/settings/team.test.tsx`
-
-| # | Test | Setup | What to assert |
-|---|------|-------|----------------|
-| 1 (happy path) | Team page renders all three sections | Mock members | "Invite to Senqo", "Add to workspace", "Members" headings visible |
-| 2 | Members list renders | Mock `getMembers` → 2 members | Both emails and roles visible |
 
 ---
 

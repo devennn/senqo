@@ -5,7 +5,7 @@ import {
   workspaceMembers,
   users,
 } from "../db/schema/index.js";
-import { findUserById, findUserByEmail, isInstanceAdmin } from "./auth-users.js";
+import { isInstanceAdmin, findUserById, findUserByEmail } from "./auth-users.js";
 import type { WorkspaceSummary, TeamMemberRecord } from "../types/repositories.js";
 
 type WorkspaceRow = typeof workspaces.$inferSelect;

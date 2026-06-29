@@ -6,7 +6,7 @@ export type WorkspaceSummary = {
 
 export type TeamMemberRecord = {
   id: string;
-  email: string;
+  email: string | null;
   role: string;
   joined_at: string | null;
 };
