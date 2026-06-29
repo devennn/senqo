@@ -28,7 +28,10 @@ Open `.env` and fill it in. Do this before `docker compose up`.
 
 **API keys:**
 
-- `OPENROUTER_API_KEY` — get one at [openrouter.ai](https://openrouter.ai)
+- `MODEL_PROVIDER` — `openrouter` or `openai`; set this first, then fill in **only that provider's block** in `.env` (see `.env.example`)
+- **OpenRouter** (`MODEL_PROVIDER=openrouter`): `OPENROUTER_API_KEY`, `OPENROUTER_CHAT_LLM`, `OPENROUTER_FORMATTER_LLM` — get a key at [openrouter.ai](https://openrouter.ai)
+- **OpenAI** (`MODEL_PROVIDER=openai`): `OPENAI_API_KEY`, `OPENAI_CHAT_LLM`, `OPENAI_FORMATTER_LLM` — get a key at [platform.openai.com](https://platform.openai.com)
+- Validate before deploy: `npm run validate:model-env`
 - `SMTP_*` — outbound email (invites, WhatsApp disconnect alerts); see `.env.example`
 - `S3_*` — see [Storage](#storage-cloudflare-r2) below
 

@@ -17,7 +17,8 @@
     "test:frontend": "cd frontend && npm test",
     "test:whatsapp": "cd whatsapp && npm test",
     "test:e2e": "npx playwright test",
-    "test:task-api": "./scripts/test-task-api.sh"
+    "test:task-api": "./scripts/test-task-api.sh",
+    "validate:model-env": "./scripts/validate-model-env.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0"

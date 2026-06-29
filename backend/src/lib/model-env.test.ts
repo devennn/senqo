@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { loadModelEnv, requireTrimmedEnv } from "./model-env.js";
+import {
+  loadModelEnv,
+  requireTrimmedEnv,
+  validateActiveModelEnv,
+} from "./model-env.js";
 
 describe("requireTrimmedEnv", () => {
   // Whitespace-only values should be treated as missing configuration.
@@ -62,6 +66,46 @@ describe("loadModelEnv", () => {
         OPENROUTER_API_KEY: "sk-or-test",
         OPENROUTER_CHAT_LLM: "openai/gpt-4.1",
       }),
-    ).toThrow("Required environment variable OPENROUTER_FORMATTER_LLM is not set");
+    ).toThrow(
+      "Required environment variable OPENROUTER_FORMATTER_LLM is not set (required when MODEL_PROVIDER=openrouter)",
+    );
+  });
+});
+
+describe("validateActiveModelEnv", () => {
+  const openrouterEnv = {
+    MODEL_PROVIDER: "openrouter",
+    OPENROUTER_API_KEY: "sk-or-test",
+    OPENROUTER_CHAT_LLM: "openai/gpt-4.1",
+    OPENROUTER_FORMATTER_LLM: "x-ai/grok-4.1-fast",
+  };
+
+  const openaiEnv = {
+    MODEL_PROVIDER: "openai",
+    OPENAI_API_KEY: "sk-test",
+    OPENAI_CHAT_LLM: "gpt-4.1",
+    OPENAI_FORMATTER_LLM: "gpt-4.1-nano-2025-04-14",
+  };
+
+  // Active provider selection should gate which env block must be present.
+  // Expected: OpenAI vars are required when MODEL_PROVIDER=openai, not OpenRouter vars.
+  it("requires OpenAI vars when MODEL_PROVIDER is openai", () => {
+    expect(validateActiveModelEnv(openaiEnv)).toBe("openai");
+  });
+
+  // OpenRouter deployments should validate the OpenRouter env block only.
+  // Expected: returns openrouter when OPENROUTER_* vars are set.
+  it("requires OpenRouter vars when MODEL_PROVIDER is openrouter", () => {
+    expect(validateActiveModelEnv(openrouterEnv)).toBe("openrouter");
+  });
+
+  // Missing OpenAI credentials should fail with provider-specific guidance.
+  // Expected: error names OPENAI_API_KEY and MODEL_PROVIDER=openai.
+  it("throws when OpenAI vars are missing for MODEL_PROVIDER=openai", () => {
+    expect(() =>
+      validateActiveModelEnv({ MODEL_PROVIDER: "openai" }),
+    ).toThrow(
+      "Required environment variable OPENAI_API_KEY is not set (required when MODEL_PROVIDER=openai)",
+    );
   });
 });
