@@ -16,7 +16,7 @@ cd senqo
 cp .env.example .env
 ```
 
-Open `.env` and fill it in. Do this before `docker compose up`.
+Open `.env` and fill it in. Do this before starting the stack (`docker compose … up`).
 
 **Secrets** — run `openssl rand -hex 32` five times and paste into:
 
@@ -55,17 +55,17 @@ Open `.env` and fill it in. Do this before `docker compose up`.
 ### 2. Start
 
 ```bash
-docker compose up -d --build
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 First run takes a minute or two. Run the same command again after you change code.
 
-| Service    | Port |
-| ---------- | ---- |
-| `frontend` | 8080 |
-| `backend`  | 3001 |
-| `whatsapp` | 3002 |
-| `postgres` | 5432 |
+| Service    | Host port (production) |
+| ---------- | ---------------------- |
+| `frontend` | `127.0.0.1:8080` only (Caddy on :443 is the public entry) |
+| `backend`  | not published |
+| `whatsapp` | not published |
+| `postgres` | not published |
 
 ### 3. Expose the app publicly (Caddy)
 
@@ -137,7 +137,7 @@ EOF
 
 ```bash
 sudo systemctl reload caddy
-docker compose up -d backend
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d backend
 ```
 
 ### 4. Open the app
@@ -168,6 +168,8 @@ Bind-mounts source; `backend`, `frontend`, and `whatsapp` hot-reload (`tsx watch
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
+`docker-compose.dev.yml` publishes host ports for local access (`8080`, `3001`, `3002`, `5432`).
+
 After editing `package.json` in a service, rebuild that service:
 
 ```bash
@@ -192,8 +194,8 @@ WhatsApp sessions persist under `whatsapp/sessions/` (host bind mount, gitignore
 npm run build              # backend + frontend production build
 
 docker compose logs -f backend
-docker compose up -d backend          # pick up .env changes (FRONTEND_URL, etc.; no frontend rebuild)
-docker compose up -d --build          # rebuild production images
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d backend          # pick up .env changes (FRONTEND_URL, etc.; no frontend rebuild)
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d --build          # rebuild production images
 docker compose down -v                # reset DB volume (R2 untouched)
 docker compose run --rm migrate       # run migrations manually
 

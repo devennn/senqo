@@ -1,0 +1,9 @@
+# Production override: bind the frontend to localhost for Caddy (HTTPS on :443).
+# Merge with the base file on VPS deployments:
+#
+#   docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+services:
+  frontend:
+    ports:
+      - "127.0.0.1:${DEV_FRONTEND_PORT:-8080}:${FRONTEND_CONTAINER_PORT:-80}"
