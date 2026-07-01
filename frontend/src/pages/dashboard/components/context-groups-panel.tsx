@@ -19,10 +19,11 @@ type Props = {
   groups: WorkspaceContextGroupSummary[];
   reload: () => Promise<void>;
   agentId: string | undefined;
+  refreshKey?: number;
 };
 
 
-export function ContextGroupsPanel({ groups, reload, agentId }: Props) {
+export function ContextGroupsPanel({ groups, reload, agentId, refreshKey = 0 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { wsPath } = useWorkspace();
@@ -98,7 +99,13 @@ export function ContextGroupsPanel({ groups, reload, agentId }: Props) {
             </Card>
           )}
 
-          {editorGroupId !== undefined ? <ContextGroupEditor key={editorGroupId} groupId={editorGroupId} onSaved={reload} /> : null}
+          {editorGroupId !== undefined ? (
+            <ContextGroupEditor
+              key={`${editorGroupId}-${refreshKey}`}
+              groupId={editorGroupId}
+              onSaved={reload}
+            />
+          ) : null}
         </div>
       </div>
 

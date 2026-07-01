@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { config as loadEnv } from "dotenv";
 
@@ -7,5 +7,18 @@ export function loadRepoEnv(): void {
   const repoEnv = resolve(process.cwd(), "../.env");
   if (existsSync(repoEnv)) {
     loadEnv({ path: repoEnv });
+  }
+}
+
+/** Loads only DATABASE_URL from repo-root `.env` for tests that import DB modules without a live Postgres. */
+export function loadRepoDatabaseUrl(): void {
+  if (process.env.DATABASE_URL) return;
+
+  const repoEnv = resolve(process.cwd(), "../.env");
+  if (!existsSync(repoEnv)) return;
+
+  const match = readFileSync(repoEnv, "utf8").match(/^DATABASE_URL=(.+)$/m);
+  if (match?.[1]) {
+    process.env.DATABASE_URL = match[1].trim();
   }
 }

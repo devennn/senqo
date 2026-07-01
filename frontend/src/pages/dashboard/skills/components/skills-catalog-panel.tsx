@@ -10,15 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 type Props = {
   navigation: SkillsNavConfig;
+  refreshKey?: number;
 };
 
-export function SkillsCatalogPanel({ navigation }: Props) {
+export function SkillsCatalogPanel({ navigation, refreshKey = 0 }: Props) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const skillId = searchParams.get("skillId");
   const mode = searchParams.get("mode");
-  const { skills, loading, fetchSkill, createSkill, updateSkill, deleteSkill, toSkillsUrl } = useSkills(navigation);
+  const { skills, loading, fetchSkill, createSkill, updateSkill, deleteSkill, toSkillsUrl, reload } =
+    useSkills(navigation);
   const [selected, setSelected] = useState<SkillWithContent | null>(null);
+
+  useEffect(() => {
+    if (!refreshKey) return;
+    void reload();
+  }, [refreshKey, reload]);
 
   useEffect(() => {
     if (!skills.length || mode === "new") {

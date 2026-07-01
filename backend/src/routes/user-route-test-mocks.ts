@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Hono } from "hono";
+import { vi } from "vitest";
 
 vi.mock("../lib/auth-jwt.js", () => ({
   verifyToken: vi.fn(),
@@ -253,129 +252,9 @@ vi.mock("../repositories/team.js", () => ({
   addMember: vi.fn(),
 }));
 
-vi.mock("../services/agent-knowledge-import.js", () => ({
-  runAgentKnowledgeImportApply: vi.fn(),
-  runAgentKnowledgeImportPreview: vi.fn(),
+vi.mock("../lib/job-queue.js", () => ({
+  getBoss: vi.fn(),
+  QUEUE_AGENT_KNOWLEDGE_IMPORT: "agent-knowledge-import",
+  QUEUE_INBOUND_AI: "inbound-ai",
+  QUEUE_TASK_EXECUTE: "task-execute",
 }));
-
-vi.mock("../services/agent-knowledge-import-job.js", () => ({
-  dismissAgentKnowledgeImportJobForAgent: vi.fn(),
-  getAgentKnowledgeImportJob: vi.fn(),
-  listAgentKnowledgeImportJobs: vi.fn(),
-  saveAgentKnowledgeImportJobProgress: vi.fn(),
-  startAgentKnowledgeImportJob: vi.fn(),
-}));
-
-import { verifyToken } from "../lib/auth-jwt.js";
-import { validateWorkspaceMembership, isWorkspaceOwner } from "../repositories/workspaces.js";
-import { listMembers, addMember } from "../repositories/team.js";
-
-const verifyTokenMock = vi.mocked(verifyToken);
-const validateWorkspaceMembershipMock = vi.mocked(validateWorkspaceMembership);
-const isWorkspaceOwnerMock = vi.mocked(isWorkspaceOwner);
-const listMembersMock = vi.mocked(listMembers);
-const addMemberMock = vi.mocked(addMember);
-
-let app: Hono;
-
-const AUTH = {
-  Authorization: "Bearer access-token-user-1",
-  "X-Workspace-Id": "ws-1",
-  "Content-Type": "application/json",
-};
-
-beforeEach(async () => {
-  vi.clearAllMocks();
-
-  verifyTokenMock.mockImplementation((token) =>
-    token === "access-token-user-1"
-      ? Promise.resolve({ userId: "user-1" })
-      : Promise.resolve(null),
-  );
-  validateWorkspaceMembershipMock.mockResolvedValue(true);
-  isWorkspaceOwnerMock.mockResolvedValue(true);
-
-  const { default: userRoute } = await import("../routes/user.js");
-  app = new Hono().route("/", userRoute);
-});
-
-describe("GET /team", () => {
-  // Workspace members are listed for any member with workspace access.
-  it("returns members list", async () => {
-    listMembersMock.mockResolvedValue([
-      { id: "m1", email: "alice@example.com", role: "owner", joined_at: "2026-01-01T00:00:00.000Z" },
-      { id: "m2", email: "bob@example.com", role: "member", joined_at: "2026-01-02T00:00:00.000Z" },
-    ]);
-
-    const res = await app.request("/team", { headers: AUTH });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.members).toHaveLength(2);
-    expect(body.members[0].email).toBe("alice@example.com");
-  });
-});
-
-describe("POST /team", () => {
-  // Existing Senqo user is added to the workspace successfully.
-  it("adds an existing user and returns ok", async () => {
-    addMemberMock.mockResolvedValue({ ok: true, message: "member_added" });
-
-    const res = await app.request("/team", {
-      method: "POST",
-      headers: AUTH,
-      body: JSON.stringify({ email: "bob@example.com" }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    expect(addMemberMock).toHaveBeenCalledWith("ws-1", "bob@example.com");
-  });
-
-  // Email has no Senqo account → 404 with user_not_found so the UI can explain registration is required.
-  it("returns 404 user_not_found when email is not registered", async () => {
-    addMemberMock.mockResolvedValue({ ok: false, message: "user_not_found" });
-
-    const res = await app.request("/team", {
-      method: "POST",
-      headers: AUTH,
-      body: JSON.stringify({ email: "unknown@company.com" }),
-    });
-
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error).toBe("user_not_found");
-  });
-
-  // Non-owner cannot add members.
-  it("returns 403 forbidden when caller is not workspace owner", async () => {
-    isWorkspaceOwnerMock.mockResolvedValue(false);
-
-    const res = await app.request("/team", {
-      method: "POST",
-      headers: AUTH,
-      body: JSON.stringify({ email: "bob@example.com" }),
-    });
-
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error).toBe("forbidden");
-    expect(addMemberMock).not.toHaveBeenCalled();
-  });
-
-  // Already a member → 409 conflict.
-  it("returns 409 already_member when user is already in the workspace", async () => {
-    addMemberMock.mockResolvedValue({ ok: false, message: "already_member" });
-
-    const res = await app.request("/team", {
-      method: "POST",
-      headers: AUTH,
-      body: JSON.stringify({ email: "bob@example.com" }),
-    });
-
-    expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.error).toBe("already_member");
-  });
-});

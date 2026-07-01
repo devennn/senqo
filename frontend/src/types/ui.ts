@@ -157,6 +157,7 @@ export type AgentListProps = {
   attachedAgentIds: string[];
   renameAgent: (formData: FormData) => boolean | Promise<boolean>;
   archiveAgent: (formData: FormData) => void | Promise<void>;
+  onImportApplied?: () => void;
 };
 
 export type AgentListRowProps = {
@@ -166,6 +167,7 @@ export type AgentListRowProps = {
   hasBeenUsed: boolean;
   renameAgent: (formData: FormData) => boolean | Promise<boolean>;
   archiveAgent: (formData: FormData) => void | Promise<void>;
+  onImportApplied?: () => void;
 };
 
 export type CreateConnectionDialogProps = {

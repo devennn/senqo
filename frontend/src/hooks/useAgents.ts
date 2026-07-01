@@ -41,9 +41,11 @@ export function useAgents() {
   });
   const [loading, setLoading] = useState(true);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (options?: { silent?: boolean }) => {
     if (!workspaceId) return;
-    setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+    }
     try {
       const requestOptions = { workspaceId };
       const [agentsRes, toolsRes, skillsRes, connectionsRes] = await Promise.all([
@@ -81,7 +83,9 @@ export function useAgents() {
     } catch {
       // Avoid unhandled rejection toast; page shows empty/loading state.
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   }, [workspaceId]);
 

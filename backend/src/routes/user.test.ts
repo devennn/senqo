@@ -257,6 +257,19 @@ vi.mock("../repositories/agent-messages.js", () => ({
   listAgentMessages: vi.fn(),
 }));
 
+vi.mock("../services/agent-knowledge-import.js", () => ({
+  runAgentKnowledgeImportApply: vi.fn(),
+  runAgentKnowledgeImportPreview: vi.fn(),
+}));
+
+vi.mock("../services/agent-knowledge-import-job.js", () => ({
+  dismissAgentKnowledgeImportJobForAgent: vi.fn(),
+  getAgentKnowledgeImportJob: vi.fn(),
+  listAgentKnowledgeImportJobs: vi.fn(),
+  saveAgentKnowledgeImportJobProgress: vi.fn(),
+  startAgentKnowledgeImportJob: vi.fn(),
+}));
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";

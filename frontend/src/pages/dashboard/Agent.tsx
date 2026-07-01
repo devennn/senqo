@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAgents } from "@/hooks/useAgents";
 import { useWorkspace } from "@/context/workspace";
@@ -52,6 +52,7 @@ export default function AgentPage() {
   const navigate = useNavigate();
   const { workspaceId, wsPath } = useWorkspace();
   const { data, loading, reload, createAgent, renameAgent, archiveAgent } = useAgents();
+  const [workspaceDataRefreshKey, setWorkspaceDataRefreshKey] = useState(0);
   const selectedId = searchParams.get("agentId") ?? data.agents[0]?.id;
   const selectedAgent = data.agents.find((a) => a.id === selectedId) ?? data.agents[0] ?? null;
   const agentConnectionOptions = useMemo(
@@ -73,14 +74,14 @@ export default function AgentPage() {
       : tabParam === "tools"
         ? "tools"
         : tabParam === "templates"
-        ? "templates"
-        : tabParam === "handoff"
-          ? "handoff"
-          : tabParam === "context"
-            ? "context"
-            : tabParam === "assets"
-              ? "assets"
-              : "profile";
+          ? "templates"
+          : tabParam === "handoff"
+            ? "handoff"
+            : tabParam === "context"
+              ? "context"
+              : tabParam === "assets"
+                ? "assets"
+                : "profile";
 
   useEffect(() => {
     if (!success) return;
@@ -175,7 +176,10 @@ export default function AgentPage() {
             <AgentSuccessBanner success={success} />
             {tab === "skills" ? (
               <div className="mt-6">
-                <SkillsCatalogPanel navigation={skillsNavigation} />
+                <SkillsCatalogPanel
+                  navigation={skillsNavigation}
+                  refreshKey={workspaceDataRefreshKey}
+                />
               </div>
             ) : tab === "tools" ? (
               <div className="mt-6">
@@ -187,6 +191,7 @@ export default function AgentPage() {
                   groups={data.workspaceContextGroups}
                   reload={reload}
                   agentId={selectedId ?? undefined}
+                  refreshKey={workspaceDataRefreshKey}
                 />
               </div>
             ) : tab === "handoff" ? (
@@ -203,6 +208,7 @@ export default function AgentPage() {
                   groups={data.responseTemplateGroups}
                   reload={reload}
                   agentId={selectedId ?? undefined}
+                  refreshKey={workspaceDataRefreshKey}
                 />
               </div>
             ) : tab === "assets" ? (
@@ -221,6 +227,10 @@ export default function AgentPage() {
                   attachedAgentIds={data.agentIdsWithConnection}
                   renameAgent={renameAgent}
                   archiveAgent={archiveAgent}
+                  onImportApplied={() => {
+                    void reload({ silent: true });
+                    setWorkspaceDataRefreshKey((key) => key + 1);
+                  }}
                 />
                 <AgentConfigForm
                   key={`${selectedAgent.id}-${selectedAgent.updated_at}`}

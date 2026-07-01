@@ -1,11 +1,16 @@
 import { PgBoss } from "pg-boss";
 import { executeInboundDebouncedAiRun } from "../services/inbound-ai-debounce-run.js";
 import { executeScheduledTask } from "../services/task-execute-run.js";
+import {
+  executeAgentKnowledgeImportJob,
+  type AgentKnowledgeImportJobPayload,
+} from "../services/agent-knowledge-import-job-run.js";
 import type { TaskExecutePayload } from "../types/task-execute.js";
 import { env } from "./env.js";
 
 export const QUEUE_INBOUND_AI = "inbound-ai";
 export const QUEUE_TASK_EXECUTE = "task-execute";
+export const QUEUE_AGENT_KNOWLEDGE_IMPORT = "agent-knowledge-import";
 
 export type InboundAiJobData = {
   workspaceId: string;
@@ -45,6 +50,10 @@ export async function startJobQueue(): Promise<void> {
     retryLimit: 2,
     retryBackoff: true,
   });
+  await instance.createQueue(QUEUE_AGENT_KNOWLEDGE_IMPORT, {
+    expireInSeconds: 3600,
+    retryLimit: 1,
+  });
 
   await instance.work<InboundAiJobData>(QUEUE_INBOUND_AI, async (jobs) => {
     for (const job of jobs) {
@@ -70,6 +79,18 @@ export async function startJobQueue(): Promise<void> {
       console.info(
         `[JobQueue/work/task-execute] Success: taskId=${job.data.taskId ?? "none"} mode=${result.mode}`,
       );
+    }
+  });
+
+  await instance.work<AgentKnowledgeImportJobPayload>(QUEUE_AGENT_KNOWLEDGE_IMPORT, async (jobs) => {
+    for (const job of jobs) {
+      const result = await executeAgentKnowledgeImportJob(job.data);
+      if (!result.ok) {
+        console.error(
+          `[JobQueue/work/agent-knowledge-import] Failed query: jobId=${job.data.jobId} error=${result.error}`,
+        );
+        throw new Error(result.error);
+      }
     }
   });
 

@@ -36,6 +36,7 @@
     "jose": "^6.2.3",
     "nodemailer": "^9.0.0",
     "papaparse": "^5.5.3",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.21.0",
     "pg-boss": "^12.18.2",
     "resend": "^6.12.2",
@@ -47,6 +48,7 @@
     "@types/node": "^22",
     "@types/nodemailer": "^8.0.1",
     "@types/papaparse": "^5.5.2",
+    "@types/pdf-parse": "^1.1.5",
     "tsx": "^4.21.0",
     "vitest": "^3.2.4"
   }

@@ -8,6 +8,7 @@ export function AgentList({
   attachedAgentIds,
   renameAgent,
   archiveAgent,
+  onImportApplied,
 }: AgentListProps) {
   const attachedAgentIdSet = new Set(attachedAgentIds);
 
@@ -30,6 +31,7 @@ export function AgentList({
               hasBeenUsed={hasBeenUsed}
               renameAgent={renameAgent}
               archiveAgent={archiveAgent}
+              onImportApplied={onImportApplied}
             />
           );
         })}

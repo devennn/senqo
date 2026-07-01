@@ -19,9 +19,10 @@ type Props = {
   groups: WorkspaceResponseTemplateGroupSummary[];
   reload: () => Promise<void>;
   agentId: string | undefined;
+  refreshKey?: number;
 };
 
-export function ResponseTemplatesPanel({ groups, reload, agentId }: Props) {
+export function ResponseTemplatesPanel({ groups, reload, agentId, refreshKey = 0 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { wsPath } = useWorkspace();
@@ -106,7 +107,11 @@ export function ResponseTemplatesPanel({ groups, reload, agentId }: Props) {
           )}
 
           {editorGroupId !== undefined && (
-            <ResponseTemplateGroupEditor key={editorGroupId} groupId={editorGroupId} onSaved={reload} />
+            <ResponseTemplateGroupEditor
+              key={`${editorGroupId}-${refreshKey}`}
+              groupId={editorGroupId}
+              onSaved={reload}
+            />
           )}
         </div>
       </div>

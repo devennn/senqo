@@ -3,18 +3,36 @@ import { Link } from "react-router-dom";
 import { Bot, MoreVertical } from "lucide-react";
 import { useWorkspace } from "@/context/workspace";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   AgentListRowDialogs,
   type AgentListRowPanel,
 } from "@/pages/dashboard/components/agent-list-row-dialogs";
+import { AgentKnowledgeImportDialog } from "@/pages/dashboard/components/agent-knowledge-import-dialog";
+import { useAgentKnowledgeImportJobs } from "@/hooks/useAgentKnowledgeImportJobs";
 import { cn } from "@/lib/utils";
 import type { AgentListRowProps } from "@/types/ui";
+
+function importJobLabel(status: string): string {
+  switch (status) {
+    case "ready":
+      return "Review import";
+    case "failed":
+      return "Import failed";
+    case "processing":
+    case "queued":
+      return "Import in progress";
+    default:
+      return "Import docs";
+  }
+}
 
 export function AgentListRow({
   agent,
@@ -23,9 +41,18 @@ export function AgentListRow({
   hasBeenUsed,
   renameAgent,
   archiveAgent,
+  onImportApplied,
 }: AgentListRowProps) {
   const [panel, setPanel] = React.useState<AgentListRowPanel>("closed");
+  const [importOpen, setImportOpen] = React.useState(false);
+  const [resumeJobId, setResumeJobId] = React.useState<string | null>(null);
   const { wsPath } = useWorkspace();
+  const { activeJob, refresh } = useAgentKnowledgeImportJobs(agent.id);
+
+  function openImport(jobId?: string | null) {
+    setResumeJobId(jobId ?? activeJob?.id ?? null);
+    setImportOpen(true);
+  }
 
   return (
     <>
@@ -56,6 +83,15 @@ export function AgentListRow({
               aria-label="Connected"
             />
           ) : null}
+          {activeJob ? (
+            <Badge variant="secondary" className="max-w-full truncate">
+              {activeJob.status === "ready"
+                ? "Import ready"
+                : activeJob.status === "failed"
+                  ? "Import failed"
+                  : "Import running"}
+            </Badge>
+          ) : null}
         </Link>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -71,29 +107,45 @@ export function AgentListRow({
             <MoreVertical className="size-4" />
             <span className="sr-only">Open agent actions</span>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[10rem]">
+          <DropdownMenuContent align="end" className="w-auto min-w-40">
             <DropdownMenuItem onClick={() => setPanel("rename")}>
               Rename
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openImport(activeJob?.id)}>
+              {importJobLabel(activeJob?.status ?? "new")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {hasAttachedConnection ? (
               <DropdownMenuItem onClick={() => setPanel("blocked")}>
                 Archive
               </DropdownMenuItem>
             ) : hasBeenUsed ? (
               <DropdownMenuItem onClick={() => setPanel("used")}>
-                Archive agent
+                Archive
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => setPanel("archive")}
               >
-                Archive agent
+                Archive
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <AgentKnowledgeImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        agentId={agent.id}
+        profileName={agent.profile_name}
+        resumeJobId={resumeJobId}
+        onApplied={() => {
+          void refresh();
+          onImportApplied?.();
+        }}
+      />
 
       <AgentListRowDialogs
         panel={panel}

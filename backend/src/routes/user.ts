@@ -54,6 +54,17 @@ import {
   HANDOFF_TOPIC_DESCRIPTION_MAX_LEN,
 } from "../repositories/handoff-topic-groups.js";
 import {
+  runAgentKnowledgeImportApply,
+  runAgentKnowledgeImportPreview,
+} from "../services/agent-knowledge-import.js";
+import {
+  dismissAgentKnowledgeImportJobForAgent,
+  getAgentKnowledgeImportJob,
+  listAgentKnowledgeImportJobs,
+  saveAgentKnowledgeImportJobProgress,
+  startAgentKnowledgeImportJob,
+} from "../services/agent-knowledge-import-job.js";
+import {
   listWorkspaceContextGroupSummaries,
   getWorkspaceContextGroupDetail,
   createWorkspaceContextGroup,
@@ -834,6 +845,144 @@ app.post("/agents/:id/archive", async (c) => {
   });
   if (!result.ok) return c.json({ error: result.message }, 500);
   return c.json({ ok: true });
+});
+
+app.post("/agents/:id/knowledge-import/preview", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const agent = await getAgentConfigById(workspaceId, agentId);
+  if (!agent) return c.json({ error: "agent_not_found" }, 404);
+
+  const contentType = c.req.header("content-type") ?? "";
+  if (!contentType.includes("multipart/form-data")) {
+    return c.json({ error: "multipart_required" }, 415);
+  }
+
+  const formData = await c.req.formData();
+  const files = formData.getAll("files").filter((entry) => typeof entry !== "string") as File[];
+  const result = await runAgentKnowledgeImportPreview({
+    workspaceId,
+    agentId,
+    profileName: String(formData.get("profileName") ?? agent.profile_name),
+    focusHint: String(formData.get("focusHint") ?? ""),
+    targetsJson: String(formData.get("targets") ?? "[]"),
+    files,
+  });
+
+  if (!result.ok) {
+    return c.json({ error: "import_preview_failed", message: result.message }, 400);
+  }
+
+  return c.json({ ok: true, draft: result.draft });
+});
+
+app.get("/agents/:id/knowledge-import/jobs", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const agent = await getAgentConfigById(workspaceId, agentId);
+  if (!agent) return c.json({ error: "agent_not_found" }, 404);
+
+  const result = await listAgentKnowledgeImportJobs(workspaceId, agentId);
+  return c.json(result);
+});
+
+app.get("/agents/:id/knowledge-import/jobs/:jobId", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const jobId = c.req.param("jobId");
+  const agent = await getAgentConfigById(workspaceId, agentId);
+  if (!agent) return c.json({ error: "agent_not_found" }, 404);
+
+  const result = await getAgentKnowledgeImportJob(workspaceId, agentId, jobId);
+  if (!result.ok) return c.json({ error: "import_job_not_found", message: result.message }, 404);
+  return c.json({ ok: true, job: result.job });
+});
+
+app.post("/agents/:id/knowledge-import/jobs", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const agent = await getAgentConfigById(workspaceId, agentId);
+  if (!agent) return c.json({ error: "agent_not_found" }, 404);
+
+  const contentType = c.req.header("content-type") ?? "";
+  if (!contentType.includes("multipart/form-data")) {
+    return c.json({ error: "multipart_required" }, 415);
+  }
+
+  const formData = await c.req.formData();
+  const files = formData.getAll("files").filter((entry) => typeof entry !== "string") as File[];
+  const result = await startAgentKnowledgeImportJob({
+    workspaceId,
+    agentId,
+    profileName: String(formData.get("profileName") ?? agent.profile_name),
+    focusHint: String(formData.get("focusHint") ?? ""),
+    targetsJson: String(formData.get("targets") ?? "[]"),
+    files,
+  });
+
+  if (!result.ok) {
+    return c.json({ error: "import_job_failed", message: result.message }, 400);
+  }
+
+  return c.json({ ok: true, job: result.job });
+});
+
+app.patch("/agents/:id/knowledge-import/jobs/:jobId", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const jobId = c.req.param("jobId");
+  const agent = await getAgentConfigById(workspaceId, agentId);
+  if (!agent) return c.json({ error: "agent_not_found" }, 404);
+
+  const body = await c.req.json();
+  const result = await saveAgentKnowledgeImportJobProgress({
+    workspaceId,
+    agentId,
+    jobId,
+    draft: body.draft,
+    selection: body.selection,
+    workspaceRefs: body.workspaceRefs,
+  });
+
+  if (!result.ok) {
+    return c.json({ error: "import_job_save_failed", message: result.message }, 400);
+  }
+
+  return c.json({ ok: true });
+});
+
+app.post("/agents/:id/knowledge-import/jobs/:jobId/dismiss", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const jobId = c.req.param("jobId");
+  const agent = await getAgentConfigById(workspaceId, agentId);
+  if (!agent) return c.json({ error: "agent_not_found" }, 404);
+
+  const result = await dismissAgentKnowledgeImportJobForAgent(workspaceId, agentId, jobId);
+  if (!result.ok) {
+    return c.json({ error: "import_job_dismiss_failed", message: result.message }, 400);
+  }
+
+  return c.json({ ok: true });
+});
+
+app.post("/agents/:id/knowledge-import/apply", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const agent = await getAgentConfigById(workspaceId, agentId);
+  if (!agent) return c.json({ error: "agent_not_found" }, 404);
+
+  const result = await runAgentKnowledgeImportApply({
+    workspaceId,
+    agentId,
+    body: await c.req.json(),
+  });
+
+  if (!result.ok) {
+    return c.json({ error: "import_apply_failed", message: result.message }, 400);
+  }
+
+  return c.json({ ok: true, workspaceRefs: result.workspaceRefs });
 });
 
 app.delete("/agents/:id", async (c) => {
