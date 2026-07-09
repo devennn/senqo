@@ -70,7 +70,6 @@ export class BaileysSession {
   /** Message ids we sent via the API — used to suppress self outbound mirrors. */
   private readonly selfSent = new Map<string, number>();
   private readonly messageDedupe = new MessageDedupeTracker();
-  private historyIngestChain: Promise<void> = Promise.resolve();
 
   constructor(connectionId: string) {
     this.connectionId = connectionId;
@@ -105,6 +104,8 @@ export class BaileysSession {
         browser: Browsers.appropriate("Chrome"),
         markOnlineOnConnect: false,
         syncFullHistory: false,
+        // Refuse initial/recent history sync (~1y). syncFullHistory:false alone is not enough.
+        shouldSyncHistoryMessage: () => false,
         generateHighQualityLinkPreview: false,
         getMessage: async () => undefined as WAMessageContent | undefined,
       });
@@ -142,18 +143,12 @@ export class BaileysSession {
       );
     });
 
-    sock.ev.on("messaging-history.set", ({ contacts, lidPnMappings, messages }) => {
+    // Contacts / LID only — do not ingest history message batches (old conversation sync).
+    sock.ev.on("messaging-history.set", ({ contacts, lidPnMappings }) => {
       if (lidPnMappings?.length) {
         for (const m of lidPnMappings) learnFromLidMapping(this.connectionId, m);
       }
       if (contacts?.length) this.onContacts(contacts);
-      if (messages?.length) {
-        logger.info(
-          { connectionId: this.connectionId, count: messages.length },
-          "messaging-history backfill batch",
-        );
-        this.enqueueHistoryIngest(messages);
-      }
     });
 
     sock.ev.on("groups.update", (updates) => {
@@ -178,23 +173,6 @@ export class BaileysSession {
       learnFromMessageKey(this.connectionId, msg.key);
       void this.onMessage(msg, source);
     }
-  }
-
-  private enqueueHistoryIngest(messages: Parameters<typeof buildMessageEvent>[1][]): void {
-    this.historyIngestChain = this.historyIngestChain
-      .then(async () => {
-        for (const msg of messages) {
-          if (!shouldIngestBaileysMessage(msg)) continue;
-          learnFromMessageKey(this.connectionId, msg.key);
-          await this.onMessage(msg, "history");
-        }
-      })
-      .catch((error) => {
-        logger.error(
-          { connectionId: this.connectionId, error: String(error) },
-          "history backfill batch failed",
-        );
-      });
   }
 
   private onContacts(contacts: Contact[]): void {

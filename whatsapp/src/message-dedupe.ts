@@ -8,8 +8,8 @@ const DEDUPE_MAX_ENTRIES = 100_000;
 
 /**
  * Prevents duplicate webhook delivery when Baileys replays the same message via
- * `notify`, `append`, and `messaging-history.set`. Backend dedupes too; this
- * avoids redundant work and oversized payloads on reconnect.
+ * `notify` and `append`. Backend dedupes too; this avoids redundant work and
+ * oversized payloads on reconnect.
  */
 export class MessageDedupeTracker {
   private readonly delivered = new Map<string, number>();

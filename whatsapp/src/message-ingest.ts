@@ -2,7 +2,7 @@ import { getHistoryMsg, type proto } from "baileys";
 import { isIngestableDmChatJid } from "./jid.js";
 import { unwrapMessage } from "./media.js";
 
-export type MessageIngestSource = "notify" | "append" | "history";
+export type MessageIngestSource = "notify" | "append";
 
 /** Upsert types we ingest — `append` is offline / catch-up replay. */
 export function isIngestableUpsertType(type: string): boolean {
