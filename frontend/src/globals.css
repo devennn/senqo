@@ -89,46 +89,55 @@
     0 4px 16px rgb(21 28 39 / 6%),
     0 8px 24px rgb(16 185 129 / 10%);
   --shadow-elevated: 0 12px 40px rgb(0 0 0 / 8%);
+  --chat-outgoing: #d9fdd3;
+  --chat-outgoing-foreground: #151c27;
+  --chat-incoming: #ffffff;
+  --chat-incoming-foreground: #151c27;
 }
 
 .dark {
-  --background: #151c27;
+  /* DESIGN.md — dark theme (elevated charcoal + mint primary) */
+  --background: #0f1419;
   --foreground: #ebf1ff;
-  --card: #2a313d;
+  --card: #1a222d;
   --card-foreground: #ebf1ff;
-  --popover: #2a313d;
+  --popover: #1a222d;
   --popover-foreground: #ebf1ff;
   --primary: #4edea3;
   --primary-foreground: #002113;
-  --secondary: #3b4a44;
+  --secondary: #24352f;
   --secondary-foreground: #d5e6df;
-  --muted: #2a313d;
-  --muted-foreground: #bacac3;
-  --accent: #0b513d;
+  --muted: #24303c;
+  --muted-foreground: #a8b8b2;
+  --accent: #1a3d32;
   --accent-foreground: #b0f0d6;
-  --destructive: #ffdad6;
-  --destructive-foreground: #93000a;
-  --border: rgb(235 241 255 / 12%);
-  --input: rgb(235 241 255 / 14%);
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+  --border: rgb(235 241 255 / 14%);
+  --input: rgb(235 241 255 / 16%);
   --ring: #4edea3;
   --chart-1: #4edea3;
   --chart-2: #95d3ba;
   --chart-3: #bacac3;
   --chart-4: #71af97;
   --chart-5: #6ffbbe;
-  --sidebar: #2a313d;
+  --sidebar: #141b24;
   --sidebar-foreground: #ebf1ff;
   --sidebar-primary: #4edea3;
   --sidebar-primary-foreground: #002113;
-  --sidebar-accent: #0b513d;
+  --sidebar-accent: #1a3d32;
   --sidebar-accent-foreground: #b0f0d6;
   --sidebar-border: rgb(235 241 255 / 12%);
   --sidebar-ring: #4edea3;
+  --chat-outgoing: #1b5c45;
+  --chat-outgoing-foreground: #ebf1ff;
+  --chat-incoming: #24303c;
+  --chat-incoming-foreground: #ebf1ff;
   --shadow-ambient:
-    0 1px 2px rgb(0 0 0 / 20%),
-    0 4px 16px rgb(0 0 0 / 18%),
-    0 8px 24px rgb(78 222 163 / 12%);
-  --shadow-elevated: 0 12px 40px rgb(0 0 0 / 35%);
+    0 1px 2px rgb(0 0 0 / 28%),
+    0 4px 16px rgb(0 0 0 / 22%),
+    0 8px 24px rgb(78 222 163 / 10%);
+  --shadow-elevated: 0 12px 40px rgb(0 0 0 / 40%);
 }
 
 @layer base {
@@ -182,12 +191,29 @@
   }
 }
 
+@keyframes conversation-message-target-flash-dark {
+  0% {
+    box-shadow: 0 0 0 0 rgb(78 222 163 / 40%);
+  }
+  30% {
+    box-shadow: 0 0 0 3px rgb(78 222 163 / 28%);
+    filter: brightness(1.08);
+  }
+  100% {
+    box-shadow: var(--shadow-ambient);
+    filter: none;
+  }
+}
+
 @layer utilities {
   .conversation-message-target-flash {
     animation: conversation-message-target-flash 1.6s ease-out;
   }
+  .dark .conversation-message-target-flash {
+    animation: conversation-message-target-flash-dark 1.6s ease-out;
+  }
   .glass {
-    background: rgb(255 255 255 / 96%);
+    background: color-mix(in srgb, var(--card) 96%, transparent);
     border-bottom: 1px solid var(--border);
   }
   .shadow-soft {
@@ -208,11 +234,31 @@
       radial-gradient(circle at 88% 12%, rgb(113 175 151 / 8%), transparent 24rem),
       linear-gradient(135deg, #f9f9ff, #ecfdf5);
   }
+  .dark .bg-app-shell {
+    background:
+      radial-gradient(circle at 8% 8%, rgb(78 222 163 / 7%), transparent 28rem),
+      radial-gradient(circle at 88% 12%, rgb(43 105 84 / 12%), transparent 24rem),
+      linear-gradient(135deg, #0f1419, #141b24);
+  }
   .bg-chat-thread {
     background-image:
       radial-gradient(circle at 1px 1px, rgb(16 185 129 / 9%) 1px, transparent 0),
       linear-gradient(180deg, rgb(255 255 255 / 85%), rgb(249 249 255 / 92%));
     background-size: 24px 24px, 100% 100%;
+  }
+  .dark .bg-chat-thread {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgb(78 222 163 / 8%) 1px, transparent 0),
+      linear-gradient(180deg, rgb(15 20 25 / 92%), rgb(20 27 36 / 96%));
+    background-size: 24px 24px, 100% 100%;
+  }
+  .bg-chat-outgoing {
+    background-color: var(--chat-outgoing);
+    color: var(--chat-outgoing-foreground);
+  }
+  .bg-chat-incoming {
+    background-color: var(--chat-incoming);
+    color: var(--chat-incoming-foreground);
   }
   .text-balance {
     text-wrap: balance;

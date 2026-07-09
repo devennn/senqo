@@ -124,6 +124,18 @@ The palette centers on a vibrant, health-conscious green.
 - **Tertiary:** A deep forest green (#064E3B) reserved for high-contrast text or grounding elements.
 - **Neutral:** A balanced slate-gray scale used for body text and borders to ensure the green remains the focal point.
 
+### Dark theme
+
+Dark mode is a first-class surface, not an inverted light theme. Tokens live under `.dark` in `frontend/src/globals.css`. Rules:
+
+- **Surfaces stay dark end-to-end.** Page shell, chat thread, cards, and panels must use dark tokens — never hardcode light fills (`#ffffff`, `#f9f9ff`, `#ecfdf5`, WhatsApp mint `#d9fdd3`) without a `dark:` counterpart.
+- **Primary shifts to mint** (`inverse-primary` / `#4EDEA3`) on dark surfaces so CTAs remain visible; **on-primary** stays near-black (`#002113`) for contrast on that mint.
+- **Cards / panels:** solid elevated charcoal (not translucent glass), Level 1 dark shadow, hairline light border at ~12% opacity. Nested rows use a deeper secondary/muted fill — not pale mint.
+- **Text:** `foreground` / `on-surface` for primary copy; `muted-foreground` must stay clearly readable on card and list backgrounds (avoid light-theme slate on dark fills).
+- **Chat bubbles:** outgoing uses a deep green fill with light text; incoming uses elevated muted/card fill with light text. Do not reuse light-mode bubble colors in dark mode.
+- **Destructive:** solid error red with white label in both themes (same as light) — not soft error-container pink.
+- **Shell / chat utilities** (`bg-app-shell`, `bg-chat-thread`, `glass`) must resolve through theme tokens so they adapt with `.dark`.
+
 ## Typography
 
 This design system utilizes **Lexend** across all levels. Lexend was chosen for its unique intersection of "fun" rounded terminals and "clear" hyper-legibility.
@@ -140,10 +152,11 @@ Spacing is governed by an 8px linear scale. To achieve the "generous whitespace"
 
 Depth is created through **Tonal Layering**, **Ambient Shadows**, and a **hairline outline** on raised surfaces.
 
-- **Page and content-panel backgrounds** stay on their existing tokens (for example `background`, `bg-card/95` shells) — do **not** change them to fix card contrast. **Cards** use solid white (#FFFFFF), Level 1 shadow, and outline-variant border so they read clearly on any light surface.
-- **Level 1 (cards, panels):** `0 1px 2px rgba(21, 28, 39, 0.06), 0 4px 16px rgba(21, 28, 39, 0.06), 0 8px 24px rgba(16, 185, 129, 0.1)` plus a **1px** `outline-variant` border (#BBCABF). Cards must remain visible without hover; do not rely on shadow alone.
-- **Level 2 (modals, sheets):** `0 12px 40px rgba(0, 0, 0, 0.08)` (no extra border on the shell).
-- **Secondary** green (#ECFDF5) is for inset rows, chips, and nested blocks inside a card — not for the outer card shell.
+- **Page and content-panel backgrounds** stay on their existing tokens (for example `background`, `bg-card/95` shells) — do **not** change them to fix card contrast. **Cards (light):** solid white (#FFFFFF), Level 1 shadow, and outline-variant border so they read clearly on any light surface. **Cards (dark):** solid elevated charcoal (`--card`), Level 1 dark shadow, and a light hairline border — never force white card shells in dark mode.
+- **Level 1 (cards, panels, light):** `0 1px 2px rgba(21, 28, 39, 0.06), 0 4px 16px rgba(21, 28, 39, 0.06), 0 8px 24px rgba(16, 185, 129, 0.1)` plus a **1px** `outline-variant` border (#BBCABF). Cards must remain visible without hover; do not rely on shadow alone.
+- **Level 1 (dark):** stronger ambient black shadow plus a soft primary glow; border at ~12% light opacity.
+- **Level 2 (modals, sheets):** light `0 12px 40px rgba(0, 0, 0, 0.08)`; dark `0 12px 40px rgba(0, 0, 0, 0.35)` (no extra border on the shell).
+- **Secondary** green (#ECFDF5) is for inset rows, chips, and nested blocks inside a card in light mode — not for the outer card shell. In dark mode use `--secondary` / `--muted` deep fills instead.
 
 ## Shapes
 
@@ -155,9 +168,9 @@ The shape language is **Rounded**, echoing the geometry of the Lexend typeface.
 
 ## Components
 
-- **Buttons:** Primary buttons feature a solid Primary Green fill with white text. Hover states should transition to a slightly darker shade. Secondary buttons use a Primary Green border with the Secondary Green background tint. **Delete** and other destructive confirms use the `destructive` variant: solid error red (`#BA1A1A`) with white label text — not outline or muted tints.
+- **Buttons:** Primary buttons feature a solid Primary Green fill with white text (light) or mint fill with near-black text (dark). Hover states should transition to a slightly darker/richer shade. Secondary buttons use a Primary border with the Secondary tint. **Delete** and other destructive confirms use the `destructive` variant: solid error red (`#BA1A1A`) with white label text in both themes — not outline, muted tints, or soft error-container pink.
 - **Inputs:** Fields use a 1px border in a light neutral, which transitions to a 2px Primary Green border on focus. Labels sit clearly above the field in a `label-md` style.
-- **Cards:** Cards are the primary vessel for information. Use solid white (`#FFFFFF`) on the page background, **Level 1** shadow, **1px** `outline-variant` border (#BBCABF), and **1rem** corner radius. Do not use `opacity` / `backdrop-blur` on the card shell. Nested content rows may use **Secondary** (#ECFDF5) fill with the same hairline border.
+- **Cards:** Cards are the primary vessel for information. **Light:** solid white (`#FFFFFF`), **Level 1** shadow, **1px** `outline-variant` border (#BBCABF), **1rem** corner radius. **Dark:** solid `--card` charcoal with the dark Level 1 shadow and light hairline border. Do not use `opacity` / `backdrop-blur` on the card shell. Nested content rows may use **Secondary** (light) or `--muted` / `--secondary` (dark) fill with the same hairline border.
 - **Chips:** Highly rounded (pill-shaped) with the Secondary Green background and Primary Green text.
 - **Lists:** Items are separated by generous 16px vertical gaps rather than thin lines, using white space as the primary separator.
 - **Progress Indicators:** Use soft, rounded caps on all bar elements to match the shape language.

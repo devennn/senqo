@@ -96,9 +96,9 @@ export function ConversationMessageItem({
       ? getGroupParticipantColorClassesByParticipantOrder(participantOrder)
       : null;
   const quoteClass = isAi
-    ? "border-purple-500/70 bg-purple-500/5"
+    ? "border-purple-500/70 bg-purple-500/10 dark:border-purple-400/60 dark:bg-purple-500/15"
     : isHumanOutgoing
-      ? "border-primary/80 bg-white/70"
+      ? "border-primary/80 bg-background/70 dark:bg-black/25"
       : "border-muted-foreground/30 bg-muted/30";
   const isAudioMessage = message.media?.mimeType?.startsWith("audio/") ?? false;
   const showContent = !isAudioMessage && message.content.trim().length > 0;
@@ -118,11 +118,15 @@ export function ConversationMessageItem({
               "flex size-8 shrink-0 items-center justify-center rounded-full",
               groupParticipantStyles?.avatarWrapClass,
               !groupParticipantStyles &&
-                (isAi ? "bg-purple-500/10" : isHumanOutgoing ? "bg-primary/10" : "bg-background"),
+                (isAi
+                  ? "bg-purple-500/10 dark:bg-purple-500/20"
+                  : isHumanOutgoing
+                    ? "bg-primary/10 dark:bg-primary/20"
+                    : "bg-muted"),
             )}
           >
             {isAi ? (
-              <Bot className="size-4 text-purple-700" />
+              <Bot className="size-4 text-purple-700 dark:text-purple-300" />
             ) : (
               <User
                 className={cn(
@@ -145,10 +149,14 @@ export function ConversationMessageItem({
           >
             <div
               className={cn(
-                "rounded-2xl px-4 py-3 text-[0.95rem] leading-relaxed text-foreground shadow-sm ring-1 ring-black/5",
+                "rounded-2xl px-4 py-3 text-[0.95rem] leading-relaxed shadow-sm ring-1 ring-black/5 dark:ring-white/10",
                 isUser ? "rounded-tl-sm" : "rounded-tr-sm",
                 groupParticipantStyles?.bubbleAccentClass,
-                isAi ? "bg-purple-500/10" : isHumanOutgoing ? "bg-[#d9fdd3]" : "bg-white",
+                isAi
+                  ? "bg-purple-500/10 text-foreground dark:bg-purple-500/20"
+                  : isHumanOutgoing
+                    ? "bg-chat-outgoing"
+                    : "bg-chat-incoming",
                 isFlashing && "conversation-message-target-flash",
               )}
             >
@@ -158,7 +166,11 @@ export function ConversationMessageItem({
                     "mb-1 text-[0.68rem] font-semibold uppercase tracking-wide",
                     groupParticipantStyles?.labelClass,
                     !groupParticipantStyles &&
-                      (isAi ? "text-purple-700" : isHumanOutgoing ? "text-primary" : "text-muted-foreground"),
+                      (isAi
+                        ? "text-purple-700 dark:text-purple-300"
+                        : isHumanOutgoing
+                          ? "text-primary dark:text-primary"
+                          : "text-muted-foreground"),
                   )}
                 >
                   {senderLabel}
@@ -182,7 +194,7 @@ export function ConversationMessageItem({
               {messageTimeLabel ? (
                 <div className="mt-1 flex justify-end">
                   <time
-                    className="text-[0.68rem] leading-none text-muted-foreground/80"
+                    className="text-[0.68rem] leading-none opacity-65"
                     dateTime={message.created_at}
                   >
                     {messageTimeLabel}
