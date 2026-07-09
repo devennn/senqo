@@ -429,6 +429,7 @@ async function handleIncomingMessageReceived(
     webhookType: input.webhookType,
     messageType,
     webhookMessageId,
+    whatsappMessageId: webhookMessageId,
     senderChatId,
     receiverChatId,
     receiverPhone,
@@ -507,6 +508,7 @@ async function handleIncomingMessageReceived(
     "human",
     {
       createdAt: messageTimestamp,
+      waMessageId: webhookMessageId,
     },
   );
   if (!created.ok)
@@ -514,6 +516,13 @@ async function handleIncomingMessageReceived(
       received: true,
       message: "ignored: failed to save message",
     });
+  // Same Baileys id already persisted (e.g. API send beat outbound_mirror) — treat as success.
+  if (!created.created) {
+    return Response.json({
+      received: true,
+      message: "ignored: duplicate whatsapp message id",
+    });
+  }
 
   if (
     input.webhookType === "message.outbound_mirror" &&

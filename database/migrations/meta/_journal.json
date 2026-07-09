@@ -43,6 +43,13 @@
       "when": 1780540924804,
       "tag": "0005_agent_knowledge_import_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780540924805,
+      "tag": "0006_messages_wa_message_id_unique",
+      "breakpoints": true
     }
   ]
 }

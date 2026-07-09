@@ -197,6 +197,7 @@ export type InsertAgentMessageInput = {
   role: AgentMessageRole;
   content: unknown;
   providerOptions?: Record<string, unknown>;
+  waMessageId?: string | null;
 };
 
 export type AgentSessionRecord = {
@@ -243,6 +244,14 @@ export type ConversationMessageSenderInput = {
 export type ConversationMessageCreateOptions = {
   sender?: ConversationMessageSenderInput;
   createdAt?: string | null;
+  /** Baileys message key id; used for idempotent inserts when set. */
+  waMessageId?: string | null;
+};
+
+export type CreateConversationMessageResult = {
+  ok: boolean;
+  /** False when a row with the same workspace + wa_message_id already existed. */
+  created: boolean;
 };
 
 export type ConversationLabelAssignmentSource = "user" | "ai";

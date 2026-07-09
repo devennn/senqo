@@ -3,6 +3,7 @@ import { releaseWorkspaceStorage, reserveWorkspaceStorage } from "./workspace-st
 import type {
   CreateConnectionInput,
   ConversationMessageCreateOptions,
+  CreateConversationMessageResult,
   ManualWhatsappSendTarget,
   WhatsappContactInfoInput,
   WhatsappConnectionEvent,
@@ -1349,6 +1350,30 @@ export async function mergeAiReasoningOntoAgentRunMessages(input: {
   }
 }
 
+function resolveWaMessageId(
+  options?: ConversationMessageCreateOptions,
+  metadata?: Record<string, unknown>,
+): string | null {
+  const fromOptions =
+    typeof options?.waMessageId === "string" ? options.waMessageId.trim() : "";
+  if (fromOptions) return fromOptions;
+  if (!metadata) return null;
+  for (const key of ["whatsappMessageId", "webhookMessageId", "greenMessageId"] as const) {
+    const value = metadata[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function withNormalizedWhatsappMessageId(
+  metadata: Record<string, unknown>,
+  waMessageId: string | null,
+): Record<string, unknown> {
+  if (!waMessageId) return metadata;
+  if (metadata.whatsappMessageId === waMessageId) return metadata;
+  return { ...metadata, whatsappMessageId: waMessageId };
+}
+
 export async function createConversationMessage(
   workspaceId: string,
   conversationId: string,
@@ -1357,20 +1382,43 @@ export async function createConversationMessage(
   metadata?: Record<string, unknown>,
   outgoingSenderType?: "ai_agent" | "human" | null,
   options?: ConversationMessageCreateOptions
-): Promise<{ ok: boolean }> {
+): Promise<CreateConversationMessageResult> {
   try {
     const createdAt = options?.createdAt ?? null;
-    await db.insert(messages).values({
+    const baseMetadata = metadata ?? {};
+    const waMessageId = resolveWaMessageId(options, baseMetadata);
+    const normalizedMetadata = withNormalizedWhatsappMessageId(baseMetadata, waMessageId);
+
+    const insertQuery = db.insert(messages).values({
       workspaceId,
       conversationId,
       role,
       content,
-      metadata: metadata ?? {},
+      metadata: normalizedMetadata,
       outgoingSenderType: outgoingSenderType ?? null,
       whatsappSenderChatId: options?.sender?.whatsappSenderChatId ?? null,
       whatsappSenderName: options?.sender?.whatsappSenderName ?? null,
+      waMessageId,
       createdAt: createdAt ? new Date(createdAt) : undefined,
     });
+
+    const inserted = waMessageId
+      ? await insertQuery
+          .onConflictDoNothing({
+            target: [messages.workspaceId, messages.waMessageId],
+            where: sql`${messages.waMessageId} is not null`,
+          })
+          .returning({ id: messages.id })
+      : await insertQuery.returning({ id: messages.id });
+
+    const created = inserted.length > 0;
+    if (!created) {
+      console.info(
+        `[${scope}/createConversationMessage] Success: duplicate skipped workspaceId=${workspaceId} waMessageId=${waMessageId}`
+      );
+      return { ok: true, created: false };
+    }
+
     const updateTime = createdAt ? new Date(createdAt) : new Date();
     await db
       .update(conversations)
@@ -1383,10 +1431,10 @@ export async function createConversationMessage(
       );
     console.info(`[${scope}/createConversationMessage] Success: userId=${workspaceId}`);
     publishRealtime(workspaceId, { type: "message.created", conversationId });
-    return { ok: true };
+    return { ok: true, created: true };
   } catch (error) {
     console.error(`[${scope}/createConversationMessage] Unexpected error: ${String(error)}`);
-    return { ok: false };
+    return { ok: false, created: false };
   }
 }
 

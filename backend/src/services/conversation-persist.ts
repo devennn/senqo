@@ -41,6 +41,11 @@ async function ensureSessionAndInsertAgentMessage(input: {
     }
   }
 
+  const waMessageId =
+    typeof input.providerOptions.whatsappMessageId === "string"
+      ? input.providerOptions.whatsappMessageId.trim()
+      : "";
+
   const persisted = await insertAgentMessages(
     [
       {
@@ -49,6 +54,7 @@ async function ensureSessionAndInsertAgentMessage(input: {
         role: input.role,
         content: asStorableAgentMessageContent(input.role, input.content),
         providerOptions: input.providerOptions,
+        waMessageId: waMessageId || null,
       },
     ],
     { ignoreDuplicates: true }

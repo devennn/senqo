@@ -211,6 +211,7 @@ export type InsertAgentMessageInput = {
   role: AgentMessageRole;
   content: unknown;
   providerOptions?: Record<string, unknown>;
+  waMessageId?: string | null;
 };
 
 export type AgentSessionRecord = {

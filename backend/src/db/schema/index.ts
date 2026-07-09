@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -8,6 +9,7 @@ import {
   jsonb,
   unique,
   index,
+  uniqueIndex,
   primaryKey,
 } from "drizzle-orm/pg-core";
 
@@ -165,12 +167,16 @@ export const messages = pgTable(
     outgoingSenderType: text("outgoing_sender_type"),
     whatsappSenderChatId: text("whatsapp_sender_chat_id"),
     whatsappSenderName: text("whatsapp_sender_name"),
+    waMessageId: text("wa_message_id"),
   },
   (t) => [
     index("idx_messages_conversation_created").on(
       t.conversationId,
       t.createdAt.asc(),
     ),
+    uniqueIndex("idx_messages_workspace_wa_message_id_unique")
+      .on(t.workspaceId, t.waMessageId)
+      .where(sql`${t.waMessageId} is not null`),
   ],
 );
 
@@ -314,7 +320,9 @@ export const agentMessages = pgTable(
       t.workspaceId,
       t.createdAt.desc(),
     ),
-    index("idx_agent_messages_wa_message_id").on(t.waMessageId),
+    uniqueIndex("idx_agent_messages_workspace_wa_message_id_unique")
+      .on(t.workspaceId, t.waMessageId)
+      .where(sql`${t.waMessageId} is not null`),
   ],
 );
 

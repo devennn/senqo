@@ -1,4 +1,4 @@
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   agentMessages,
@@ -9,6 +9,15 @@ import type {
 } from "../types/repositories.js";
 
 const scope = "AgentMessagesRepository";
+
+function resolveAgentWaMessageId(item: InsertAgentMessageInput): string | null {
+  const fromInput =
+    typeof item.waMessageId === "string" ? item.waMessageId.trim() : "";
+  if (fromInput) return fromInput;
+  const fromOptions = item.providerOptions?.whatsappMessageId;
+  if (typeof fromOptions === "string" && fromOptions.trim()) return fromOptions.trim();
+  return null;
+}
 
 export async function listAgentMessages(
   workspaceId: string,
@@ -52,10 +61,17 @@ export async function insertAgentMessages(
       role: item.role,
       content: item.content as never,
       providerOptions: item.providerOptions ?? null,
+      waMessageId: resolveAgentWaMessageId(item),
     }));
 
     if (options?.ignoreDuplicates) {
-      await db.insert(agentMessages).values(rows).onConflictDoNothing();
+      await db
+        .insert(agentMessages)
+        .values(rows)
+        .onConflictDoNothing({
+          target: [agentMessages.workspaceId, agentMessages.waMessageId],
+          where: sql`${agentMessages.waMessageId} is not null`,
+        });
     } else {
       await db.insert(agentMessages).values(rows);
     }

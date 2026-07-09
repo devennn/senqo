@@ -124,6 +124,7 @@ export async function sendAgentWhatsappMessage(input: {
           },
         },
         "ai_agent",
+        { waMessageId: sent.messageId || null },
       );
 
       console.info(
@@ -142,6 +143,7 @@ export async function sendAgentWhatsappMessage(input: {
       message,
       { ...baseMeta, whatsappMessageId: sent.messageId },
       "ai_agent",
+      { waMessageId: sent.messageId || null },
     );
 
     console.info(

@@ -38,7 +38,7 @@ describe("sendManualConversationMessage", () => {
   it("persists message, mirrors to agent transcript, and returns ok on success", async () => {
     mockGetManualWhatsappSendTarget.mockResolvedValue(mockTarget);
     mockSendTextMessage.mockResolvedValue({ messageId: "wa-msg-1" });
-    mockCreateConversationMessage.mockResolvedValue({ ok: true });
+    mockCreateConversationMessage.mockResolvedValue({ ok: true, created: true });
     mockPersistHumanOutboundText.mockResolvedValue({ ok: true });
 
     const result = await sendManualConversationMessage({
@@ -59,7 +59,15 @@ describe("sendManualConversationMessage", () => {
       chatId: "test-chat-id",
       text: "Hello from manual",
     });
-    expect(mockCreateConversationMessage).toHaveBeenCalled();
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Hello from manual",
+      expect.objectContaining({ whatsappMessageId: "wa-msg-1" }),
+      "human",
+      { waMessageId: "wa-msg-1" },
+    );
     expect(mockPersistHumanOutboundText).toHaveBeenCalled();
   });
 
@@ -99,7 +107,7 @@ describe("sendManualConversationMessage", () => {
   it("returns error when createConversationMessage fails", async () => {
     mockGetManualWhatsappSendTarget.mockResolvedValue(mockTarget);
     mockSendTextMessage.mockResolvedValue({ messageId: "wa-msg-1" });
-    mockCreateConversationMessage.mockResolvedValue({ ok: false });
+    mockCreateConversationMessage.mockResolvedValue({ ok: false, created: false });
 
     const result = await sendManualConversationMessage({
       workspaceId: "ws-1",
@@ -117,7 +125,7 @@ describe("sendManualConversationMessage", () => {
   it("trims whitespace from message before sending", async () => {
     mockGetManualWhatsappSendTarget.mockResolvedValue(mockTarget);
     mockSendTextMessage.mockResolvedValue({ messageId: "wa-msg-2" });
-    mockCreateConversationMessage.mockResolvedValue({ ok: true });
+    mockCreateConversationMessage.mockResolvedValue({ ok: true, created: true });
     mockPersistHumanOutboundText.mockResolvedValue({ ok: true });
 
     const result = await sendManualConversationMessage({
@@ -134,6 +142,7 @@ describe("sendManualConversationMessage", () => {
       "Hello trimmed",
       expect.any(Object),
       "human",
+      { waMessageId: "wa-msg-2" },
     );
   });
 });

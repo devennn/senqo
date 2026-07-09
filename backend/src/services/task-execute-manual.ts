@@ -119,6 +119,7 @@ export async function sendScheduledTaskAsManualWhatsapp(input: {
           whatsappMessageId: sent.messageId,
         },
         "human",
+        { waMessageId: sent.messageId || null },
       );
       if (!savedText.ok) {
         return { ok: false, error: "Message sent but failed to save to the database." };
@@ -142,6 +143,7 @@ export async function sendScheduledTaskAsManualWhatsapp(input: {
           },
         },
         "human",
+        { waMessageId: fileMessageId || null },
       );
       if (!savedFile.ok) {
         return { ok: false, error: "Message sent but failed to save the attachment to the database." };
@@ -159,6 +161,7 @@ export async function sendScheduledTaskAsManualWhatsapp(input: {
           whatsappFileMessageId: fileMessageId,
         },
         "human",
+        { waMessageId: sent.messageId || null },
       );
       if (!saved.ok) {
         return { ok: false, error: "Message sent but failed to save to the database." };

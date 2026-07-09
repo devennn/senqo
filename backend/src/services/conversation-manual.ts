@@ -46,7 +46,8 @@ export async function sendManualConversationMessage(input: {
         whatsappMessageId: sent.messageId,
         whatsappConnectionId: target.connection.id,
       },
-      "human"
+      "human",
+      { waMessageId: sent.messageId || null },
     );
 
     if (!saved.ok) {
@@ -127,7 +128,8 @@ export async function sendManualConversationMedia(
           caption,
         },
       },
-      "human"
+      "human",
+      { waMessageId: sent.messageId || null },
     );
 
     if (!saved.ok) {
