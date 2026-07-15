@@ -14,6 +14,7 @@ type Props = {
   profileName: string;
   resumeJobId?: string | null;
   onApplied?: () => void;
+  onCleared?: () => void;
 };
 
 export function AgentKnowledgeImportDialog({
@@ -23,6 +24,7 @@ export function AgentKnowledgeImportDialog({
   profileName,
   resumeJobId,
   onApplied,
+  onCleared,
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -46,6 +48,7 @@ export function AgentKnowledgeImportDialog({
               profileName={profileName}
               resumeJobId={resumeJobId}
               onApplied={onApplied}
+              onCleared={onCleared}
               onDone={() => onOpenChange(false)}
               onRunInBackground={() => onOpenChange(false)}
             />

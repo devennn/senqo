@@ -145,6 +145,9 @@ export function AgentListRow({
           void refresh();
           onImportApplied?.();
         }}
+        onCleared={() => {
+          void refresh();
+        }}
       />
 
       <AgentListRowDialogs

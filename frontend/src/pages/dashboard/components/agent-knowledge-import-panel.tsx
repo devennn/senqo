@@ -17,6 +17,7 @@ type Props = {
   resumeJobId?: string | null;
   onDone?: () => void;
   onApplied?: () => void;
+  onCleared?: () => void;
   onRunInBackground?: () => void;
 };
 
@@ -26,6 +27,7 @@ export function AgentKnowledgeImportPanel({
   resumeJobId,
   onDone,
   onApplied,
+  onCleared,
   onRunInBackground,
 }: Props) {
   const {
@@ -55,7 +57,7 @@ export function AgentKnowledgeImportPanel({
     discardSkill,
     discardTemplateGroup,
     discardTemplateEntry,
-  } = useAgentKnowledgeImport({ agentId, profileName, resumeJobId, onApplied });
+  } = useAgentKnowledgeImport({ agentId, profileName, resumeJobId, onApplied, onCleared });
 
   if (phase === "processing") {
     return (

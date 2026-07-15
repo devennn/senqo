@@ -22,6 +22,7 @@ import {
 } from "@/lib/agent-knowledge-import-selection";
 import {
   applyAgentKnowledgeImport,
+  dismissAgentKnowledgeImportJob,
   getAgentKnowledgeImportJob,
   saveAgentKnowledgeImportJobProgress,
   startAgentKnowledgeImportJob,
@@ -85,6 +86,7 @@ type ImportScope = {
   profileName: string;
   resumeJobId?: string | null;
   onApplied?: () => void;
+  onCleared?: () => void;
 };
 
 export function useAgentKnowledgeImport({
@@ -92,6 +94,7 @@ export function useAgentKnowledgeImport({
   profileName,
   resumeJobId,
   onApplied,
+  onCleared,
 }: ImportScope) {
   const [phase, setPhase] = useState<AgentKnowledgeImportPhase>("upload");
   const [jobId, setJobId] = useState<string | null>(resumeJobId ?? null);
@@ -270,14 +273,15 @@ export function useAgentKnowledgeImport({
     }
   }, [agentId, canGenerate, files, focusHint, profileName, targets]);
 
-  const finishIfReviewComplete = useCallback(
-    (nextDraft: AgentKnowledgeImportDraft, nextSelection: AgentKnowledgeImportSelection) => {
-      if (isImportReviewComplete(nextDraft, nextSelection)) {
-        setPhase("applied");
-      }
-    },
-    [],
-  );
+  const dismissCurrentJob = useCallback(async () => {
+    const currentJobId = jobIdRef.current;
+    if (!currentJobId) return;
+    try {
+      await dismissAgentKnowledgeImportJob(agentId, currentJobId);
+    } catch {
+      // Best-effort — local clear still proceeds.
+    }
+  }, [agentId]);
 
   const runApply = useCallback(
     async (payload: AgentKnowledgeImportDraft, nextSelection: AgentKnowledgeImportSelection) => {
@@ -304,8 +308,6 @@ export function useAgentKnowledgeImport({
       const nextRefs = mergeWorkspaceRefs(workspaceRefsRef.current, result.workspaceRefs);
       setSelection(appliedSelection);
       setWorkspaceRefs(nextRefs);
-      finishIfReviewComplete(draft, appliedSelection);
-      onApplied?.();
       if (jobIdRef.current) {
         await saveAgentKnowledgeImportJobProgress(agentId, jobIdRef.current, {
           draft,
@@ -313,8 +315,13 @@ export function useAgentKnowledgeImport({
           workspaceRefs: nextRefs,
         }).catch(() => undefined);
       }
+      if (isImportReviewComplete(draft, appliedSelection)) {
+        setPhase("applied");
+        await dismissCurrentJob();
+      }
+      onApplied?.();
     },
-    [agentId, draft, finishIfReviewComplete, onApplied, runApply],
+    [agentId, dismissCurrentJob, draft, onApplied, runApply],
   );
 
   const applyAllPending = useCallback(async () => {
@@ -356,19 +363,23 @@ export function useAgentKnowledgeImport({
   );
 
   const reset = useCallback(() => {
-    setPhase("upload");
-    setJobId(null);
-    setFiles([]);
-    setTargets(["context", "skills", "templates"]);
-    setFocusHint("");
-    setDraft(null);
-    setSelection(null);
-    setWorkspaceRefs(createEmptyWorkspaceRefs());
-    setApplyingTarget(null);
-    setFileError(null);
-    setGenerateError(null);
-    setApplyError(null);
-  }, []);
+    void (async () => {
+      await dismissCurrentJob();
+      setPhase("upload");
+      setJobId(null);
+      setFiles([]);
+      setTargets(["context", "skills", "templates"]);
+      setFocusHint("");
+      setDraft(null);
+      setSelection(null);
+      setWorkspaceRefs(createEmptyWorkspaceRefs());
+      setApplyingTarget(null);
+      setFileError(null);
+      setGenerateError(null);
+      setApplyError(null);
+      onCleared?.();
+    })();
+  }, [dismissCurrentJob, onCleared]);
 
   const updateDraft = useCallback((next: AgentKnowledgeImportDraft) => {
     setDraft(next);
