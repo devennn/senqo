@@ -49,8 +49,15 @@ export function AgentListRow({
   const { wsPath } = useWorkspace();
   const { activeJob, refresh } = useAgentKnowledgeImportJobs(agent.id);
 
-  function openImport(jobId?: string | null) {
-    setResumeJobId(jobId ?? activeJob?.id ?? null);
+  async function openImport(jobId?: string | null) {
+    const jobs = await refresh();
+    const latest =
+      jobs.find((job) => job.id === jobId) ??
+      jobs.find((job) => job.status === "ready") ??
+      jobs.find((job) => job.status === "processing" || job.status === "queued") ??
+      jobs.find((job) => job.status === "failed") ??
+      null;
+    setResumeJobId(latest?.id ?? jobId ?? activeJob?.id ?? null);
     setImportOpen(true);
   }
 
@@ -111,7 +118,11 @@ export function AgentListRow({
             <DropdownMenuItem onClick={() => setPanel("rename")}>
               Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openImport(activeJob?.id)}>
+            <DropdownMenuItem
+              onClick={() => {
+                void openImport(activeJob?.id);
+              }}
+            >
               {importJobLabel(activeJob?.status ?? "new")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -137,10 +148,19 @@ export function AgentListRow({
 
       <AgentKnowledgeImportDialog
         open={importOpen}
-        onOpenChange={setImportOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            void refresh();
+          }
+          setImportOpen(open);
+        }}
         agentId={agent.id}
         profileName={agent.profile_name}
         resumeJobId={resumeJobId}
+        onJobStarted={(jobId) => {
+          setResumeJobId(jobId);
+          void refresh();
+        }}
         onApplied={() => {
           void refresh();
           onImportApplied?.();

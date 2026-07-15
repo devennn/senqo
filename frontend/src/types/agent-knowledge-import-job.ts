@@ -28,3 +28,14 @@ export type AgentKnowledgeImportJob = {
 };
 
 export const AGENT_KNOWLEDGE_IMPORT_POLL_MS = 3000;
+
+/** Single in-flight import: ready for review, or still queued/processing. */
+export function pickActiveAgentKnowledgeImportJob(
+  jobs: AgentKnowledgeImportJob[],
+): AgentKnowledgeImportJob | null {
+  return (
+    jobs.find((job) => job.status === "ready") ??
+    jobs.find((job) => job.status === "processing" || job.status === "queued") ??
+    null
+  );
+}

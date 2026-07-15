@@ -921,6 +921,12 @@ app.post("/agents/:id/knowledge-import/jobs", async (c) => {
   });
 
   if (!result.ok) {
+    if (result.error === "import_job_already_active") {
+      return c.json(
+        { error: "import_job_already_active", message: result.message, jobId: result.jobId },
+        409,
+      );
+    }
     return c.json({ error: "import_job_failed", message: result.message }, 400);
   }
 

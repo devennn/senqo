@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { AgentKnowledgeImportJob } from "@/types/agent-knowledge-import-job";
-import { AGENT_KNOWLEDGE_IMPORT_POLL_MS } from "@/types/agent-knowledge-import-job";
+import {
+  AGENT_KNOWLEDGE_IMPORT_POLL_MS,
+  pickActiveAgentKnowledgeImportJob,
+} from "@/types/agent-knowledge-import-job";
 
 export function useAgentKnowledgeImportJobs(agentId: string | null) {
   const [jobs, setJobs] = useState<AgentKnowledgeImportJob[]>([]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<AgentKnowledgeImportJob[]> => {
     if (!agentId) {
       setJobs([]);
-      return;
+      return [];
     }
     try {
       const result = await api.get<{ jobs: AgentKnowledgeImportJob[] }>(
         `/api/user/agents/${agentId}/knowledge-import/jobs`,
       );
       setJobs(result.jobs);
+      return result.jobs;
     } catch {
       setJobs([]);
+      return [];
     }
   }, [agentId]);
 
@@ -39,8 +44,7 @@ export function useAgentKnowledgeImportJobs(agentId: string | null) {
   }, [jobs, refresh]);
 
   const activeJob =
-    jobs.find((job) => job.status === "ready") ??
-    jobs.find((job) => job.status === "processing" || job.status === "queued") ??
+    pickActiveAgentKnowledgeImportJob(jobs) ??
     jobs.find((job) => job.status === "failed") ??
     null;
 

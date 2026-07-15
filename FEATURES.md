@@ -24,7 +24,7 @@
 
 ## Knowledge base (agent)
 
-- Import docs — per-agent menu action: upload PDF/CSV/Markdown, AI drafts context/skills/templates in a background job, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs to resume
+- Import docs — per-agent menu action: upload PDF/CSV/Markdown, AI drafts context/skills/templates in one background job at a time, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs (or Import in progress) to show the same processing/review UI
 - Workspace context — structured factual snippets organized into groups
 - Response templates — canned Q&A pairs used as authoritative replies
 - Handoff topics — escalation definitions for when to transfer to a human

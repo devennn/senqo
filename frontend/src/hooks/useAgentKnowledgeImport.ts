@@ -24,6 +24,7 @@ import {
   applyAgentKnowledgeImport,
   dismissAgentKnowledgeImportJob,
   getAgentKnowledgeImportJob,
+  listAgentKnowledgeImportJobs,
   saveAgentKnowledgeImportJobProgress,
   startAgentKnowledgeImportJob,
 } from "@/lib/agent-knowledge-import-api";
@@ -34,7 +35,10 @@ import type {
   AgentKnowledgeImportTarget,
 } from "@/types/agent-knowledge-import";
 import type { AgentKnowledgeImportJob } from "@/types/agent-knowledge-import-job";
-import { AGENT_KNOWLEDGE_IMPORT_POLL_MS } from "@/types/agent-knowledge-import-job";
+import {
+  AGENT_KNOWLEDGE_IMPORT_POLL_MS,
+  pickActiveAgentKnowledgeImportJob,
+} from "@/types/agent-knowledge-import-job";
 import type {
   AgentKnowledgeImportApplyTarget,
   AgentKnowledgeImportSelection,
@@ -87,6 +91,7 @@ type ImportScope = {
   resumeJobId?: string | null;
   onApplied?: () => void;
   onCleared?: () => void;
+  onJobStarted?: (jobId: string) => void;
 };
 
 export function useAgentKnowledgeImport({
@@ -95,6 +100,7 @@ export function useAgentKnowledgeImport({
   resumeJobId,
   onApplied,
   onCleared,
+  onJobStarted,
 }: ImportScope) {
   const [phase, setPhase] = useState<AgentKnowledgeImportPhase>("upload");
   const [jobId, setJobId] = useState<string | null>(resumeJobId ?? null);
@@ -139,10 +145,30 @@ export function useAgentKnowledgeImport({
   );
 
   useEffect(() => {
-    if (resumeJobId) {
-      void loadJob(resumeJobId);
-    }
-  }, [loadJob, resumeJobId]);
+    let cancelled = false;
+
+    const resume = async () => {
+      if (resumeJobId) {
+        await loadJob(resumeJobId);
+        return;
+      }
+      try {
+        const result = await listAgentKnowledgeImportJobs(agentId);
+        if (cancelled) return;
+        const active = pickActiveAgentKnowledgeImportJob(result.jobs);
+        if (active) {
+          await loadJob(active.id);
+        }
+      } catch {
+        // Stay on upload when the jobs list cannot be loaded.
+      }
+    };
+
+    void resume();
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId, loadJob, resumeJobId]);
 
   useEffect(() => {
     if (!jobId || phase !== "processing") return;
@@ -257,6 +283,7 @@ export function useAgentKnowledgeImport({
         focusHint,
       });
       setJobId(result.job.id);
+      onJobStarted?.(result.job.id);
       if (result.job.status === "ready" && result.job.draft) {
         hydrateFromJob(result.job, {
           setJobId,
@@ -268,10 +295,21 @@ export function useAgentKnowledgeImport({
         });
       }
     } catch (err) {
+      try {
+        const listed = await listAgentKnowledgeImportJobs(agentId);
+        const active = pickActiveAgentKnowledgeImportJob(listed.jobs);
+        if (active) {
+          await loadJob(active.id);
+          onJobStarted?.(active.id);
+          return;
+        }
+      } catch {
+        // Fall through to the original start error.
+      }
       setGenerateError(err instanceof Error ? err.message : "Could not start import.");
       setPhase("upload");
     }
-  }, [agentId, canGenerate, files, focusHint, profileName, targets]);
+  }, [agentId, canGenerate, files, focusHint, loadJob, onJobStarted, profileName, targets]);
 
   const dismissCurrentJob = useCallback(async () => {
     const currentJobId = jobIdRef.current;
@@ -380,6 +418,14 @@ export function useAgentKnowledgeImport({
       onCleared?.();
     })();
   }, [dismissCurrentJob, onCleared]);
+
+  // Nothing left to review (all discarded / empty draft): dismiss the ready job
+  // so the agent list badge clears, and return to the upload UI.
+  useEffect(() => {
+    if (phase !== "review" || !draft || !selection) return;
+    if (!isImportReviewComplete(draft, selection)) return;
+    reset();
+  }, [draft, phase, reset, selection]);
 
   const updateDraft = useCallback((next: AgentKnowledgeImportDraft) => {
     setDraft(next);

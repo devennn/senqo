@@ -43,12 +43,31 @@ export async function startAgentKnowledgeImportJob(input: {
   focusHint: string;
   targetsJson: string;
   files: File[];
-}): Promise<{ ok: true; job: ReturnType<typeof toJobResponse> } | { ok: false; message: string }> {
+}): Promise<
+  | { ok: true; job: ReturnType<typeof toJobResponse> }
+  | { ok: false; message: string; error?: "import_job_already_active"; jobId?: string }
+> {
   const validated = validateAgentKnowledgeImportPreviewInput({
     targetsJson: input.targetsJson,
     files: input.files,
   });
   if (!validated.ok) return validated;
+
+  const activeJobs = await listActiveAgentKnowledgeImportJobs(input.workspaceId, input.agentId);
+  const blocking = activeJobs.find(
+    (job) => job.status === "queued" || job.status === "processing" || job.status === "ready",
+  );
+  if (blocking) {
+    console.warn(
+      `[${scope}/start] Failed query: import already active agentId=${input.agentId} jobId=${blocking.id}`,
+    );
+    return {
+      ok: false,
+      error: "import_job_already_active",
+      jobId: blocking.id,
+      message: "An import is already in progress for this agent.",
+    };
+  }
 
   const jobId = crypto.randomUUID();
   const uploadedFiles = [];
