@@ -130,6 +130,35 @@ export function formatAgentStepFinishBlock(
   return lines.join("\n");
 }
 
+export function formatAgentStructuredOutputBlock(
+  scope: string,
+  input: {
+    sessionId: string;
+    dryRun: boolean;
+    structuredOutput: unknown;
+    outboundPrepared: unknown;
+    outboundSent: number;
+  },
+): string {
+  return [
+    `[${scope}]`,
+    agentLogRuleHeavy,
+    "  agent_run_result (LLM structured output)",
+    agentLogRuleLight,
+    kvLine("session", input.sessionId),
+    kvLine("dry run", String(input.dryRun)),
+    kvLine("whatsapp sent", String(input.outboundSent)),
+    agentLogRuleLight,
+    "  Full LLM output",
+    prettyJsonForLog(input.structuredOutput, { maxLength: 20_000 }),
+    agentLogRuleLight,
+    "  Outbound after prepare/dedupe",
+    prettyJsonForLog(input.outboundPrepared, { maxLength: 8_000 }),
+    agentLogRuleHeavy,
+    "",
+  ].join("\n");
+}
+
 export function prettyJsonForLog(
   value: unknown,
   options?: { maxLength?: number; linePrefix?: string },

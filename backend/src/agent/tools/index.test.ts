@@ -16,10 +16,6 @@ vi.mock("../tools/load-skills-tool.js", () => ({
   createLoadSkillsTool: vi.fn(() => ({})),
 }));
 
-vi.mock("../tools/send-whatsapp-message-tool.js", () => ({
-  createSendWhatsappMessageTool: vi.fn(() => ({})),
-}));
-
 vi.mock("../tools/custom-tools.js", () => ({
   loadCustomTools: vi.fn(async (_ctx, keys: string[]) => {
     const tools: Record<string, { description: string }> = {};
@@ -39,34 +35,33 @@ const mockContext: AgentToolRuntimeContext = {
 };
 
 describe("getAgentTools", () => {
-  // All builtin and custom tool keys are resolved into tool instances in one map.
-  // Expected: 6 tools returned, including builtins and one custom key.
-  it("returns builtin and custom tools when keys enabled", async () => {
+  // Builtin and custom tools resolve; send_whatsapp_message is no longer a builtin.
+  it("returns builtin and custom tools without send_whatsapp_message", async () => {
     const tools = await getAgentTools(mockContext, [
       "create_task",
       "get_weather",
       "load_skills",
-      "send_whatsapp_message",
       "handoff_to_human",
       "apply_conversation_labels",
     ]);
 
     const keys = Object.keys(tools);
-    expect(keys).toHaveLength(6);
     expect(keys).toContain("create_task");
     expect(keys).toContain("get_weather");
     expect(keys).toContain("load_skills");
+    expect(keys).toContain("handoff_to_human");
+    expect(keys).toContain("apply_conversation_labels");
+    expect(keys).not.toContain("send_whatsapp_message");
+    expect(keys).toHaveLength(5);
   });
 
   // No tools should be returned when the enabled list is empty.
-  // Expected: empty object with no keys.
   it("returns empty object when enabledToolKeys is empty", async () => {
     const tools = await getAgentTools(mockContext, []);
     expect(Object.keys(tools)).toHaveLength(0);
   });
 
   // Non-builtin keys are loaded as custom tools alongside builtins.
-  // Expected: both the builtin key and the custom key appear in the result.
   it("loads custom tools for non-builtin keys", async () => {
     const tools = await getAgentTools(mockContext, ["create_task", "my_custom_tool"]);
     const keys = Object.keys(tools);
@@ -75,7 +70,6 @@ describe("getAgentTools", () => {
   });
 
   // A null/undefined tool keys list should be handled gracefully without crashing.
-  // Expected: empty object returned, no error thrown.
   it("returns empty object when enabledToolKeys is not an array", async () => {
     const tools = await getAgentTools(mockContext, null as unknown as string[]);
     expect(Object.keys(tools)).toHaveLength(0);

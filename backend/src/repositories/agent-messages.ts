@@ -38,7 +38,18 @@ export async function listAgentMessages(
     console.info(
       `[${scope}/listAgentMessages] Success: workspaceId=${workspaceId} sessionId=${sessionId}`
     );
-    return rows as unknown as AgentMessageRecord[];
+    return rows.map((row) => ({
+      id: row.id,
+      workspace_id: row.workspaceId,
+      agent_session_id: row.agentSessionId,
+      role: row.role as AgentMessageRecord["role"],
+      content: row.content,
+      provider_options: (row.providerOptions as Record<string, unknown> | null) ?? null,
+      created_at:
+        row.createdAt instanceof Date
+          ? row.createdAt.toISOString()
+          : String(row.createdAt),
+    }));
   } catch (error) {
     console.error(`[${scope}/listAgentMessages] Unexpected error: ${String(error)}`);
     return [];

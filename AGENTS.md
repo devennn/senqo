@@ -126,6 +126,7 @@ Forbidden:
 - Validate input (e.g. Zod) at the route boundary.
 - Enforce auth via **`backend/src/middleware/auth.ts`** and workspace scope via **`X-Workspace-Id`** where applicable.
 - Never expose DB credentials or S3 secrets to the frontend.
+- **No unused return payloads** — Do not include fields on API responses, hook return values, or `RunAgentResult`-style objects unless a real caller uses them. Prefer computing/persisting side effects inside the function (e.g. operator reasoning → DB) over echoing them back. When changing a contract, drop dead fields in the same change.
 
 ### 9. Code style
 

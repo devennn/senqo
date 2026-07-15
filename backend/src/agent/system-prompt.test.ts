@@ -6,39 +6,34 @@ import {
 } from "./system-prompt.js";
 
 describe("DEFAULT_TOOL_KEYS", () => {
-  // Verifies the default tool set contains all essential agent capabilities.
-  // Expected: the array includes create_task, load_skills, send_whatsapp_message, handoff_to_human, apply_conversation_labels.
-  it("includes all required default tools", () => {
+  // Default builtins no longer include a WhatsApp send tool.
+  it("includes required default tools without send_whatsapp_message", () => {
     expect(DEFAULT_TOOL_KEYS).toContain("create_task");
     expect(DEFAULT_TOOL_KEYS).toContain("load_skills");
-    expect(DEFAULT_TOOL_KEYS).toContain("send_whatsapp_message");
     expect(DEFAULT_TOOL_KEYS).toContain("handoff_to_human");
     expect(DEFAULT_TOOL_KEYS).toContain("apply_conversation_labels");
+    expect(DEFAULT_TOOL_KEYS).not.toContain("send_whatsapp_message");
   });
 });
 
 describe("resolveEnabledToolKeys", () => {
   // Merges default and config-provided tools without duplicates.
-  // Expected: output contains both default and extra keys; duplicates appear only once.
   it("returns default tools plus config tools, deduplicated", () => {
     const result = resolveEnabledToolKeys(["get_weather", "create_task"]);
     expect(result).toContain("create_task");
     expect(result).toContain("get_weather");
     expect(result).toContain("load_skills");
-    expect(result).toContain("send_whatsapp_message");
-    // create_task appears only once (already in defaults)
+    expect(result).not.toContain("send_whatsapp_message");
     expect(result.filter((k) => k === "create_task")).toHaveLength(1);
   });
 
   // When configTools is undefined, only the default tool keys should be returned.
-  // Expected: result equals DEFAULT_TOOL_KEYS.
   it("returns only defaults when configTools is undefined", () => {
     const result = resolveEnabledToolKeys(undefined);
     expect(result).toEqual([...DEFAULT_TOOL_KEYS]);
   });
 
   // When configTools is an empty array, only the default tool keys should be returned.
-  // Expected: result equals DEFAULT_TOOL_KEYS.
   it("returns only defaults when configTools is empty array", () => {
     const result = resolveEnabledToolKeys([]);
     expect(result).toEqual([...DEFAULT_TOOL_KEYS]);
@@ -60,8 +55,7 @@ const baseInput = {
 
 describe("buildAgentSystemPrompt", () => {
   // Assembles all configuration sections into a single system prompt string.
-  // Expected: prompt contains profile name, behavior, context, templates, handoff topics, and labels.
-  it("merges behaviour, response templates, context groups, handoff topics, and skills", () => {
+  it("merges behaviour, response templates, context groups, handoff topics, and labels", () => {
     const prompt = buildAgentSystemPrompt(baseInput);
     expect(prompt).toContain("WidgetBot");
     expect(prompt).toContain("Be helpful and concise.");
@@ -71,39 +65,53 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("VIP, New Lead");
   });
 
-  // When dryRun is true, the prompt must instruct the agent not to send real WhatsApp messages.
-  // Expected: dry-run rule is present; live message rule is absent.
-  it("includes dry-run WhatsApp rule when dryRun is true", () => {
+  // Dry-run drafts messages without sending.
+  it("includes dry-run messages rule when dryRun is true", () => {
     const prompt = buildAgentSystemPrompt({ ...baseInput, dryRun: true });
-    expect(prompt).toContain(
-      "Do not call `send_whatsapp_message`. Return draft text only.",
-    );
-    expect(prompt).not.toContain(
-      "This is a WhatsApp conversation. Call `send_whatsapp_message` with the final message text.",
-    );
+    expect(prompt).toContain("This is a dry run. Fill `messages`");
+    expect(prompt).not.toContain("The runtime sends them after your turn");
+    expect(prompt).not.toContain("send_whatsapp_message");
   });
 
-  // When dryRun is false, the prompt must instruct the agent to send live WhatsApp messages.
-  // Expected: live message rule is present; dry-run rule is absent.
-  it("includes live WhatsApp rule when dryRun is false", () => {
+  // Live turns put customer text in messages for post-run send.
+  it("includes live messages rule when dryRun is false", () => {
     const prompt = buildAgentSystemPrompt({ ...baseInput, dryRun: false });
-    expect(prompt).toContain(
-      "This is a WhatsApp conversation. Call `send_whatsapp_message` with the final message text.",
-    );
-    expect(prompt).not.toContain(
-      "Do not call `send_whatsapp_message`. Return draft text only.",
-    );
+    expect(prompt).toContain("Put customer-facing replies in `messages`");
+    expect(prompt).toContain("The runtime sends them after your turn");
+    expect(prompt).not.toContain("send_whatsapp_message");
+  });
+
+  // Handoff flag and empty/courtesy messages are documented for the model.
+  it("instructs handoff_enabled true only after handoff_to_human", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("set `handoff_enabled` to true");
+    expect(prompt).toContain("prefer empty `messages`");
+    expect(prompt).toContain("set `handoff_enabled` to false");
+  });
+
+  // Asset delivery uses messages[].assetFileName, not a send tool.
+  it("mentions assetFileName on messages items", () => {
+    const prompt = buildAgentSystemPrompt({
+      ...baseInput,
+      assetGroups: [
+        {
+          name: "Menus",
+          assets: [{ fileName: "menu.pdf", description: "Weekly menu" }],
+        },
+      ],
+    });
+    expect(prompt).toContain("assetFileName");
+    expect(prompt).toContain("menu.pdf");
+    expect(prompt).not.toContain("call `send_whatsapp_message`");
   });
 
   // When no asset groups are configured, the prompt should indicate that clearly.
-  // Expected: prompt contains "(none configured for this agent)".
   it('shows "(none configured)" for empty asset groups', () => {
     const prompt = buildAgentSystemPrompt(baseInput);
     expect(prompt).toContain("(none configured for this agent)");
   });
 
   // The available tools section lists enabled tool keys with their descriptions.
-  // Expected: prompt lists the tool keys and the custom tool description.
   it("includes available tools section with all enabled tool keys", () => {
     const prompt = buildAgentSystemPrompt({
       ...baseInput,

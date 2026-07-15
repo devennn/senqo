@@ -1,6 +1,5 @@
-import type { ModelMessage } from "ai";
-
 import type { StoredUserImageUrlPart } from "./agent-multimodal.js";
+import type { AgentOutboundMessage } from "../agent/agent-output-schema.js";
 
 export type RunAgentInput = {
   workspaceId: string;
@@ -22,11 +21,8 @@ export type RunAgentInput = {
 
 export type RunAgentResult = {
   sessionId: string;
-  reply: string;
-  num_whatsapp_send: number;
-  modelMessages: ModelMessage[];
-  /** Dashboard-only; empty when skipped inference or model omits. */
-  reasoningForOperators: string;
+  messages: AgentOutboundMessage[];
+  handoff_enabled: boolean;
 };
 
 export type SkillSummary = {
@@ -62,7 +58,6 @@ export type AgentStepFinishToolResultLog = {
 
 export type AgentToolKey =
   | "load_skills"
-  | "send_whatsapp_message"
   | "create_task"
   | "handoff_to_human"
   | "apply_conversation_labels";

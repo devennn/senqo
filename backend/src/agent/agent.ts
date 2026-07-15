@@ -1,9 +1,9 @@
 import { ToolLoopAgent, Output, type ModelMessage, stepCountIs } from "ai";
-import { z } from "zod";
 import type { RunAgentInput, RunAgentResult } from "../types/agent.js";
 import {
   formatAgentPrepareStepBlock,
   formatAgentStepFinishBlock,
+  formatAgentStructuredOutputBlock,
   inferStepAction,
   previewMessage,
   summarizeText,
@@ -33,26 +33,17 @@ import {
 } from "../repositories/agent.js";
 import { touchAgentSession } from "../repositories/agent-sessions.js";
 import { mergeAiReasoningOntoAgentRunMessages } from "../repositories/whatsapp.js";
+import { prepareOutboundMessages, sendPreparedOutboundMessages } from "../services/agent-outbound-messages.js";
+import {
+  AGENT_RUN_LOG_KIND_LLM_OUTPUT,
+  AGENT_RUN_LOG_KIND_WHATSAPP_SENT,
+  AGENT_RUN_LOG_SOURCE,
+  isAgentRunLogProviderOptions,
+} from "../lib/agent-run-log.js";
+import { agentOutputSchema } from "./agent-output-schema.js";
 import { getChatLLM } from "./llm.js";
 
 const logScope = "AgentRuntime";
-const agentOutputSchema = z.object({
-  reply: z
-    .string()
-    .describe("Final user-facing reply or summary for the agent run."),
-  num_whatsapp_send: z
-    .number()
-    .int()
-    .min(0)
-    .describe(
-      "Number of WhatsApp messages the agent actually sent with the send_whatsapp_message tool.",
-    ),
-  reasoning_for_operators: z
-    .string()
-    .describe(
-      "Dashboard-only: why this run's reply fits the customer and what grounded it (thread, templates, context, skills, behavior, tools). Never customer-facing. Use an empty string when there is nothing to explain.",
-    ),
-});
 
 const DEFAULT_AGENT_TOOL_KEYS = BUILTIN_AGENT_TOOL_KEYS;
 
@@ -60,29 +51,6 @@ function isMissingToolResultError(messageText: string): boolean {
   return /Tool result(s)? (is|are) missing for tool call(s)?/i.test(
     messageText,
   );
-}
-
-function isSuccessfulWhatsappToolOutput(value: unknown): boolean {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  return (value as { ok?: unknown }).ok === true;
-}
-
-function countSuccessfulWhatsappSends(result: {
-  steps?: Array<{
-    toolResults?: Array<{ toolName?: string; output?: unknown }>;
-  }>;
-}): number {
-  return (result.steps ?? []).reduce((count, step) => {
-    const sentInStep = (step.toolResults ?? []).filter(
-      (toolResult) =>
-        toolResult.toolName === "send_whatsapp_message" &&
-        isSuccessfulWhatsappToolOutput(toolResult.output),
-    ).length;
-    return count + sentInStep;
-  }, 0);
 }
 
 export async function runAgentSession(
@@ -103,10 +71,10 @@ export async function runAgentSession(
 
   let historyMessages: ModelMessage[] = [];
   if (!isDryRun) {
-    const historicalRows = await listAgentMessages(
+    const historicalRows = (await listAgentMessages(
       input.workspaceId,
       sessionId,
-    );
+    )).filter((row) => !isAgentRunLogProviderOptions(row.provider_options));
     const rawHistory = historicalRows.map((row) =>
       toModelMessageFromRow({
         role: row.role,
@@ -119,8 +87,6 @@ export async function runAgentSession(
         `[${logScope}] Pruned ${rawHistory.length - historyMessages.length} orphaned tool-call message(s) from history sessionId=${sessionId}`,
       );
     } else {
-      // Temporary diagnostic: log assistant message content shapes so we can
-      // tell whether tool calls are stored in the format our pruner expects.
       const assistantShapes = rawHistory
         .filter((m) => m.role === "assistant")
         .map((m) => {
@@ -185,10 +151,8 @@ export async function runAgentSession(
     }
     return {
       sessionId,
-      reply: "",
-      num_whatsapp_send: 0,
-      modelMessages: [],
-      reasoningForOperators: "",
+      messages: [],
+      handoff_enabled: false,
     };
   }
 
@@ -215,12 +179,7 @@ export async function runAgentSession(
     },
     enabledToolKeys,
   );
-  const activeTools = Object.keys(tools).filter((toolName) => {
-    if (toolName === "send_whatsapp_message") {
-      return !isDryRun;
-    }
-    return true;
-  });
+  const activeTools = Object.keys(tools);
 
   console.info(
     `[${logScope}/tools] active=${activeTools.length > 0 ? activeTools.join(",") : "none"}`,
@@ -235,7 +194,7 @@ export async function runAgentSession(
       schema: agentOutputSchema,
       name: "agent_run_result",
       description:
-        "Return the final agent run result. If this run needs an outbound WhatsApp reply, call send_whatsapp_message before returning and set num_whatsapp_send to the count of sent messages. Include reasoning_for_operators for workspace operators (never paste into send_whatsapp_message).",
+        "Return the final agent run result. Put customer WhatsApp bubbles in messages (0–3). Set handoff_enabled when you called handoff_to_human. Include reasoning_for_operators for workspace operators (never paste into messages).",
     }),
     stopWhen: stepCountIs(20),
     prepareStep: ({ stepNumber, messages }) => {
@@ -315,7 +274,7 @@ export async function runAgentSession(
           schema: agentOutputSchema,
           name: "agent_run_result",
           description:
-            "Return the final agent run result without calling tools. Set num_whatsapp_send to 0 and include reasoning_for_operators.",
+            "Return the final agent run result without calling tools. Prefer empty messages, handoff_enabled false, and include reasoning_for_operators.",
         }),
         stopWhen: stepCountIs(20),
       });
@@ -349,11 +308,91 @@ export async function runAgentSession(
   }
 
   const structuredOutput = result.output;
-  const numWhatsappSend = countSuccessfulWhatsappSends(result);
-  const reply = structuredOutput.reply;
+  const rawMessages = Array.isArray(structuredOutput?.messages)
+    ? structuredOutput.messages
+    : [];
+  const handoffEnabled = Boolean(structuredOutput?.handoff_enabled);
   const reasoningForOperators = (
-    structuredOutput.reasoning_for_operators ?? ""
+    structuredOutput?.reasoning_for_operators ?? ""
   ).trim();
+
+  let outboundMessages = prepareOutboundMessages(rawMessages);
+  let outboundSent = 0;
+  let deliveries: Array<{
+    text: string;
+    assetFileName: string;
+    idMessage: string;
+  }> = [];
+  if (input.agentConfigId) {
+    const sent = await sendPreparedOutboundMessages({
+      workspaceId: input.workspaceId,
+      conversationId: sessionId,
+      agentConfigId: input.agentConfigId,
+      messages: rawMessages,
+      dryRun: isDryRun,
+      ...(agentRunId ? { agentRunId } : {}),
+    });
+    outboundMessages = sent.messages;
+    outboundSent = sent.sent;
+    deliveries = sent.deliveries;
+  }
+
+  console.info(
+    formatAgentStructuredOutputBlock(logScope, {
+      sessionId,
+      dryRun: isDryRun,
+      structuredOutput,
+      outboundPrepared: outboundMessages,
+      outboundSent,
+    }),
+  );
+
+  if (!isDryRun) {
+    const logRows = [
+      {
+        workspaceId: input.workspaceId,
+        sessionId,
+        role: "assistant" as const,
+        content: {
+          type: AGENT_RUN_LOG_KIND_LLM_OUTPUT,
+          messages: structuredOutput?.messages ?? [],
+          reasoning_for_operators: reasoningForOperators,
+          handoff_enabled: handoffEnabled,
+        },
+        providerOptions: {
+          source: AGENT_RUN_LOG_SOURCE,
+          kind: AGENT_RUN_LOG_KIND_LLM_OUTPUT,
+          ...(agentRunId ? { agent_run_id: agentRunId } : {}),
+        },
+      },
+      {
+        workspaceId: input.workspaceId,
+        sessionId,
+        role: "assistant" as const,
+        content: {
+          type: AGENT_RUN_LOG_KIND_WHATSAPP_SENT,
+          sent: outboundSent,
+          dryRun: isDryRun,
+          bubbles: deliveries.map((d) => ({
+            text: d.text,
+            assetFileName: d.assetFileName,
+            idMessage: d.idMessage,
+          })),
+        },
+        providerOptions: {
+          source: AGENT_RUN_LOG_SOURCE,
+          kind: AGENT_RUN_LOG_KIND_WHATSAPP_SENT,
+          ...(agentRunId ? { agent_run_id: agentRunId } : {}),
+        },
+      },
+    ];
+    const logsSaved = await insertAgentMessages(logRows);
+    if (!logsSaved) {
+      console.error(
+        `[${logScope}] Failed query: could not persist agent run logs conversationId=${sessionId}`,
+      );
+    }
+  }
 
   if (!isDryRun && agentRunId && reasoningForOperators) {
     const merged = await mergeAiReasoningOntoAgentRunMessages({
@@ -371,9 +410,7 @@ export async function runAgentSession(
 
   return {
     sessionId,
-    reply,
-    num_whatsapp_send: numWhatsappSend,
-    modelMessages: generatedToPersist,
-    reasoningForOperators,
+    messages: outboundMessages,
+    handoff_enabled: handoffEnabled,
   };
 }

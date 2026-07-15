@@ -2,7 +2,6 @@
 export const BUILTIN_AGENT_TOOL_KEYS = [
   "create_task",
   "load_skills",
-  "send_whatsapp_message",
   "handoff_to_human",
   "apply_conversation_labels",
 ] as const;

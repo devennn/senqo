@@ -4,7 +4,6 @@ import type { AgentSystemPromptInput } from "../types/agent.js";
 export const DEFAULT_TOOL_KEYS = [
   "create_task",
   "load_skills",
-  "send_whatsapp_message",
   "handoff_to_human",
   "apply_conversation_labels",
 ] as const;
@@ -12,8 +11,6 @@ export const DEFAULT_TOOL_KEYS = [
 const TOOL_DESCRIPTIONS: Record<string, string> = {
   create_task: "Schedule one-time or recurring follow-up tasks.",
   load_skills: "Load workspace skill content by name when needed.",
-  send_whatsapp_message:
-    "Send the outbound WhatsApp reply to the customer. Optionally attach a workspace asset by exact filename.",
   handoff_to_human: "Transfer the conversation to a human teammate.",
   apply_conversation_labels:
     "Assign AI conversation labels using workspace label UUIDs.",
@@ -40,8 +37,8 @@ export function resolveEnabledToolKeys(
 
 export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
   const whatsappRule = input.dryRun
-    ? "Do not call `send_whatsapp_message`. Return draft text only."
-    : "This is a WhatsApp conversation. Call `send_whatsapp_message` with the final message text. Do not stop at drafting only.";
+    ? "This is a dry run. Fill `messages` with the draft WhatsApp bubbles you would send (prefer one; at most three distinct). The runtime will not send them. Set `handoff_enabled` to false unless you would have handed off."
+    : "This is a WhatsApp conversation. Put customer-facing replies in `messages` (prefer one bubble; at most three distinct bubbles; never repeat the same text). The runtime sends them after your turn. Do not stop at drafting only.";
   const toolsText = formatAvailableTools(input.enabledToolKeys, input.customToolDescriptions);
   const workspaceContext = input.workspaceContext.trim();
   const responseTemplates = input.responseTemplates.trim();
@@ -59,22 +56,24 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
 
 ## Core Responsibilities
 - Answer customer WhatsApp messages using grounded workspace knowledge.
-- Use tools when sending a reply, scheduling follow-ups, loading skills, handing off to a human, or labeling the conversation.
+- Use tools when scheduling follow-ups, loading skills, handing off to a human, or labeling the conversation.
+- Deliver customer WhatsApp text via structured output \`messages\` (not a send tool).
 
 ## Default Instructions
 - Only state facts from this chat, loaded skills, or embedded workspace context and templates.
 - When response templates match the customer's intent (paraphrases, typos, and short phrasing are OK), use the Answer exactly — same facts, numbers, ranges, and disclaimers.
 - If the customer writes in another language, deliver template answers in that language without changing meaning or factual details.
-- You may add a minimal WhatsApp lead-in before template content unless Behavior forbids it; combine into one outbound message.
+- You may add a minimal WhatsApp lead-in before template content unless Behavior forbids it; combine into one outbound message in \`messages\`.
 
 ## Tool Usage Rules
 - ${whatsappRule}
-- Use \`send_whatsapp_message\` for customer replies. When sending a listed asset helps, pass its exact \`assetFileName\` plus a \`message\` caption or companion text—you decide timing from each file's description and the conversation.
+- When sending a listed asset helps, put it on a \`messages\` item: exact \`assetFileName\` plus \`text\` as caption or companion copy. For text-only bubbles set \`assetFileName\` to an empty string.
 - Use \`create_task\` when a follow-up should happen in the future (one-time or recurring), for example reminders, re-engagement, check-ins, or scheduled outreach. Include a clear task prompt and valid schedule fields.
 - Use \`load_skills\` when workspace skill content is needed beyond embedded context and templates.
-- Use \`handoff_to_human\` when configured handoff topics match or human judgment is required.
+- Use \`handoff_to_human\` when configured handoff topics match or human judgment is required. When you hand off, set \`handoff_enabled\` to true, prefer empty \`messages\` (or one short courtesy bubble), and do not continue normal resolution.
+- When you do not hand off, set \`handoff_enabled\` to false. Do not set \`handoff_enabled\` true unless you called \`handoff_to_human\`.
 - Use \`apply_conversation_labels\` when the conversation clearly matches a configured label.
-- In your final structured output, fill \`reasoning_for_operators\` for workspace operators only — never put this text in \`send_whatsapp_message\`. For trivial small talk, one brief sentence. When the reply uses facts or policy, say what grounded it: recent customer messages, response templates, workspace context, loaded skills, and behavior rules. Say if handoff_to_human, apply_conversation_labels, or create_task materially drove the outcome.
+- In your final structured output, fill \`reasoning_for_operators\` for workspace operators only — never put this text in \`messages\`. For trivial small talk, one brief sentence. When the reply uses facts or policy, say what grounded it: recent customer messages, response templates, workspace context, loaded skills, and behavior rules. Say if handoff_to_human, apply_conversation_labels, or create_task materially drove the outcome.
 
 ## Available Tools
 ${toolsText}
@@ -144,7 +143,7 @@ function formatAgentAssets(groups: { name: string; assets: { fileName: string; d
     return "(none configured for this agent)";
   }
   const lines = [
-    "Each entry describes what the file contains—not when to send it. You decide when sharing a file helps the customer; then call `send_whatsapp_message` with `assetFileName` set to the exact filename below and `message` as the WhatsApp caption or companion text.",
+    "Each entry describes what the file contains—not when to send it. You decide when sharing a file helps the customer; then add a `messages` item with `assetFileName` set to the exact filename below and `text` as the WhatsApp caption or companion text. For text-only bubbles use an empty `assetFileName`.",
     "---",
   ];
   for (const grp of groups) {

@@ -74,8 +74,11 @@ async function main(): Promise<void> {
     throw new Error("Failed to run agent session.");
   }
 
-  process.stdout.write(`${result.reply}\n`);
+  process.stdout.write(
+    `${result.messages.map((m) => m.text).join("\n\n")}\n`,
+  );
   process.stdout.write(`sessionId=${result.sessionId}\n`);
+  process.stdout.write(`handoff_enabled=${result.handoff_enabled}\n`);
 }
 
 main().catch((error: unknown) => {

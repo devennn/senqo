@@ -19,7 +19,7 @@
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model
 - Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`
 - Workspace secrets — Settings → Secrets stores encrypted env values as `ctx.env` at tool runtime
-- Built-in tools — platform tools (send WhatsApp, schedule tasks, handoff, labels, load skills) always on
+- Built-in tools — platform tools (schedule tasks, handoff, labels, load skills) always on; WhatsApp replies come from structured `messages` (up to 3 bubbles) sent by the runtime after the agent run
 - Demo tool — new workspaces get a seeded `get_weather` custom tool (Open-Meteo, no API key)
 
 ## Knowledge base (agent)

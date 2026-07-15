@@ -3,7 +3,6 @@ import { createTaskTool } from "../tools/create-task-tool.js";
 import { createApplyConversationLabelsTool } from "../tools/apply-conversation-labels-tool.js";
 import { createHandoffToHumanTool } from "../tools/handoff-to-human-tool.js";
 import { createLoadSkillsTool } from "../tools/load-skills-tool.js";
-import { createSendWhatsappMessageTool } from "../tools/send-whatsapp-message-tool.js";
 import { loadCustomTools } from "../tools/custom-tools.js";
 import type { AgentToolRuntimeContext } from "../tools/shared.js";
 import type { BuiltinAgentToolKey } from "../../lib/builtin-agent-tool-keys.js";
@@ -20,7 +19,6 @@ export async function getAgentTools(
   const registry: Record<BuiltinAgentToolKey, ToolSet[BuiltinAgentToolKey]> = {
     create_task: createTaskTool(context),
     load_skills: createLoadSkillsTool(context),
-    send_whatsapp_message: createSendWhatsappMessageTool(context),
     handoff_to_human: createHandoffToHumanTool(context),
     apply_conversation_labels: createApplyConversationLabelsTool(context),
   };

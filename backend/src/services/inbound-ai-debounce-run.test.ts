@@ -59,10 +59,8 @@ beforeEach(() => {
   mockGetContactIsTestForConversation.mockResolvedValue(true);
   mockRunAgentSession.mockResolvedValue({
     sessionId: "conv-1",
-    reply: "Hi there",
-    num_whatsapp_send: 0,
-    modelMessages: [],
-    reasoningForOperators: "",
+    messages: [{ text: "Hi there" }],
+    handoff_enabled: false,
   });
   mockClearInboundAiDebouncePending.mockResolvedValue(true);
 });

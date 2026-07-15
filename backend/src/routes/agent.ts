@@ -45,10 +45,8 @@ app.post("/", async (c) => {
 
     return c.json({
       sessionId: result.sessionId,
-      reply: result.reply,
-      reasoning_for_operators: result.reasoningForOperators,
-      num_whatsapp_send: result.num_whatsapp_send,
-      modelMessages: result.modelMessages,
+      messages: result.messages,
+      handoff_enabled: result.handoff_enabled,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
