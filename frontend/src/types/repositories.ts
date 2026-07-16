@@ -338,6 +338,8 @@ export type ConversationQuotedPreview = {
 
 export type ConversationMessageMedia = {
   path?: string;
+  /** Object storage namespace; defaults to whatsapp-media when signing previews. */
+  storageBucket?: string;
   fileName?: string;
   mimeType?: string;
   caption?: string;
@@ -492,6 +494,7 @@ export type CreateTaskInput = {
   id: string;
   workspaceId: string;
   agentConfigId: string;
+  whatsappConnectionId?: string | null;
   leadId?: string | null;
   prompt: string;
   scheduleType: "recurring" | "one_time";
@@ -514,6 +517,11 @@ export type PaginatedResult<T> = {
 export type SchedulableAgentRecord = {
   id: string;
   profile_name: string;
+  connections: Array<{
+    id: string;
+    display_name: string;
+    phone_number: string | null;
+  }>;
 };
 
 /** Minimal contact row for task creation UI (optional lead link). */

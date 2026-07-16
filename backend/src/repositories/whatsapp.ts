@@ -24,7 +24,7 @@ import {
   conversations,
   messages,
 } from "../db/schema/index.js";
-import { eq, desc, asc, and, isNull, inArray, or, sql } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, inArray, or, sql, not } from "drizzle-orm";
 
 const WHATSAPP_MODES: readonly WhatsappConnectionMode[] = ["inactive", "testing", "live"];
 
@@ -619,6 +619,55 @@ export async function findConnectionByPhoneNumber(
   }
 }
 
+export async function listConnectionsByAgentConfigId(
+  workspaceId: string,
+  agentConfigId: string,
+): Promise<
+  Array<{
+    id: string;
+    workspace_id: string;
+    display_name: string;
+    phone_number: string | null;
+    mode: WhatsappConnectionMode;
+  }>
+> {
+  const trimmedAgent = agentConfigId.trim();
+  if (!trimmedAgent) {
+    console.error(`[${scope}/listConnectionsByAgentConfigId] Failed query: agentConfigId is empty`);
+    return [];
+  }
+  try {
+    const data = await db
+      .select()
+      .from(whatsappConnections)
+      .where(
+        and(
+          eq(whatsappConnections.workspaceId, workspaceId),
+          eq(whatsappConnections.agentConfigId, trimmedAgent),
+        ),
+      )
+      .orderBy(asc(whatsappConnections.createdAt));
+    const rows = data.map((row) => {
+      const rawMode = row.mode as string | null | undefined;
+      const mode: WhatsappConnectionMode =
+        rawMode === "testing" || rawMode === "live" ? rawMode : "inactive";
+      return {
+        id: row.id,
+        workspace_id: row.workspaceId,
+        display_name: row.displayName,
+        phone_number: row.phoneNumber ?? null,
+        mode,
+      };
+    });
+    console.info(`[${scope}/listConnectionsByAgentConfigId] Success: userId=${workspaceId}`);
+    return rows;
+  } catch (error) {
+    console.error(`[${scope}/listConnectionsByAgentConfigId] Unexpected error: ${String(error)}`);
+    return [];
+  }
+}
+
+/** Returns one attached connection if any exist (archive/delete gates). Prefer listConnectionsByAgentConfigId for multi-attach. */
 export async function findConnectionByAgentConfigId(
   workspaceId: string,
   agentConfigId: string
@@ -633,34 +682,59 @@ export async function findConnectionByAgentConfigId(
     mode: "inactive" as WhatsappConnectionMode,
   };
   try {
-    const data = await db
-      .select()
-      .from(whatsappConnections)
-      .where(
-        and(
-          eq(whatsappConnections.workspaceId, workspaceId),
-          eq(whatsappConnections.agentConfigId, agentConfigId),
-        ),
-      )
-      .limit(1);
-    const row = data[0] ?? null;
+    const rows = await listConnectionsByAgentConfigId(workspaceId, agentConfigId);
+    const row = rows[0] ?? null;
     if (!row) {
       console.error(`[${scope}/findConnectionByAgentConfigId] Failed query: Connection not found`);
       return fallback;
     }
-    const rawMode = row.mode as string | null | undefined;
-    const mode: WhatsappConnectionMode =
-      rawMode === "testing" || rawMode === "live" ? rawMode : "inactive";
     console.info(`[${scope}/findConnectionByAgentConfigId] Success: userId=${workspaceId}`);
     return {
       id: row.id,
-      workspace_id: row.workspaceId,
-      mode,
+      workspace_id: row.workspace_id,
+      mode: row.mode,
     };
   } catch (error) {
     console.error(`[${scope}/findConnectionByAgentConfigId] Unexpected error: ${String(error)}`);
     return fallback;
   }
+}
+
+/**
+ * Resolves which WhatsApp line a task (or similar agent-initiated send) should use.
+ * Prefer an explicit connection id; otherwise only auto-pick when the agent has exactly one attachment.
+ */
+export async function resolveWhatsappConnectionIdForAgentTask(
+  workspaceId: string,
+  agentConfigId: string,
+  whatsappConnectionId?: string | null,
+): Promise<{ ok: true; connectionId: string } | { ok: false; error: string }> {
+  const trimmedAgent = agentConfigId.trim();
+  if (!trimmedAgent) {
+    return { ok: false, error: "Agent id is required." };
+  }
+  const attached = await listConnectionsByAgentConfigId(workspaceId, trimmedAgent);
+  const explicit = whatsappConnectionId?.trim() ?? "";
+  if (explicit) {
+    const match = attached.find((row) => row.id === explicit);
+    if (!match) {
+      return {
+        ok: false,
+        error: "WhatsApp connection is not attached to this agent.",
+      };
+    }
+    return { ok: true, connectionId: match.id };
+  }
+  if (attached.length === 1) {
+    return { ok: true, connectionId: attached[0].id };
+  }
+  if (attached.length === 0) {
+    return { ok: false, error: "No WhatsApp connection attached to this agent." };
+  }
+  return {
+    ok: false,
+    error: "WhatsApp connection is required when the agent has multiple connections.",
+  };
 }
 
 export async function getConversationWhatsappChatId(
@@ -955,14 +1029,14 @@ export async function resolveWhatsappConnectionForConversationAgentOutbound(
 
     let connectionRowId = scopedId;
     if (!connectionRowId) {
-      const byAgent = await findConnectionByAgentConfigId(workspaceId, trimmedAgent);
-      if (!byAgent.id) {
+      const attached = await listConnectionsByAgentConfigId(workspaceId, trimmedAgent);
+      if (attached.length !== 1) {
         console.error(
-          `[${scope}/resolveWhatsappConnectionForConversationAgentOutbound] Failed query: no connection for agent`,
+          `[${scope}/resolveWhatsappConnectionForConversationAgentOutbound] Failed query: no unambiguous connection for agent count=${attached.length}`,
         );
         return null;
       }
-      connectionRowId = byAgent.id.trim();
+      connectionRowId = attached[0].id.trim();
     }
 
     const row = await getWhatsappConnectionRowById(workspaceId, connectionRowId);
@@ -1114,9 +1188,15 @@ export async function getWhatsappConnectionModeForInboundAi(
       console.info(`[${scope}/getWhatsappConnectionModeForInboundAi] Success: no agent userId=${workspaceId}`);
       return "inactive";
     }
-    const byAgent = await findConnectionByAgentConfigId(workspaceId, trimmedAgent);
-    console.info(`[${scope}/getWhatsappConnectionModeForInboundAi] Success: by-agent userId=${workspaceId}`);
-    return byAgent.id ? byAgent.mode : "inactive";
+    const attached = await listConnectionsByAgentConfigId(workspaceId, trimmedAgent);
+    if (attached.length === 1) {
+      console.info(`[${scope}/getWhatsappConnectionModeForInboundAi] Success: by-agent userId=${workspaceId}`);
+      return attached[0].mode;
+    }
+    console.info(
+      `[${scope}/getWhatsappConnectionModeForInboundAi] Success: inactive ambiguous userId=${workspaceId}`,
+    );
+    return "inactive";
   } catch (error) {
     console.error(`[${scope}/getWhatsappConnectionModeForInboundAi] Unexpected error: ${String(error)}`);
     return "inactive";
@@ -1128,8 +1208,8 @@ export async function bindAgentToFirstAvailableAuthorizedConnection(
   agentId: string,
 ): Promise<{ ok: boolean; message: string }> {
   try {
-    const existing = await findConnectionByAgentConfigId(workspaceId, agentId);
-    if (existing.id) {
+    const existing = await listConnectionsByAgentConfigId(workspaceId, agentId);
+    if (existing.length > 0) {
       console.info(
         `[${scope}/bindAgentToFirstAvailableAuthorizedConnection] Success: already attached userId=${workspaceId}`,
       );
@@ -1166,43 +1246,69 @@ export async function bindAgentToFirstAvailableAuthorizedConnection(
   }
 }
 
+/** Sync this agent's attachments to exactly `connectionIds` (empty = detach all). Reclaims lines owned by other agents. */
+export async function syncAgentWhatsappConnections(
+  workspaceId: string,
+  agentId: string,
+  connectionIds: string[],
+): Promise<{ ok: boolean; message: string }> {
+  const trimmedAgent = agentId.trim();
+  if (!trimmedAgent) {
+    console.error(`[${scope}/syncAgentWhatsappConnections] Failed query: agentId is empty`);
+    return { ok: false, message: "agent_id_required" };
+  }
+  const uniqueIds = [
+    ...new Set(connectionIds.map((id) => id.trim()).filter((id) => id.length > 0)),
+  ];
+  try {
+    if (uniqueIds.length > 0) {
+      await db
+        .update(whatsappConnections)
+        .set({ agentConfigId: trimmedAgent })
+        .where(
+          and(
+            eq(whatsappConnections.workspaceId, workspaceId),
+            inArray(whatsappConnections.id, uniqueIds),
+          ),
+        );
+    }
+
+    const detachConditions = [
+      eq(whatsappConnections.workspaceId, workspaceId),
+      eq(whatsappConnections.agentConfigId, trimmedAgent),
+    ];
+    if (uniqueIds.length > 0) {
+      detachConditions.push(not(inArray(whatsappConnections.id, uniqueIds)));
+    }
+    await db
+      .update(whatsappConnections)
+      .set({ agentConfigId: null })
+      .where(and(...detachConditions));
+
+    console.info(`[${scope}/syncAgentWhatsappConnections] Success: userId=${workspaceId}`);
+    return {
+      ok: true,
+      message:
+        uniqueIds.length === 0
+          ? "Agent detached from WhatsApp connections"
+          : "Agent WhatsApp connections synced",
+    };
+  } catch (error) {
+    console.error(`[${scope}/syncAgentWhatsappConnections] Unexpected error: ${String(error)}`);
+    return { ok: false, message: "Unexpected error" };
+  }
+}
+
 export async function bindAgentToWhatsappConnection(
   workspaceId: string,
   agentId: string,
   connectionId: string | null
 ): Promise<{ ok: boolean; message: string }> {
-  try {
-    await db
-      .update(whatsappConnections)
-      .set({ agentConfigId: null })
-      .where(
-        and(
-          eq(whatsappConnections.workspaceId, workspaceId),
-          eq(whatsappConnections.agentConfigId, agentId),
-        ),
-      );
-
-    if (!connectionId) {
-      console.info(`[${scope}/bindAgentToWhatsappConnection] Success: userId=${workspaceId}`);
-      return { ok: true, message: "Agent detached from WhatsApp connection" };
-    }
-
-    await db
-      .update(whatsappConnections)
-      .set({ agentConfigId: agentId })
-      .where(
-        and(
-          eq(whatsappConnections.workspaceId, workspaceId),
-          eq(whatsappConnections.id, connectionId),
-        ),
-      );
-
-    console.info(`[${scope}/bindAgentToWhatsappConnection] Success: userId=${workspaceId}`);
-    return { ok: true, message: "Agent attached to WhatsApp connection" };
-  } catch (error) {
-    console.error(`[${scope}/bindAgentToWhatsappConnection] Unexpected error: ${String(error)}`);
-    return { ok: false, message: "Unexpected error" };
-  }
+  return syncAgentWhatsappConnections(
+    workspaceId,
+    agentId,
+    connectionId ? [connectionId] : [],
+  );
 }
 
 export async function findOrCreateConversationByWhatsappChatId(
@@ -1212,40 +1318,33 @@ export async function findOrCreateConversationByWhatsappChatId(
   contactDisplayName: string,
   whatsappChatId: string,
 ): Promise<string | null> {
+  const incomingConnectionId = whatsappConnectionId.trim();
+  const chatId = whatsappChatId.trim();
+  if (!incomingConnectionId || !chatId) {
+    console.error(
+      `[${scope}/findOrCreateConversationByWhatsappChatId] Failed query: connectionId or chatId empty`,
+    );
+    return null;
+  }
+
   try {
     const title = `${contactDisplayName} - WhatsApp`;
-    const incomingConnectionId = whatsappConnectionId.trim();
     const existing = await db
       .select({
         id: conversations.id,
-        whatsappConnectionId: conversations.whatsappConnectionId,
       })
       .from(conversations)
       .where(
         and(
           eq(conversations.workspaceId, workspaceId),
-          eq(conversations.whatsappChatId, whatsappChatId),
+          eq(conversations.whatsappConnectionId, incomingConnectionId),
+          eq(conversations.whatsappChatId, chatId),
         ),
       )
       .limit(1);
     const existingRow = existing[0] ?? null;
 
     if (existingRow?.id) {
-      const currentConnectionId = existingRow.whatsappConnectionId?.trim() ?? "";
-      if (
-        incomingConnectionId.length > 0 &&
-        currentConnectionId !== incomingConnectionId
-      ) {
-        await db
-          .update(conversations)
-          .set({ whatsappConnectionId: incomingConnectionId })
-          .where(
-            and(
-              eq(conversations.workspaceId, workspaceId),
-              eq(conversations.id, existingRow.id),
-            ),
-          );
-      }
       console.info(`[${scope}/findOrCreateConversationByWhatsappChatId] Success: userId=${workspaceId}`);
       return existingRow.id;
     }
@@ -1254,11 +1353,11 @@ export async function findOrCreateConversationByWhatsappChatId(
       .insert(conversations)
       .values({
         workspaceId,
-        whatsappConnectionId,
+        whatsappConnectionId: incomingConnectionId,
         contactId,
         title,
         status: "open",
-        whatsappChatId,
+        whatsappChatId: chatId,
         handlingMode: "ai",
       })
       .returning({ id: conversations.id });

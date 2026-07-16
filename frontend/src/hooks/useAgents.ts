@@ -134,8 +134,9 @@ export function useAgents() {
       return false;
     }
 
-    const attachedConnectionId =
-      data.connections.find((connection) => connection.agent_config_id === id)?.id ?? null;
+    const attachedConnectionIds = data.connections
+      .filter((connection) => connection.agent_config_id === id)
+      .map((connection) => connection.id);
 
     try {
       await api.put(`/api/user/agents/${id}`, {
@@ -147,7 +148,7 @@ export function useAgents() {
         contextGroups: Array.isArray(agent.context_groups) ? agent.context_groups : [],
         handoffTopicGroups: Array.isArray(agent.handoff_topic_groups) ? agent.handoff_topic_groups : [],
         assetGroups: Array.isArray(agent.asset_groups) ? agent.asset_groups : [],
-        attachedConnectionId,
+        attachedConnectionIds,
         autoAssignConversationLabels: agent.auto_assign_conversation_labels !== false,
       });
       await reload();

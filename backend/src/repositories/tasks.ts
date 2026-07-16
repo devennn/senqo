@@ -45,15 +45,41 @@ function normalizeLeadContactRow(
   };
 }
 
-function mapSchedulableAgentRows(
-  rows: { id: string; profileName: string }[],
+function mapSchedulableAgentsWithConnections(
+  agentRows: { id: string; profileName: string }[],
+  connectionRows: Array<{
+    agentConfigId: string | null;
+    id: string;
+    displayName: string;
+    phoneNumber: string | null;
+  }>,
 ): SchedulableAgentRecord[] {
+  const connectionsByAgent = new Map<
+    string,
+    Array<{ id: string; display_name: string; phone_number: string | null }>
+  >();
+  for (const row of connectionRows) {
+    const agentId = row.agentConfigId?.trim() ?? "";
+    if (!agentId) continue;
+    const list = connectionsByAgent.get(agentId) ?? [];
+    list.push({
+      id: row.id,
+      display_name: row.displayName,
+      phone_number: row.phoneNumber ?? null,
+    });
+    connectionsByAgent.set(agentId, list);
+  }
+
   const seen = new Set<string>();
   const agents: SchedulableAgentRecord[] = [];
-  for (const row of rows) {
+  for (const row of agentRows) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
-    agents.push({ id: row.id, profile_name: row.profileName });
+    agents.push({
+      id: row.id,
+      profile_name: row.profileName,
+      connections: connectionsByAgent.get(row.id) ?? [],
+    });
   }
   return agents;
 }
@@ -66,6 +92,9 @@ export async function listSchedulableAgents(
       .select({
         id: agentConfigs.id,
         profileName: agentConfigs.profileName,
+        connectionId: whatsappConnections.id,
+        connectionDisplayName: whatsappConnections.displayName,
+        connectionPhone: whatsappConnections.phoneNumber,
       })
       .from(agentConfigs)
       .innerJoin(
@@ -81,11 +110,20 @@ export async function listSchedulableAgents(
           isNull(agentConfigs.archivedAt),
         ),
       )
-      .orderBy(desc(agentConfigs.updatedAt));
+      .orderBy(desc(agentConfigs.updatedAt), asc(whatsappConnections.createdAt));
 
     if (attachedAgentRows.length > 0) {
+      const agents = mapSchedulableAgentsWithConnections(
+        attachedAgentRows.map((row) => ({ id: row.id, profileName: row.profileName })),
+        attachedAgentRows.map((row) => ({
+          agentConfigId: row.id,
+          id: row.connectionId,
+          displayName: row.connectionDisplayName,
+          phoneNumber: row.connectionPhone,
+        })),
+      );
       console.info(`[${scope}/listSchedulableAgents] Success: userId=${workspaceId}`);
-      return mapSchedulableAgentRows(attachedAgentRows);
+      return agents;
     }
 
     const connectionRows = await db
@@ -123,7 +161,7 @@ export async function listSchedulableAgents(
       .orderBy(desc(agentConfigs.updatedAt));
 
     console.info(`[${scope}/listSchedulableAgents] Success: userId=${workspaceId}`);
-    return mapSchedulableAgentRows(workspaceAgentRows);
+    return mapSchedulableAgentsWithConnections(workspaceAgentRows, []);
   } catch (error) {
     console.error(
       `[${scope}/listSchedulableAgents] Unexpected error: ${String(error)}`,
@@ -142,6 +180,7 @@ export async function createTask(
         id: input.id,
         workspaceId: input.workspaceId,
         agentConfigId: input.agentConfigId,
+        whatsappConnectionId: input.whatsappConnectionId ?? null,
         leadId: input.leadId ?? null,
         prompt: input.prompt,
         fileUrl: input.fileUrl ?? null,
@@ -204,6 +243,7 @@ export async function getTaskById(
     | "lead_id"
     | "prompt"
     | "agent_config_id"
+    | "whatsapp_connection_id"
     | "one_time_at"
     | "daily_contact_limit"
     | "source"
@@ -219,6 +259,7 @@ export async function getTaskById(
         leadId: tasks.leadId,
         prompt: tasks.prompt,
         agentConfigId: tasks.agentConfigId,
+        whatsappConnectionId: tasks.whatsappConnectionId,
         oneTimeAt: tasks.oneTimeAt,
         dailyContactLimit: tasks.dailyContactLimit,
         source: tasks.source,
@@ -243,6 +284,7 @@ export async function getTaskById(
       lead_id: data.leadId,
       prompt: data.prompt,
       agent_config_id: data.agentConfigId,
+      whatsapp_connection_id: data.whatsappConnectionId ?? null,
       one_time_at: data.oneTimeAt as unknown as string | null,
       daily_contact_limit: data.dailyContactLimit,
       source: data.source as TaskRecord["source"],

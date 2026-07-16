@@ -50,6 +50,20 @@
       "when": 1780540924805,
       "tag": "0006_messages_wa_message_id_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780540924806,
+      "tag": "0007_tasks_whatsapp_connection_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780540924807,
+      "tag": "0008_conversations_per_connection_unique",
+      "breakpoints": true
     }
   ]
 }

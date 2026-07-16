@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { AgentToolRuntimeContext } from "../tools/shared.js";
 import { findOrCreateLeadForConversation } from "../../repositories/leads.js";
 import { createTask } from "../../repositories/tasks.js";
+import { getConversationWithContact } from "../../repositories/conversations.js";
+import { resolveWhatsappConnectionIdForAgentTask } from "../../repositories/whatsapp.js";
 import { scheduleAgentTask } from "../../services/job-scheduler.js";
 import { taskScheduleSchema, toCronSchedule } from "../../services/task-schedule.js";
 
@@ -12,12 +14,13 @@ const createTaskToolInputSchema = z.object({
   scheduleType: taskScheduleSchema.shape.scheduleType,
   oneTimeAt: taskScheduleSchema.shape.oneTimeAt,
   attachCurrentConversationLead: z.boolean().default(true),
+  whatsappConnectionId: z.string().uuid().optional(),
 });
 
 export function createTaskTool(context: AgentToolRuntimeContext) {
   return tool({
     description:
-      "Create a one-time task for follow-ups/outreach. Can auto-link the current conversation lead.",
+      "Create a one-time task for follow-ups/outreach. Can auto-link the current conversation lead. When the agent has multiple WhatsApp lines, pass whatsappConnectionId or the current conversation line is used.",
     inputSchema: createTaskToolInputSchema,
     execute: async (input) => {
       if (!context.agentConfigId) {
@@ -33,6 +36,24 @@ export function createTaskTool(context: AgentToolRuntimeContext) {
       if (input.attachCurrentConversationLead) {
         const lead = await findOrCreateLeadForConversation(context.workspaceId, context.sessionId);
         leadId = lead?.id ?? null;
+      }
+
+      let preferredConnectionId = input.whatsappConnectionId?.trim() ?? "";
+      if (!preferredConnectionId) {
+        const conversation = await getConversationWithContact(
+          context.workspaceId,
+          context.sessionId,
+        );
+        preferredConnectionId = conversation?.whatsappConnection?.id?.trim() ?? "";
+      }
+
+      const connectionResolved = await resolveWhatsappConnectionIdForAgentTask(
+        context.workspaceId,
+        context.agentConfigId,
+        preferredConnectionId || null,
+      );
+      if (!connectionResolved.ok) {
+        return { ok: false, error: connectionResolved.error };
       }
 
       let cronExpression: string | null = null;
@@ -71,6 +92,7 @@ export function createTaskTool(context: AgentToolRuntimeContext) {
         id: taskId,
         workspaceId: context.workspaceId,
         agentConfigId: context.agentConfigId,
+        whatsappConnectionId: connectionResolved.connectionId,
         leadId,
         prompt: input.prompt,
         fileUrl: input.fileUrl ?? null,

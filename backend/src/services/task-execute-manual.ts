@@ -2,9 +2,9 @@ import { sendTextMessageCompat as sendTextMessage, sendMediaByUrl } from "../ser
 import { getLeadContactForWorkspace } from "../repositories/leads.js";
 import {
   createConversationMessage,
-  findConnectionByAgentConfigId,
   findOrCreateConversationByWhatsappChatId,
   resolveWhatsappConnectionForConversationAgentOutbound,
+  resolveWhatsappConnectionIdForAgentTask,
 } from "../repositories/whatsapp.js";
 import {
   persistHumanOutboundMediaToAgentSession,
@@ -21,6 +21,7 @@ export async function sendScheduledTaskAsManualWhatsapp(input: {
   leadId: string;
   instruction: string;
   fileUrl?: string | null;
+  whatsappConnectionId?: string | null;
 }): Promise<{ ok: true; conversationId: string; idMessage: string } | { ok: false; error: string }> {
   const text = input.instruction
     .replace(/%0D%0A/gi, "\n")
@@ -41,15 +42,19 @@ export async function sendScheduledTaskAsManualWhatsapp(input: {
     return { ok: false, error: "Invalid contact phone for WhatsApp." };
   }
 
-  const connection = await findConnectionByAgentConfigId(input.workspaceId, input.agentConfigId);
-  if (!connection.id) {
-    return { ok: false, error: "No WhatsApp connection attached to this agent." };
+  const resolvedLine = await resolveWhatsappConnectionIdForAgentTask(
+    input.workspaceId,
+    input.agentConfigId,
+    input.whatsappConnectionId,
+  );
+  if (!resolvedLine.ok) {
+    return { ok: false, error: resolvedLine.error };
   }
 
   const displayName = `${leadContact.firstName} ${leadContact.lastName}`.trim() || "WhatsApp Contact";
   const conversationId = await findOrCreateConversationByWhatsappChatId(
     input.workspaceId,
-    connection.id,
+    resolvedLine.connectionId,
     leadContact.contactId,
     displayName,
     chatId,

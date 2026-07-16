@@ -61,7 +61,7 @@ async function resolveSenderConnection(
   workspaceId: string,
   senderPhone: string,
 ): Promise<
-  | { ok: true; agentConfigId: string }
+  | { ok: true; agentConfigId: string; whatsappConnectionId: string }
   | {
       ok: false;
       response: CreateScheduledTaskApiResponse;
@@ -96,7 +96,11 @@ async function resolveSenderConnection(
         response: { ok: false, error: "sender_agent_not_attached" },
       };
     }
-    return { ok: true, agentConfigId: senderConnection.agent_config_id };
+    return {
+      ok: true,
+      agentConfigId: senderConnection.agent_config_id,
+      whatsappConnectionId: senderConnection.id,
+    };
   }
   return {
     ok: false,
@@ -253,6 +257,7 @@ app.post("/", async (c) => {
     id: taskId,
     workspaceId,
     agentConfigId: senderResolved.agentConfigId,
+    whatsappConnectionId: senderResolved.whatsappConnectionId,
     leadId: leadRecord.id,
     prompt: parsed.data.message,
     scheduleType: "one_time",

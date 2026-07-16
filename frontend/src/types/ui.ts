@@ -28,7 +28,7 @@ export type AgentConfigFormNormalizedSnapshot = {
   workspaceContextGroups: readonly string[];
   assetGroups: readonly string[];
   handoffTopicGroups: readonly string[];
-  attachedConnectionId: string;
+  attachedConnectionIds: readonly string[];
   autoAssignConversationLabels: boolean;
 };
 

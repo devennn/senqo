@@ -133,8 +133,9 @@ export const conversations = pgTable(
     whatsappConnectionId: uuid("whatsapp_connection_id"),
   },
   (t) => [
-    unique("uq_conversations_workspace_whatsapp_chat_id").on(
+    unique("uq_conversations_workspace_connection_whatsapp_chat_id").on(
       t.workspaceId,
+      t.whatsappConnectionId,
       t.whatsappChatId,
     ),
     index("idx_conversations_workspace_updated").on(
@@ -444,6 +445,10 @@ export const tasks = pgTable(
     agentConfigId: uuid("agent_config_id")
       .notNull()
       .references(() => agentConfigs.id, { onDelete: "restrict" }),
+    whatsappConnectionId: uuid("whatsapp_connection_id").references(
+      () => whatsappConnections.id,
+      { onDelete: "restrict" },
+    ),
     prompt: text("prompt").notNull(),
     scheduleType: text("schedule_type").notNull(),
     cronExpression: text("cron_expression"),

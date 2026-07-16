@@ -103,6 +103,7 @@ export async function executeScheduledTask(payload: TaskExecutePayload): Promise
         leadId: effectiveLeadId,
         instruction: outbound.message,
         fileUrl: outbound.fileUrl,
+        whatsappConnectionId: taskRow?.whatsapp_connection_id ?? null,
       });
       if (!manual.ok) {
         console.error(`[${logScope}] Manual WhatsApp send failed`, { error: manual.error });
@@ -141,6 +142,7 @@ export async function executeScheduledTask(payload: TaskExecutePayload): Promise
         agentConfigId: payload.agentConfigId,
         messageBody: outbound.message,
         fileUrl: outbound.fileUrl,
+        whatsappConnectionId: taskRow.whatsapp_connection_id,
         limit: batchLimit,
         dryRun,
       });

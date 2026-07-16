@@ -39,7 +39,10 @@ export function agentConnectionSectionDirty(
   baseline: AgentConfigFormNormalizedSnapshot,
   current: AgentConfigFormNormalizedSnapshot,
 ): boolean {
-  return current.attachedConnectionId !== baseline.attachedConnectionId;
+  return !stringArraysEqual(
+    sortedCopy([...current.attachedConnectionIds]),
+    sortedCopy([...baseline.attachedConnectionIds]),
+  );
 }
 
 export function agentWorkspaceContextGroupsDirty(
@@ -107,8 +110,10 @@ export function buildAgentConfigFormBaseline(input: {
   const contextGroupIds = new Set(input.workspaceContextGroups.map((g) => g.id));
   const assetGroupIds = new Set(input.workspaceAssetGroups.map((g) => g.id));
   const handoffGroupIds = new Set(input.handoffTopicGroups.map((g) => g.id));
-  const attachedConnection = input.connections.find(
-    (connection) => connection.attachedAgentId === input.agent.id,
+  const attachedConnectionIds = sortedCopy(
+    input.connections
+      .filter((connection) => connection.attachedAgentId === input.agent.id)
+      .map((connection) => connection.id),
   );
   const toolsSorted = sortedCopy(
     (input.agent.tools ?? []).filter((key) => configurableToolKeys.has(key)),
@@ -137,7 +142,7 @@ export function buildAgentConfigFormBaseline(input: {
     workspaceContextGroups: contextSorted,
     assetGroups: assetSorted,
     handoffTopicGroups: handoffSorted,
-    attachedConnectionId: attachedConnection?.id ?? "",
+    attachedConnectionIds,
     autoAssignConversationLabels: input.agent.auto_assign_conversation_labels !== false,
   };
 }
@@ -153,7 +158,7 @@ export function readAgentConfigFormSnapshot(form: HTMLFormElement): AgentConfigF
     workspaceContextGroups: sortedCopy(fd.getAll("contextGroups").map(String)),
     assetGroups: sortedCopy(fd.getAll("assetGroups").map(String)),
     handoffTopicGroups: sortedCopy(fd.getAll("handoffTopicGroups").map(String)),
-    attachedConnectionId: String(fd.get("attachedConnectionId") ?? ""),
+    attachedConnectionIds: sortedCopy(fd.getAll("attachedConnectionIds").map(String)),
     autoAssignConversationLabels: fd.get("autoAssignConversationLabels") === "on",
   };
 }
@@ -165,8 +170,8 @@ export function agentConfigFormSnapshotsEqual(
   return (
     a.profileName === b.profileName &&
     a.behavior === b.behavior &&
-    a.attachedConnectionId === b.attachedConnectionId &&
     a.autoAssignConversationLabels === b.autoAssignConversationLabels &&
+    stringArraysEqual(a.attachedConnectionIds, b.attachedConnectionIds) &&
     stringArraysEqual(a.tools, b.tools) &&
     stringArraysEqual(a.skills, b.skills) &&
     stringArraysEqual(a.responseTemplateGroups, b.responseTemplateGroups) &&

@@ -59,6 +59,27 @@ describe("createTask", () => {
     });
     expect(result.ok).toBe(false);
   });
+  // createTask with whatsappConnectionId → insert succeeds and persists the connection, needed so multi-line agents send on the chosen line.
+  it("persists whatsappConnectionId when provided", async () => {
+    mockReturning.mockResolvedValue([{ id: "task-2" }]);
+    const result = await createTask({
+      id: "task-2",
+      workspaceId: "ws-1",
+      agentConfigId: "a1",
+      whatsappConnectionId: "conn-1",
+      prompt: "Say hello",
+      scheduleType: "one_time",
+      oneTimeAt: "2025-01-01T00:00:00Z",
+      timezone: "UTC",
+      jobPayload: {},
+      source: "user",
+    });
+    expect(result.ok).toBe(true);
+    expect(result.id).toBe("task-2");
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({ whatsappConnectionId: "conn-1" }),
+    );
+  });
 });
 
 describe("cancelTaskById", () => {
@@ -78,11 +99,19 @@ describe("cancelTaskById", () => {
 });
 
 describe("listSchedulableAgents", () => {
-  // Agents are directly attached to a WhatsApp connection → they are returned with profile_name, needed to verify the join-based query works.
+  // Agents are directly attached to a WhatsApp connection → they are returned with profile_name and connections, needed to verify the join-based query works.
   it("returns agents attached to a WhatsApp connection", async () => {
     const innerJoin = vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
-        orderBy: vi.fn().mockResolvedValue([{ id: "a1", profileName: "Bot" }]),
+        orderBy: vi.fn().mockResolvedValue([
+          {
+            id: "a1",
+            profileName: "Bot",
+            connectionId: "c1",
+            connectionDisplayName: "Line 1",
+            connectionPhone: "+1",
+          },
+        ]),
       }),
     });
     mockDb.select.mockReturnValueOnce({
@@ -91,6 +120,9 @@ describe("listSchedulableAgents", () => {
     const result = await listSchedulableAgents("ws-1");
     expect(result).toHaveLength(1);
     expect(result[0].profile_name).toBe("Bot");
+    expect(result[0].connections).toEqual([
+      { id: "c1", display_name: "Line 1", phone_number: "+1" },
+    ]);
   });
 
   // An authorized WhatsApp connection exists but no agent is directly attached → all workspace agents are still returned, needed to cover the fallback path where any authorized connection makes all agents schedulable.
@@ -117,5 +149,6 @@ describe("listSchedulableAgents", () => {
     const result = await listSchedulableAgents("ws-1");
     expect(result).toHaveLength(1);
     expect(result[0].profile_name).toBe("Bot");
+    expect(result[0].connections).toEqual([]);
   });
 });

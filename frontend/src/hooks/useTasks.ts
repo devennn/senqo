@@ -72,9 +72,11 @@ export function useTasks(query: TasksQuery) {
   }, [workspaceId, fetchPage, query.page, query.search]);
 
   const createTask = useCallback(async (formData: FormData) => {
+    const whatsappConnectionId = String(formData.get("whatsappConnectionId") ?? "").trim();
     await api.post("/api/user/tasks", {
       prompt: String(formData.get("prompt") ?? ""),
       agentId: String(formData.get("agentId") ?? ""),
+      ...(whatsappConnectionId ? { whatsappConnectionId } : {}),
       fileUrl: String(formData.get("fileUrl") ?? "") || undefined,
       taskLinkMode: String(formData.get("taskLinkMode") ?? "contactless"),
       contactId: String(formData.get("contactId") ?? "") || undefined,

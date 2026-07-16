@@ -20,6 +20,9 @@ vi.mock("../db/index.js", () => ({ db: mockDb }));
 const {
   createConnection,
   bindAgentToWhatsappConnection,
+  syncAgentWhatsappConnections,
+  listConnectionsByAgentConfigId,
+  resolveWhatsappConnectionIdForAgentTask,
   updateConnectionMode,
   deleteConnectionByWorkspace,
   findOrCreateConversationByWhatsappChatId,
@@ -89,6 +92,95 @@ describe("bindAgentToWhatsappConnection", () => {
     mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     const result = await bindAgentToWhatsappConnection("ws-1", "agent-1", "conn-1");
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("syncAgentWhatsappConnections", () => {
+  // Syncing A+B attaches both without wiping siblings, needed for multi-connection agents.
+  it("syncs multiple connection ids", async () => {
+    mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const result = await syncAgentWhatsappConnections("ws-1", "agent-1", ["conn-a", "conn-b"]);
+    expect(result.ok).toBe(true);
+    expect(mockDb.update).toHaveBeenCalled();
+  });
+
+  // Syncing to empty list detaches all, needed so Agent setup can clear attachments.
+  it("detaches all when connection ids empty", async () => {
+    mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const result = await syncAgentWhatsappConnections("ws-1", "agent-1", []);
+    expect(result.ok).toBe(true);
+    expect(result.message).toBe("Agent detached from WhatsApp connections");
+  });
+});
+
+describe("listConnectionsByAgentConfigId", () => {
+  // Agent with two attached lines → both returned, needed for task UI and validation.
+  it("returns all attached connections", async () => {
+    const mockOrderBy = vi.fn().mockResolvedValue([
+      {
+        id: "conn-a",
+        workspaceId: "ws-1",
+        displayName: "A",
+        phoneNumber: "+1",
+        mode: "live",
+      },
+      {
+        id: "conn-b",
+        workspaceId: "ws-1",
+        displayName: "B",
+        phoneNumber: "+2",
+        mode: "testing",
+      },
+    ]);
+    const mockWhereSelect = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+    mockDb.select.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: mockWhereSelect }) });
+    const rows = await listConnectionsByAgentConfigId("ws-1", "agent-1");
+    expect(rows).toHaveLength(2);
+    expect(rows[0].id).toBe("conn-a");
+    expect(rows[1].mode).toBe("testing");
+  });
+});
+
+describe("resolveWhatsappConnectionIdForAgentTask", () => {
+  // Explicit id that is attached → returned, needed so tasks send on the chosen line.
+  it("returns explicit attached connection", async () => {
+    const mockOrderBy = vi.fn().mockResolvedValue([
+      { id: "conn-a", workspaceId: "ws-1", displayName: "A", phoneNumber: null, mode: "live" },
+      { id: "conn-b", workspaceId: "ws-1", displayName: "B", phoneNumber: null, mode: "live" },
+    ]);
+    mockDb.select.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ orderBy: mockOrderBy }) }),
+    });
+    const result = await resolveWhatsappConnectionIdForAgentTask("ws-1", "agent-1", "conn-b");
+    expect(result).toEqual({ ok: true, connectionId: "conn-b" });
+  });
+
+  // No explicit id and exactly one attachment → auto-pick, needed for single-line agents.
+  it("auto-picks when agent has exactly one connection", async () => {
+    const mockOrderBy = vi.fn().mockResolvedValue([
+      { id: "conn-a", workspaceId: "ws-1", displayName: "A", phoneNumber: null, mode: "live" },
+    ]);
+    mockDb.select.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ orderBy: mockOrderBy }) }),
+    });
+    const result = await resolveWhatsappConnectionIdForAgentTask("ws-1", "agent-1", null);
+    expect(result).toEqual({ ok: true, connectionId: "conn-a" });
+  });
+
+  // No explicit id and multiple attachments → error, needed to prevent sending on a random line.
+  it("fails when multiple connections and none specified", async () => {
+    const mockOrderBy = vi.fn().mockResolvedValue([
+      { id: "conn-a", workspaceId: "ws-1", displayName: "A", phoneNumber: null, mode: "live" },
+      { id: "conn-b", workspaceId: "ws-1", displayName: "B", phoneNumber: null, mode: "live" },
+    ]);
+    mockDb.select.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ orderBy: mockOrderBy }) }),
+    });
+    const result = await resolveWhatsappConnectionIdForAgentTask("ws-1", "agent-1", null);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("multiple");
+    }
   });
 });
 
@@ -177,36 +269,37 @@ describe("getWhatsappConnectionModeForInboundAi", () => {
 });
 
 describe("findOrCreateConversationByWhatsappChatId", () => {
-  // Existing thread was opened on another line → whatsapp_connection_id is updated to the inbound line, needed so multi-connection workspaces gate AI on the active line.
-  it("updates whatsapp_connection_id when reusing an existing conversation on a different line", async () => {
-    const mockLimit = vi.fn().mockResolvedValue([
-      { id: "conv-1", whatsappConnectionId: "conn-inactive" },
-    ]);
+  // Same chat id on a different connection is a different thread → insert creates a new conversation, needed so multi-line workspaces keep inbox history and outbound per line.
+  it("creates a separate conversation when the same chat id arrives on another line", async () => {
+    const mockLimit = vi.fn().mockResolvedValue([]);
     const mockWhereSelect = vi.fn().mockReturnValue({ limit: mockLimit });
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhereSelect });
     mockDb.select.mockReturnValue({ from: mockFrom });
-    mockSet.mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    });
+    mockReturning.mockResolvedValue([{ id: "conv-b" }]);
+    mockValues.mockReturnValue({ returning: mockReturning });
 
     const conversationId = await findOrCreateConversationByWhatsappChatId(
       "ws-1",
-      "conn-testing",
+      "conn-b",
       "contact-1",
       "Test User",
       "60123456789@s.whatsapp.net",
     );
 
-    expect(conversationId).toBe("conv-1");
-    expect(mockDb.update).toHaveBeenCalled();
-    expect(mockSet).toHaveBeenCalledWith({ whatsappConnectionId: "conn-testing" });
+    expect(conversationId).toBe("conv-b");
+    expect(mockDb.insert).toHaveBeenCalled();
+    expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        whatsappConnectionId: "conn-b",
+        whatsappChatId: "60123456789@s.whatsapp.net",
+      }),
+    );
   });
 
-  // Thread already belongs to the inbound line → no redundant update is issued, needed to avoid needless writes on every message.
-  it("does not update whatsapp_connection_id when the line already matches", async () => {
-    const mockLimit = vi.fn().mockResolvedValue([
-      { id: "conv-1", whatsappConnectionId: "conn-testing" },
-    ]);
+  // Thread already exists for this connection + chat id → reuse without rewriting the line, needed to avoid merging threads across numbers.
+  it("reuses the existing conversation for the same connection and chat id", async () => {
+    const mockLimit = vi.fn().mockResolvedValue([{ id: "conv-1" }]);
     const mockWhereSelect = vi.fn().mockReturnValue({ limit: mockLimit });
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhereSelect });
     mockDb.select.mockReturnValue({ from: mockFrom });
@@ -221,6 +314,20 @@ describe("findOrCreateConversationByWhatsappChatId", () => {
 
     expect(conversationId).toBe("conv-1");
     expect(mockDb.update).not.toHaveBeenCalled();
+    expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  // Empty connection id → null, needed so WhatsApp-backed threads are never created without a line.
+  it("returns null when connection id is empty", async () => {
+    const conversationId = await findOrCreateConversationByWhatsappChatId(
+      "ws-1",
+      "   ",
+      "contact-1",
+      "Test User",
+      "60123456789@s.whatsapp.net",
+    );
+    expect(conversationId).toBeNull();
+    expect(mockDb.select).not.toHaveBeenCalled();
   });
 });
 

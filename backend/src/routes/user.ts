@@ -109,13 +109,14 @@ import {
   listConnections,
   getConnectionById,
   createConnection,
-  bindAgentToWhatsappConnection,
   bindAgentToFirstAvailableAuthorizedConnection,
+  syncAgentWhatsappConnections,
+  listConnectionsByAgentConfigId,
+  resolveWhatsappConnectionIdForAgentTask,
   updateConnectionSyncState,
   updateConnectionMode,
   updateConnectionDisplayName,
   WHATSAPP_CONNECTION_DISPLAY_NAME_MAX_LEN,
-  findConnectionByAgentConfigId,
   listRecentConnectionEvents,
   recordConnectionEvent,
   deleteConnectionByWorkspace,
@@ -320,7 +321,8 @@ const updateAgentSchema = z.object({
   behavior: z.string(),
   tools: z.array(z.string()),
   skills: z.array(z.string()),
-  attachedConnectionId: z.string().nullable().optional(),
+  /** When present (including []), sync attachments. When omitted, leave attachments unchanged. */
+  attachedConnectionIds: z.array(z.string().uuid()).optional(),
   autoAssignConversationLabels: z.boolean().optional().default(true),
   responseTemplateGroups: z.array(z.string().uuid()).max(40).optional(),
   handoffTopicGroups: z.array(z.string().uuid()).max(40).optional(),
@@ -425,11 +427,13 @@ app.put("/agents/:id", async (c) => {
     context_groups: contextGroups,
     asset_groups: assetGroups,
   });
-  await bindAgentToWhatsappConnection(
-    workspaceId,
-    agentId,
-    body.data.attachedConnectionId ?? null,
-  );
+  if (body.data.attachedConnectionIds !== undefined) {
+    await syncAgentWhatsappConnections(
+      workspaceId,
+      agentId,
+      body.data.attachedConnectionIds,
+    );
+  }
   return c.json({ ok: true });
 });
 
@@ -833,8 +837,8 @@ app.delete("/workspace-context-groups/:id", async (c) => {
 app.post("/agents/:id/archive", async (c) => {
   const workspaceId = c.get("workspaceId");
   const agentId = c.req.param("id");
-  const bound = await findConnectionByAgentConfigId(workspaceId, agentId);
-  if (bound.id) return c.json({ error: "whatsapp_detach_required" }, 409);
+  const bound = await listConnectionsByAgentConfigId(workspaceId, agentId);
+  if (bound.length > 0) return c.json({ error: "whatsapp_detach_required" }, 409);
   const config = await getAgentConfigById(workspaceId, agentId);
   if (!config) return c.json({ error: "agent_not_found" }, 404);
   if (config.first_used_at)
@@ -994,8 +998,8 @@ app.post("/agents/:id/knowledge-import/apply", async (c) => {
 app.delete("/agents/:id", async (c) => {
   const workspaceId = c.get("workspaceId");
   const agentId = c.req.param("id");
-  const bound = await findConnectionByAgentConfigId(workspaceId, agentId);
-  if (bound.id) return c.json({ error: "whatsapp_detach_required" }, 409);
+  const bound = await listConnectionsByAgentConfigId(workspaceId, agentId);
+  if (bound.length > 0) return c.json({ error: "whatsapp_detach_required" }, 409);
   const config = await getAgentConfigById(workspaceId, agentId);
   if (!config) return c.json({ error: "agent_not_found" }, 404);
   if (config.first_used_at) return c.json({ error: "cannot_delete_used" }, 422);
@@ -1954,6 +1958,7 @@ const createTaskSchema = taskScheduleSchema
   .extend({
     prompt: z.string().min(1),
     agentId: z.string().min(1),
+    whatsappConnectionId: z.string().uuid().optional(),
     fileUrl: z.string().url().optional(),
     taskLinkMode: z.enum(["single_contact", "contactless", "tools_source"]),
     contactId: z.string().optional(),
@@ -2019,6 +2024,24 @@ app.post("/tasks", async (c) => {
   );
   if (!bound.ok) return c.json({ error: "agent_not_eligible" }, 422);
 
+  const connectionResolved = await resolveWhatsappConnectionIdForAgentTask(
+    workspaceId,
+    parsed.data.agentId,
+    parsed.data.whatsappConnectionId,
+  );
+  if (!connectionResolved.ok) {
+    return c.json(
+      {
+        error:
+          connectionResolved.error.includes("multiple")
+            ? "whatsapp_connection_required"
+            : "whatsapp_connection_invalid",
+        message: connectionResolved.error,
+      },
+      422,
+    );
+  }
+
   let cronExpression: string | null = null;
   let oneTimeAt: string | null = null;
   let timezone = "UTC";
@@ -2072,6 +2095,7 @@ app.post("/tasks", async (c) => {
     id: taskId,
     workspaceId,
     agentConfigId: parsed.data.agentId,
+    whatsappConnectionId: connectionResolved.connectionId,
     leadId,
     prompt: parsed.data.prompt,
     scheduleType: parsed.data.scheduleType,

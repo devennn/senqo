@@ -13,6 +13,7 @@ export async function runTaskOutreachBatch(input: {
   agentConfigId: string;
   messageBody: string;
   fileUrl?: string | null;
+  whatsappConnectionId?: string | null;
   limit: number;
   dryRun: boolean;
 }): Promise<TaskOutreachBatchResult> {
@@ -42,6 +43,7 @@ export async function runTaskOutreachBatch(input: {
       leadId,
       instruction: body,
       fileUrl: input.fileUrl ?? null,
+      whatsappConnectionId: input.whatsappConnectionId,
     });
 
     if (!sent.ok) {

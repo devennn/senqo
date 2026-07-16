@@ -71,7 +71,7 @@ export function AgentConfigForm({
         contextGroups: fd.getAll("contextGroups").map(String),
         assetGroups: fd.getAll("assetGroups").map(String),
         handoffTopicGroups: fd.getAll("handoffTopicGroups").map(String),
-        attachedConnectionId: String(fd.get("attachedConnectionId") ?? "") || null,
+        attachedConnectionIds: fd.getAll("attachedConnectionIds").map(String),
         autoAssignConversationLabels: fd.get("autoAssignConversationLabels") === "on",
       });
       setSaved(true);
@@ -111,6 +111,11 @@ export function AgentConfigForm({
             saving={saving}
           />
           <AgentConnectionAttachFields
+            key={`${agent.id}:${connections
+              .filter((c) => c.attachedAgentId === agent.id)
+              .map((c) => c.id)
+              .sort()
+              .join(",")}`}
             connections={connections}
             agentId={agent.id}
             sectionDirty={sectionDirty.connection}

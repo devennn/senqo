@@ -3,6 +3,7 @@
 ## Inbox & conversations
 
 - Unified inbox — sidebar with search, filters (label, WhatsApp line, human-handling-only), and per-line routing
+- Threads are per WhatsApp line — the same contact on two connected numbers is two conversations (pre-fix merged threads are left as-is)
 - Thread view — message history with infinite scroll, AI reasoning insights, timeline-style handoff markers
 - Manual replies — compose text and media; outbound sends show delivery confirmation
 - AI / Human toggle — per-conversation control over automated vs manual replies
@@ -15,7 +16,8 @@
 - Multi-model — powered by OpenRouter; plug in any supported LLM
 - Inline saves — per-section save buttons when settings change; transient success feedback
 - Operator insights — dashboard-only explanation of what grounded each AI reply
-- Per-connection attach — bind an agent to a WhatsApp line; Inactive / Testing / Live modes
+- Per-connection attach — bind an agent to one or more WhatsApp lines from Agent setup; Inactive / Testing / Live modes stay per connection
+- Tasks — when an agent has multiple attached lines, pick which WhatsApp connection the task sends on
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model
 - Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`
 - Workspace secrets — Settings → Secrets stores encrypted env values as `ctx.env` at tool runtime
