@@ -11,6 +11,7 @@ import {
   listConversationIdsByLabel,
   listLabelBadgesForConversations,
 } from "../repositories/conversation-labels.js";
+import { findAgentAssetStorageByFileName } from "../repositories/workspace-asset-groups.js";
 import {
   getWhatsappConnectionRowById,
   isWhatsappConnectionRowSendable,
@@ -600,6 +601,7 @@ function toMessageSelectRow(raw: {
 }
 
 async function hydrateConversationMessageRows(
+  workspaceId: string,
   rows: MessageSelectRow[],
 ): Promise<ConversationMessage[]> {
   const result: ConversationMessage[] = [];
@@ -617,6 +619,8 @@ async function hydrateConversationMessageRows(
     const media: ConversationMessageMedia | null = rawMedia
       ? {
           path: typeof rawMedia.path === "string" ? rawMedia.path : undefined,
+          storageBucket:
+            typeof rawMedia.storageBucket === "string" ? rawMedia.storageBucket : undefined,
           fileName: typeof rawMedia.fileName === "string" ? rawMedia.fileName : undefined,
           mimeType: typeof rawMedia.mimeType === "string" ? rawMedia.mimeType : undefined,
           caption: typeof rawMedia.caption === "string" ? rawMedia.caption : undefined,
@@ -634,8 +638,22 @@ async function hydrateConversationMessageRows(
         }
       : null;
 
+    if (media && !media.path?.trim() && media.fileName?.trim()) {
+      const source = typeof metadata?.source === "string" ? metadata.source : "";
+      if (source === "agent_tool_send_whatsapp") {
+        const asset = await findAgentAssetStorageByFileName(workspaceId, media.fileName);
+        if (asset) {
+          media.path = asset.storagePath;
+          media.storageBucket = "agent-assets";
+          if (!media.mimeType) media.mimeType = asset.mimeType;
+        }
+      }
+    }
+
     if (media?.path) {
-      const signedUrl = await storageCreateSignedUrl("whatsapp-media", media.path, 60 * 60);
+      const resolvedBucket =
+        media.storageBucket?.trim() === "agent-assets" ? "agent-assets" : "whatsapp-media";
+      const signedUrl = await storageCreateSignedUrl(resolvedBucket, media.path, 60 * 60);
       if (signedUrl) {
         media.signedUrl = signedUrl;
       }
@@ -700,7 +718,7 @@ export async function listConversationMessagesLatestPage(
     const hasMoreOlderMessages = rows.length > capped;
     const slice = hasMoreOlderMessages ? rows.slice(0, capped) : rows;
     const ascendingRows = [...slice].reverse();
-    const result = await hydrateConversationMessageRows(ascendingRows);
+    const result = await hydrateConversationMessageRows(workspaceId, ascendingRows);
     console.info(`[${scope}/listConversationMessagesLatestPage] Success: userId=${workspaceId}`);
     return { messages: result, hasMoreOlderMessages };
   } catch (error) {
@@ -754,7 +772,7 @@ export async function listConversationMessagesOlderPage(
     const hasMoreOlderMessages = rows.length > capped;
     const slice = hasMoreOlderMessages ? rows.slice(0, capped) : rows;
     const ascendingRows = [...slice].reverse();
-    const result = await hydrateConversationMessageRows(ascendingRows);
+    const result = await hydrateConversationMessageRows(workspaceId, ascendingRows);
     console.info(`[${scope}/listConversationMessagesOlderPage] Success: userId=${workspaceId}`);
     return { messages: result, hasMoreOlderMessages };
   } catch (error) {

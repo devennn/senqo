@@ -118,6 +118,8 @@ export async function sendAgentWhatsappMessage(input: {
           whatsappMessageId: sent.messageId,
           mediaKind,
           media: {
+            path: asset.storage_path,
+            storageBucket: "agent-assets",
             fileName: asset.file_name,
             mimeType: asset.mime_type,
             caption,

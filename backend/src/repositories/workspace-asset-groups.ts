@@ -472,6 +472,36 @@ export async function getAgentAssetByFileNameForAgent(
   }
 }
 
+/** Resolves storage path for inbox preview when older messages omitted media.path. */
+export async function findAgentAssetStorageByFileName(
+  workspaceId: string,
+  fileName: string,
+): Promise<{ storagePath: string; mimeType: string } | null> {
+  const normalized = fileName.trim();
+  if (!normalized) return null;
+  try {
+    const [data] = await db
+      .select({
+        storagePath: agentAssets.storagePath,
+        mimeType: agentAssets.mimeType,
+      })
+      .from(agentAssets)
+      .where(
+        and(eq(agentAssets.workspaceId, workspaceId), ilike(agentAssets.fileName, normalized)),
+      )
+      .limit(1);
+    if (!data?.storagePath) {
+      console.error(`[${scope}/findAgentAssetStorageByFileName] Failed query: asset not found`);
+      return null;
+    }
+    console.info(`[${scope}/findAgentAssetStorageByFileName] Success: workspaceId=${workspaceId}`);
+    return { storagePath: data.storagePath, mimeType: data.mimeType };
+  } catch (error) {
+    console.error(`[${scope}/findAgentAssetStorageByFileName] Unexpected error: ${String(error)}`);
+    return null;
+  }
+}
+
 export async function downloadAgentAssetBytes(storagePath: string): Promise<ArrayBuffer | null> {
   try {
     const data = await storageDownload("agent-assets", storagePath);
