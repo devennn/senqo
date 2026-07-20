@@ -200,6 +200,7 @@ export default function AgentPage() {
                   groups={data.handoffTopicGroups}
                   reload={reload}
                   agentId={selectedId ?? undefined}
+                  agents={data.agents}
                 />
               </div>
             ) : tab === "templates" ? (
@@ -239,8 +240,8 @@ export default function AgentPage() {
                   availableSkills={data.skills}
                   responseTemplateGroups={data.responseTemplateGroups}
                   workspaceContextGroups={data.workspaceContextGroups}
-                  handoffTopicGroups={data.handoffTopicGroups}
                   workspaceAssetGroups={data.workspaceAssetGroups}
+                  handoffTopicGroups={data.handoffTopicGroups}
                   connections={agentConnectionOptions}
                   onSaved={() => {
                     void reload();

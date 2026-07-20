@@ -1,20 +1,26 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
+import { connectionPhonesToDigits } from "@/lib/handoff-phone";
 import { teamMemberErrorMessage } from "@/lib/team-member-errors";
 import { TRANSIENT_SUCCESS_FEEDBACK_MS } from "@/lib/transient-feedback";
 import { useIsWorkspaceOwner } from "@/hooks/useIsWorkspaceOwner";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingsPageLoader } from "@/pages/settings/components/settings-page-loader";
-import type { TeamMemberRecord } from "@/types/repositories";
+import { TeamMembersCard } from "@/pages/settings/components/team-members-card";
+import type { TeamMemberRecord, WhatsappConnection } from "@/types/repositories";
 
 export default function TeamPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
   const { isOwner, loading: ownerLoading } = useIsWorkspaceOwner();
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
+  const [connections, setConnections] = useState<WhatsappConnection[]>([]);
+  const [connectionPhoneDigits, setConnectionPhoneDigits] = useState<string[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [addLoading, setAddLoading] = useState(false);
@@ -33,10 +39,20 @@ export default function TeamPage() {
   const loadMembers = useCallback(async () => {
     setLoadError(null);
     try {
-      const res = await api.get<{ members: TeamMemberRecord[] }>("/api/user/team");
-      setMembers(res.members ?? []);
+      const [teamRes, connectionsRes] = await Promise.all([
+        api.get<{ members: TeamMemberRecord[] }>("/api/user/team"),
+        api.get<{ connections: WhatsappConnection[] }>("/api/user/connections"),
+      ]);
+      const nextConnections = connectionsRes.connections ?? [];
+      setMembers(teamRes.members ?? []);
+      setConnections(nextConnections);
+      setConnectionPhoneDigits(
+        connectionPhonesToDigits(nextConnections.map((c) => c.phone_number)),
+      );
     } catch (e) {
       setMembers([]);
+      setConnections([]);
+      setConnectionPhoneDigits([]);
       setLoadError(String((e as Error).message));
     } finally {
       setLoadingMembers(false);
@@ -57,8 +73,7 @@ export default function TeamPage() {
       setSearchParams({ success: "member_added" });
       e.currentTarget.reset();
     } catch (err) {
-      const code = String((err as Error).message);
-      setSearchParams({ error: code });
+      setSearchParams({ error: String((err as Error).message) });
     }
     setAddLoading(false);
   }
@@ -103,13 +118,7 @@ export default function TeamPage() {
               <form onSubmit={handleAddMember} className="flex flex-col gap-3 sm:flex-row">
                 <div className="flex-1 space-y-2">
                   <Label htmlFor="email">Email address</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="colleague@company.com"
-                    required
-                  />
+                  <Input id="email" name="email" type="email" placeholder="colleague@company.com" required />
                 </div>
                 <div className="flex items-end">
                   <Button type="submit" className="w-full sm:w-auto" disabled={addLoading}>
@@ -121,24 +130,14 @@ export default function TeamPage() {
           </Card>
         ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Members</CardTitle>
-          </CardHeader>
-          <CardContent className="divide-y divide-border">
-            {members.map((m) => (
-              <div key={m.id} className="flex items-center justify-between py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{m.email || "Unknown member"}</p>
-                  <p className="text-xs capitalize text-muted-foreground">{m.role}</p>
-                </div>
-              </div>
-            ))}
-            {members.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">No team members yet.</p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <TeamMembersCard
+          members={members}
+          currentUserId={user?.id}
+          isOwner={Boolean(isOwner)}
+          connections={connections}
+          connectionPhoneDigits={connectionPhoneDigits}
+          onChanged={loadMembers}
+        />
       </div>
     </section>
   );

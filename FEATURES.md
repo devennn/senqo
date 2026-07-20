@@ -7,6 +7,7 @@
 - Thread view — message history with infinite scroll, AI reasoning insights, timeline-style handoff markers
 - Manual replies — compose text and media; outbound sends show delivery confirmation
 - AI / Human toggle — per-conversation control over automated vs manual replies
+- Handoff WhatsApp notify — when a chat switches to human handling, chosen verified teammates get a WhatsApp alert with reason, customer phone, WhatsApp line, workspace, and a dashboard link to open the conversation
 - Conversation labels — apply workspace labels; filter inbox by label
 - Delete conversation — permanently remove thread, messages, and AI history (CRM contact preserved)
 
@@ -29,7 +30,8 @@
 - Import docs — per-agent menu action: upload PDF/CSV/Markdown, AI drafts context/skills/templates in one background job at a time, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs (or Import in progress) to show the same processing/review UI
 - Workspace context — structured factual snippets organized into groups
 - Response templates — canned Q&A pairs used as authoritative replies
-- Handoff topics — escalation definitions for when to transfer to a human
+- Handoff topics — escalation definitions for when to transfer to a human (create/edit groups on Agent setup → Human handoff; attach groups to an agent on Profile → Knowledge → Topics that need a human so they are included in the agent prompt; from a group, Handoff settings can also attach agents and choose notify people)
+- Handoff notify people — via the Handoff settings dialog on a topic group, pick one or more teammates with verified handoff phones for the selected agents; each gets an alert from the conversation’s WhatsApp line when they registered on that same line
 - Skills — markdown playbooks for specialized workflows
 - Asset groups — sendable files (images, video, audio, documents) the agent reasons about
 - Auto-assign labels — agent can classify conversations with workspace labels
@@ -64,4 +66,5 @@
 - API keys — create, list, delete workspace API keys with optional expiry
 - Workspace secrets — encrypted key/value pairs for custom tool `requiredEnv`
 - Team — workspace owners add existing Senqo users to a workspace; unregistered emails are rejected with a clear error
+- Handoff phone registration — owners (or the member themselves) register a personal WhatsApp number on Team per connected WhatsApp line, confirm with a dashboard OTP sent from that line only; the same personal number needs a separate registration for each line that should alert them
 - User profile — name fields; password change

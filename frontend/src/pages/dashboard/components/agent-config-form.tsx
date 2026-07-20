@@ -7,17 +7,10 @@ import { Bot } from "lucide-react";
 import { api } from "@/lib/api";
 import { AgentConnectionAttachFields } from "@/pages/dashboard/components/agent-connection-attach-fields";
 import { AgentConfigFormAutoAssignLabelsField } from "@/pages/dashboard/components/agent-config-form-auto-assign-labels-field";
-import { AgentConfigKnowledgeCapabilityFields } from "@/pages/dashboard/components/agent-config-knowledge-capability-fields";
+import { AgentConfigFormKnowledgeBlock } from "@/pages/dashboard/components/agent-config-form-knowledge-block";
 import { AgentProfileBehaviorFields } from "@/pages/dashboard/components/agent-profile-behavior-fields";
 import { useWorkspace } from "@/context/workspace";
 import type { AgentConfigFormProps } from "@/types/ui";
-
-function agentTabHref(wsPath: (path: string) => string, agentId: string, tab: string): string {
-  const params = new URLSearchParams();
-  params.set("tab", tab);
-  params.set("agentId", agentId);
-  return `${wsPath("/agent")}?${params.toString()}`;
-}
 
 export function AgentConfigForm({
   agent,
@@ -44,29 +37,20 @@ export function AgentConfigForm({
     workspaceAssetGroups,
     handoffTopicGroups,
   });
-  const selectedTools = new Set(Array.isArray(agent.tools) ? agent.tools : []);
-  const selectedSkills = new Set(Array.isArray(agent.skills) ? agent.skills : []);
-  const selectedResponseTemplateGroups = new Set(Array.isArray(agent.response_template_groups) ? agent.response_template_groups : []);
-  const selectedHandoffTopicGroups = new Set(Array.isArray(agent.handoff_topic_groups) ? agent.handoff_topic_groups : []);
-  const selectedContextGroups = new Set(Array.isArray(agent.context_groups) ? agent.context_groups : []);
-  const selectedAssetGroups = new Set(Array.isArray(agent.asset_groups) ? agent.asset_groups : []);
   useTransientBooleanReset(saved, setSaved, TRANSIENT_SUCCESS_FEEDBACK_MS);
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
     setSaving(true);
     setSaved(false);
     setSaveError(null);
-
     try {
       const fd = new FormData(e.currentTarget);
-      const tools = fd.getAll("tools").map(String);
-      const skills = fd.getAll("skills").map(String);
       await api.put(`/api/user/agents/${agent.id}`, {
         profileName: String(fd.get("profileName") ?? ""),
         behavior: String(fd.get("behavior") ?? ""),
-        tools,
-        skills,
+        tools: fd.getAll("tools").map(String),
+        skills: fd.getAll("skills").map(String),
         responseTemplateGroups: fd.getAll("responseTemplateGroups").map(String),
         contextGroups: fd.getAll("contextGroups").map(String),
         assetGroups: fd.getAll("assetGroups").map(String),
@@ -84,6 +68,12 @@ export function AgentConfigForm({
     }
   }
 
+  const attachedKey = connections
+    .filter((c) => c.attachedAgentId === agent.id)
+    .map((c) => c.id)
+    .sort()
+    .join(",");
+
   return (
     <Card>
       <CardHeader>
@@ -92,8 +82,7 @@ export function AgentConfigForm({
           Agent Profile & Behavior
         </CardTitle>
         <CardDescription>
-          Configure how your AI agent responds to customers. A Save button appears next to what you changed
-          (same style as Create New Agent).
+          Configure how your AI agent responds. A Save button appears next to what you changed.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -111,41 +100,23 @@ export function AgentConfigForm({
             saving={saving}
           />
           <AgentConnectionAttachFields
-            key={`${agent.id}:${connections
-              .filter((c) => c.attachedAgentId === agent.id)
-              .map((c) => c.id)
-              .sort()
-              .join(",")}`}
+            key={`${agent.id}:${attachedKey}`}
             connections={connections}
             agentId={agent.id}
             sectionDirty={sectionDirty.connection}
             saving={saving}
           />
-          <AgentConfigKnowledgeCapabilityFields
+          <AgentConfigFormKnowledgeBlock
+            agent={agent}
+            sectionDirty={sectionDirty}
+            saving={saving}
+            wsPath={wsPath}
             availableTools={availableTools}
             availableSkills={availableSkills}
             responseTemplateGroups={responseTemplateGroups}
             workspaceContextGroups={workspaceContextGroups}
             workspaceAssetGroups={workspaceAssetGroups}
             handoffTopicGroups={handoffTopicGroups}
-            selectedTools={selectedTools}
-            selectedSkills={selectedSkills}
-            selectedResponseTemplateGroups={selectedResponseTemplateGroups}
-            selectedContextGroups={selectedContextGroups}
-            selectedAssetGroups={selectedAssetGroups}
-            selectedHandoffTopicGroups={selectedHandoffTopicGroups}
-            templatesTabHref={agentTabHref(wsPath, agent.id, "templates")}
-            contextTabHref={agentTabHref(wsPath, agent.id, "context")}
-            assetsTabHref={agentTabHref(wsPath, agent.id, "assets")}
-            handoffTabHref={agentTabHref(wsPath, agent.id, "handoff")}
-            toolsTabHref={agentTabHref(wsPath, agent.id, "tools")}
-            workspaceContextDirty={sectionDirty.workspaceContext}
-            assetGroupsDirty={sectionDirty.assetGroups}
-            responseTemplatesDirty={sectionDirty.responseTemplates}
-            handoffTopicsDirty={sectionDirty.handoffTopics}
-            toolsDirty={sectionDirty.tools}
-            skillsDirty={sectionDirty.skills}
-            saving={saving}
           />
           <AgentConfigFormAutoAssignLabelsField
             defaultChecked={agent.auto_assign_conversation_labels !== false}

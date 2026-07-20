@@ -82,6 +82,7 @@ vi.mock("../repositories/workspaces.js", () => ({
   createWorkspaceForUser: vi.fn(),
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
+  isWorkspaceTeammate: vi.fn(),
   updateWorkspaceNameAsOwner: vi.fn(),
 }));
 
@@ -273,18 +274,42 @@ vi.mock("../services/agent-knowledge-import-job.js", () => ({
   startAgentKnowledgeImportJob: vi.fn(),
 }));
 
+vi.mock("../services/handoff-notify.js", () => ({
+  notifyHandoffHuman: vi.fn(),
+  scheduleHandoffNotify: vi.fn(),
+}));
+
+vi.mock("../repositories/handoff-phones.js", () => ({
+  getHandoffPhone: vi.fn(),
+  userHasVerifiedHandoffPhone: vi.fn(),
+  listHandoffPhonesForUsers: vi.fn(),
+}));
+
+vi.mock("../services/handoff-phone-verify.js", () => ({
+  startHandoffPhoneVerification: vi.fn(),
+  confirmHandoffPhoneVerification: vi.fn(),
+  clearHandoffPhoneRegistration: vi.fn(),
+}));
+
+vi.mock("../repositories/team.js", () => ({
+  addMember: vi.fn(),
+  listMembers: vi.fn(),
+}));
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";
 import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser } from "../repositories/workspaces.js";
 import { listConversationLabels, createConversationLabel, deleteConversationLabel } from "../repositories/conversation-labels.js";
 import { listContactsPage } from "../repositories/contacts.js";
-import { listConversations } from "../repositories/conversations.js";
+import { listConversations, getConversationWithContact, updateConversationHandlingMode } from "../repositories/conversations.js";
 import { listTasksPage, listSchedulableAgents } from "../repositories/tasks.js";
-import { listConnections, listRecentConnectionEvents } from "../repositories/whatsapp.js";
+import { listConnections, listRecentConnectionEvents, createConversationMessage } from "../repositories/whatsapp.js";
 import { listWorkspaceSecrets, createWorkspaceSecret, deleteWorkspaceSecret } from "../repositories/workspace-secrets.js";
 import { listApiKeys, createApiKey, deleteApiKey } from "../repositories/api-keys.js";
-import { listAgentConfigs, createAgentConfig } from "../repositories/agent.js";
+import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentConfig } from "../repositories/agent.js";
+import { validateHandoffTopicGroupIdsForWorkspace } from "../repositories/handoff-topic-groups.js";
+import { scheduleHandoffNotify } from "../services/handoff-notify.js";
 import { findUserById } from "../repositories/auth-users.js";
 import { getProfileForSettings, updateProfile } from "../repositories/profiles.js";
 import { getWorkspaceRow } from "../repositories/workspaces.js";
@@ -299,6 +324,9 @@ const createConversationLabelMock = vi.mocked(createConversationLabel);
 const deleteConversationLabelMock = vi.mocked(deleteConversationLabel);
 const listContactsPageMock = vi.mocked(listContactsPage);
 const listConversationsMock = vi.mocked(listConversations);
+const getConversationWithContactMock = vi.mocked(getConversationWithContact);
+const updateConversationHandlingModeMock = vi.mocked(updateConversationHandlingMode);
+const createConversationMessageMock = vi.mocked(createConversationMessage);
 const listTasksPageMock = vi.mocked(listTasksPage);
 const listSchedulableAgentsMock = vi.mocked(listSchedulableAgents);
 const listConnectionsMock = vi.mocked(listConnections);
@@ -311,6 +339,10 @@ const createApiKeyMock = vi.mocked(createApiKey);
 const deleteApiKeyMock = vi.mocked(deleteApiKey);
 const listAgentConfigsMock = vi.mocked(listAgentConfigs);
 const createAgentConfigMock = vi.mocked(createAgentConfig);
+const getAgentConfigByIdMock = vi.mocked(getAgentConfigById);
+const updateAgentConfigMock = vi.mocked(updateAgentConfig);
+const validateHandoffTopicGroupIdsMock = vi.mocked(validateHandoffTopicGroupIdsForWorkspace);
+const scheduleHandoffNotifyMock = vi.mocked(scheduleHandoffNotify);
 const findUserByIdMock = vi.mocked(findUserById);
 const getProfileForSettingsMock = vi.mocked(getProfileForSettings);
 const updateProfileMock = vi.mocked(updateProfile);
@@ -800,5 +832,110 @@ describe("POST /agents", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe("agent-new");
+  });
+});
+
+describe("PUT /agents/:id handoff topic groups", () => {
+  // Profile save must persist marked handoff topic groups for prompt inclusion.
+  it("persists handoffTopicGroups on agent update", async () => {
+    getAgentConfigByIdMock.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      profile_name: "Bot",
+      behavior: "",
+      tools: [],
+      skills: [],
+      response_template_groups: [],
+      handoff_topic_groups: [],
+      context_groups: [],
+      asset_groups: [],
+      handoff_notify_user_ids: [],
+      auto_assign_conversation_labels: true,
+    });
+    validateHandoffTopicGroupIdsMock.mockResolvedValue({
+      ok: true,
+      normalized: ["22222222-2222-4222-8222-222222222222"],
+    });
+    updateAgentConfigMock.mockResolvedValue({ ok: true });
+
+    const res = await app.request("/agents/11111111-1111-4111-8111-111111111111", {
+      method: "PUT",
+      headers: AUTH,
+      body: JSON.stringify({
+        profileName: "Bot",
+        behavior: "",
+        tools: [],
+        skills: [],
+        handoffTopicGroups: ["22222222-2222-4222-8222-222222222222"],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(validateHandoffTopicGroupIdsMock).toHaveBeenCalledWith(
+      "ws-1",
+      ["22222222-2222-4222-8222-222222222222"],
+    );
+    expect(updateAgentConfigMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        handoff_topic_groups: ["22222222-2222-4222-8222-222222222222"],
+      }),
+    );
+  });
+});
+
+describe("PATCH /conversations/:id/handling-mode", () => {
+  // Manual toggle to human must succeed and only schedule notify (best-effort).
+  it("switches to human and schedules notify without awaiting delivery", async () => {
+    getConversationWithContactMock.mockResolvedValue({
+      id: "33333333-3333-4333-8333-333333333333",
+      handlingMode: "ai",
+    });
+    updateConversationHandlingModeMock.mockResolvedValue({ ok: true });
+    createConversationMessageMock.mockResolvedValue({ ok: true });
+
+    const res = await app.request(
+      "/conversations/33333333-3333-4333-8333-333333333333/handling-mode",
+      {
+        method: "PATCH",
+        headers: AUTH,
+        body: JSON.stringify({ handlingMode: "human" }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ ok: true, handlingMode: "human" });
+    expect(updateConversationHandlingModeMock).toHaveBeenCalledWith(
+      "ws-1",
+      "33333333-3333-4333-8333-333333333333",
+      "human",
+    );
+    expect(scheduleHandoffNotifyMock).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      conversationId: "33333333-3333-4333-8333-333333333333",
+      reason: "Manual handoff",
+    });
+  });
+
+  // Mode update success is independent of notify — response stays ok even if schedule is a no-op mock.
+  it("returns ok when switching to human even if notify scheduling is a no-op", async () => {
+    getConversationWithContactMock.mockResolvedValue({
+      id: "33333333-3333-4333-8333-333333333333",
+      handlingMode: "ai",
+    });
+    updateConversationHandlingModeMock.mockResolvedValue({ ok: true });
+    createConversationMessageMock.mockResolvedValue({ ok: false });
+    scheduleHandoffNotifyMock.mockImplementation(() => undefined);
+
+    const res = await app.request(
+      "/conversations/33333333-3333-4333-8333-333333333333/handling-mode",
+      {
+        method: "PATCH",
+        headers: AUTH,
+        body: JSON.stringify({ handlingMode: "human" }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, handlingMode: "human" });
   });
 });

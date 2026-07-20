@@ -72,7 +72,25 @@ vi.mock("../repositories/workspaces.js", () => ({
   createWorkspaceForUser: vi.fn(),
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
+  isWorkspaceTeammate: vi.fn(),
   updateWorkspaceNameAsOwner: vi.fn(),
+}));
+
+vi.mock("../repositories/handoff-phones.js", () => ({
+  getHandoffPhone: vi.fn(),
+  userHasVerifiedHandoffPhone: vi.fn(),
+  listHandoffPhonesForUsers: vi.fn(),
+}));
+
+vi.mock("../services/handoff-phone-verify.js", () => ({
+  startHandoffPhoneVerification: vi.fn(),
+  confirmHandoffPhoneVerification: vi.fn(),
+  clearHandoffPhoneRegistration: vi.fn(),
+}));
+
+vi.mock("../services/handoff-notify.js", () => ({
+  notifyHandoffHuman: vi.fn(),
+  scheduleHandoffNotify: vi.fn(),
 }));
 
 vi.mock("../repositories/auth-users.js", () => ({

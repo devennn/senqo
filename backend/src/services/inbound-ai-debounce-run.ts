@@ -10,6 +10,7 @@ import {
   isBareWhatsAppTypePlaceholderLine,
 } from "../lib/trailing-user-messages.js";
 import { THREAD_EVENT_HANDOFF_TO_HUMAN } from "../lib/conversation-thread-events.js";
+import { scheduleHandoffNotify } from "./handoff-notify.js";
 import { resolveInboundMediaSigned } from "../lib/inbound-media-resolve.js";
 import {
   getConversationHandlingMode,
@@ -116,6 +117,12 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
           `[${logScope}] Failed query: unable to save handoff thread event conversationId=${input.conversationId}`,
         );
       }
+      scheduleHandoffNotify({
+        workspaceId: input.workspaceId,
+        conversationId: input.conversationId,
+        agentConfigId: input.agentConfigId,
+        reason: INBOUND_UNSUPPORTED_MEDIA_HANDOFF_REASON,
+      });
     }
     try {
       const result = await runAgentSession({

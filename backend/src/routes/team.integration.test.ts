@@ -73,7 +73,25 @@ vi.mock("../repositories/workspaces.js", () => ({
   createWorkspaceForUser: vi.fn(),
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
+  isWorkspaceTeammate: vi.fn(),
   updateWorkspaceNameAsOwner: vi.fn(),
+}));
+
+vi.mock("../repositories/handoff-phones.js", () => ({
+  getHandoffPhone: vi.fn(),
+  userHasVerifiedHandoffPhone: vi.fn(),
+  listHandoffPhonesForUsers: vi.fn(),
+}));
+
+vi.mock("../services/handoff-phone-verify.js", () => ({
+  startHandoffPhoneVerification: vi.fn(),
+  confirmHandoffPhoneVerification: vi.fn(),
+  clearHandoffPhoneRegistration: vi.fn(),
+}));
+
+vi.mock("../services/handoff-notify.js", () => ({
+  notifyHandoffHuman: vi.fn(),
+  scheduleHandoffNotify: vi.fn(),
 }));
 
 vi.mock("../repositories/auth-users.js", () => ({
@@ -270,14 +288,25 @@ vi.mock("../services/agent-knowledge-import-job.js", () => ({
 }));
 
 import { verifyToken } from "../lib/auth-jwt.js";
-import { validateWorkspaceMembership, isWorkspaceOwner } from "../repositories/workspaces.js";
+import {
+  validateWorkspaceMembership,
+  isWorkspaceOwner,
+  isWorkspaceTeammate,
+} from "../repositories/workspaces.js";
 import { listMembers, addMember } from "../repositories/team.js";
+import {
+  startHandoffPhoneVerification,
+  confirmHandoffPhoneVerification,
+} from "../services/handoff-phone-verify.js";
 
 const verifyTokenMock = vi.mocked(verifyToken);
 const validateWorkspaceMembershipMock = vi.mocked(validateWorkspaceMembership);
 const isWorkspaceOwnerMock = vi.mocked(isWorkspaceOwner);
+const isWorkspaceTeammateMock = vi.mocked(isWorkspaceTeammate);
 const listMembersMock = vi.mocked(listMembers);
 const addMemberMock = vi.mocked(addMember);
+const startHandoffPhoneVerificationMock = vi.mocked(startHandoffPhoneVerification);
+const confirmHandoffPhoneVerificationMock = vi.mocked(confirmHandoffPhoneVerification);
 
 let app: Hono;
 
@@ -297,6 +326,7 @@ beforeEach(async () => {
   );
   validateWorkspaceMembershipMock.mockResolvedValue(true);
   isWorkspaceOwnerMock.mockResolvedValue(true);
+  isWorkspaceTeammateMock.mockResolvedValue(true);
 
   const { default: userRoute } = await import("../routes/user.js");
   app = new Hono().route("/", userRoute);
@@ -306,8 +336,29 @@ describe("GET /team", () => {
   // Workspace members are listed for any member with workspace access.
   it("returns members list", async () => {
     listMembersMock.mockResolvedValue([
-      { id: "m1", email: "alice@example.com", role: "owner", joined_at: "2026-01-01T00:00:00.000Z" },
-      { id: "m2", email: "bob@example.com", role: "member", joined_at: "2026-01-02T00:00:00.000Z" },
+      {
+        id: "user-owner",
+        userId: "user-owner",
+        email: "alice@example.com",
+        role: "owner",
+        joined_at: "2026-01-01T00:00:00.000Z",
+        handoffPhones: [],
+      },
+      {
+        id: "m2",
+        userId: "user-2",
+        email: "bob@example.com",
+        role: "member",
+        joined_at: "2026-01-02T00:00:00.000Z",
+        handoffPhones: [
+          {
+            connectionId: "conn-1",
+            connectionName: "Line 1",
+            phone: "15551234567",
+            status: "verified",
+          },
+        ],
+      },
     ]);
 
     const res = await app.request("/team", { headers: AUTH });
@@ -316,6 +367,7 @@ describe("GET /team", () => {
     const body = await res.json();
     expect(body.members).toHaveLength(2);
     expect(body.members[0].email).toBe("alice@example.com");
+    expect(body.members[1].handoffPhones[0].status).toBe("verified");
   });
 });
 
@@ -380,5 +432,93 @@ describe("POST /team", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toBe("already_member");
+  });
+});
+
+describe("POST /team/handoff-phone", () => {
+  // Owner registers a teammate phone → verification start is called.
+  it("owner registers member phone and returns ok", async () => {
+    startHandoffPhoneVerificationMock.mockResolvedValue({ ok: true });
+
+    const res = await app.request("/team/handoff-phone", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({
+        userId: "11111111-1111-4111-8111-111111111111",
+        phone: "15551234567",
+        whatsappConnectionId: "33333333-3333-4333-8333-333333333333",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(startHandoffPhoneVerificationMock).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      userId: "11111111-1111-4111-8111-111111111111",
+      phone: "15551234567",
+      whatsappConnectionId: "33333333-3333-4333-8333-333333333333",
+    });
+  });
+
+  // Non-owner cannot register another member's phone.
+  it("returns 403 when member tries to register another user", async () => {
+    isWorkspaceOwnerMock.mockResolvedValue(false);
+
+    const res = await app.request("/team/handoff-phone", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({
+        userId: "22222222-2222-4222-8222-222222222222",
+        phone: "15551234567",
+        whatsappConnectionId: "33333333-3333-4333-8333-333333333333",
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("forbidden");
+    expect(startHandoffPhoneVerificationMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /team/handoff-phone/confirm", () => {
+  // Valid confirmation code → 200.
+  it("confirms phone and returns ok", async () => {
+    confirmHandoffPhoneVerificationMock.mockResolvedValue({ ok: true });
+
+    const res = await app.request("/team/handoff-phone/confirm", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({
+        userId: "11111111-1111-4111-8111-111111111111",
+        whatsappConnectionId: "33333333-3333-4333-8333-333333333333",
+        code: "123456",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+  });
+
+  // Bad code → 400 with invalid_code.
+  it("returns 400 invalid_code when confirmation fails", async () => {
+    confirmHandoffPhoneVerificationMock.mockResolvedValue({
+      ok: false,
+      message: "invalid_code",
+    });
+
+    const res = await app.request("/team/handoff-phone/confirm", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({
+        userId: "11111111-1111-4111-8111-111111111111",
+        whatsappConnectionId: "33333333-3333-4333-8333-333333333333",
+        code: "000000",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid_code");
   });
 });

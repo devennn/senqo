@@ -34,6 +34,11 @@ vi.mock("../lib/inbound-media-resolve.js", () => ({
   resolveInboundMediaSigned: vi.fn(),
 }));
 
+vi.mock("./handoff-notify.js", () => ({
+  scheduleHandoffNotify: vi.fn(),
+  notifyHandoffHuman: vi.fn(),
+}));
+
 const { executeInboundDebouncedAiRun } = await import("./inbound-ai-debounce-run.js");
 
 const baseInput = {

@@ -70,6 +70,9 @@ export function useAgents() {
           handoff_topic_groups: Array.isArray(a.handoff_topic_groups) ? [...a.handoff_topic_groups] : [],
           context_groups: Array.isArray(a.context_groups) ? [...a.context_groups] : [],
           asset_groups: Array.isArray(a.asset_groups) ? [...a.asset_groups] : [],
+          handoff_notify_user_ids: Array.isArray(a.handoff_notify_user_ids)
+            ? a.handoff_notify_user_ids.map(String)
+            : [],
         })),
         agentIdsWithConnection: agentsRes.agentIdsWithConnection,
         responseTemplateGroups: agentsRes.responseTemplateGroups ?? [],

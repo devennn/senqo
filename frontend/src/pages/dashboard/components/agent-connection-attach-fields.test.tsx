@@ -24,6 +24,7 @@ describe("agentConnectionSectionDirty", () => {
     context_groups: [],
     asset_groups: [],
     handoff_topic_groups: [],
+    handoff_notify_user_ids: [],
     auto_assign_conversation_labels: true,
   };
 

@@ -1,89 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { Users } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useClickToEditGroupName } from "@/hooks/useClickToEditGroupName";
-import { api } from "@/lib/api";
+import { useHandoffTopicGroupEditor } from "@/hooks/useHandoffTopicGroupEditor";
 import { HANDOFF_TOPIC_ENTRIES_MAX_PER_GROUP } from "@/lib/agent-handoff-topic-limits";
-import type { WorkspaceHandoffTopicEntryRecord, WorkspaceHandoffTopicGroupWithEntries } from "@/types/repositories";
+import { HandoffTopicGroupEditorContent } from "@/pages/dashboard/components/handoff-topic-group-editor-content";
 import { HandoffTopicGroupNameFields } from "@/pages/dashboard/components/handoff-topic-group-name-fields";
-import { HandoffTopicGroupTopicsBlock } from "@/pages/dashboard/components/handoff-topic-group-topics-block";
 import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
 import { PageLoader } from "@/components/ui/spinner";
 
-export function HandoffTopicGroupEditor({ groupId, onSaved }: { groupId: string; onSaved: () => Promise<void> }) {
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [groupName, setGroupName] = useState("");
-  const [baselineName, setBaselineName] = useState("");
-  const [entries, setEntries] = useState<WorkspaceHandoffTopicEntryRecord[]>([]);
-  const [savingGroupName, setSavingGroupName] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [deletingGroup, setDeletingGroup] = useState(false);
-  const [deleteGroupDialogOpen, setDeleteGroupDialogOpen] = useState(false);
+type Props = {
+  groupId: string;
+  onSaved: () => Promise<void>;
+  onOpenAttachDialog: () => void;
+};
 
-  const loadGroup = useCallback(async () => {
-    const res = await api.get<{ group: WorkspaceHandoffTopicGroupWithEntries }>(
-      `/api/user/handoff-topic-groups/${groupId}`,
-    );
-    setGroupName(res.group.name);
-    setBaselineName(res.group.name);
-    const ordered = [...res.group.entries].sort((a, b) => a.sort_order - b.sort_order);
-    setEntries(ordered);
-  }, [groupId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function boot() {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        await loadGroup();
-      } catch (e) {
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Could not load group.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void boot();
-    return () => {
-      cancelled = true;
-    };
-  }, [groupId, loadGroup]);
-
-  const nameDirty = useMemo(() => groupName.trim() !== baselineName.trim(), [baselineName, groupName]);
-
-  const clearNameError = useCallback(() => setNameError(null), []);
-  const { nameEditing, startNameEdit, endNameEdit } = useClickToEditGroupName(groupId, baselineName, setGroupName, clearNameError);
-
-  async function handleSaveGroupName() {
-    setSavingGroupName(true);
-    setNameError(null);
-    try {
-      await api.patch(`/api/user/handoff-topic-groups/${groupId}`, { name: groupName.trim() });
-      setBaselineName(groupName.trim());
-      endNameEdit();
-      await onSaved();
-    } catch (e) {
-      setNameError(e instanceof Error ? e.message : "Could not save group name.");
-    } finally {
-      setSavingGroupName(false);
-    }
-  }
-
-  async function handleConfirmDeleteGroup() {
-    setDeletingGroup(true);
-    try {
-      await api.delete(`/api/user/handoff-topic-groups/${groupId}`);
-      await onSaved();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not delete group.";
-      throw new Error(msg);
-    } finally {
-      setDeletingGroup(false);
-    }
-  }
+export function HandoffTopicGroupEditor({ groupId, onSaved, onOpenAttachDialog }: Props) {
+  const editor = useHandoffTopicGroupEditor(groupId, onSaved);
+  const actionsDisabled = editor.deletingGroup || editor.loading || Boolean(editor.loadError);
 
   return (
     <Card>
@@ -94,63 +28,71 @@ export function HandoffTopicGroupEditor({ groupId, onSaved }: { groupId: string;
           helpContent={
             <p>
               Click the title to rename. Press Escape while editing to cancel. Define topics that should trigger a human
-              takeover. Attach this group on Profile per agent. Edit one topic row at a time.
+              takeover. Edit one topic row at a time. Use Handoff settings to choose agents and who to notify.
             </p>
           }
-          loading={loading}
-          loadError={loadError}
-          nameEditing={nameEditing}
-          groupName={groupName}
-          deletingGroup={deletingGroup}
-          onStartNameEdit={startNameEdit}
+          loading={editor.loading}
+          loadError={editor.loadError}
+          nameEditing={editor.nameEditing}
+          groupName={editor.groupName}
+          deletingGroup={editor.deletingGroup}
+          onStartNameEdit={editor.startNameEdit}
           nameFields={
             <HandoffTopicGroupNameFields
               groupId={groupId}
-              value={groupName}
-              onChange={setGroupName}
-              nameDirty={nameDirty}
-              saving={savingGroupName}
-              disabled={deletingGroup}
-              error={nameError}
-              onSave={() => void handleSaveGroupName()}
+              value={editor.groupName}
+              onChange={editor.setGroupName}
+              nameDirty={editor.nameDirty}
+              saving={editor.savingGroupName}
+              disabled={editor.deletingGroup}
+              error={editor.nameError}
+              onSave={() => void editor.handleSaveGroupName()}
               className="min-w-0"
             />
           }
         />
-        {!loading && !loadError ? (
+        {!editor.loading && !editor.loadError ? (
           <CardDescription>
-            {entries.length}/{HANDOFF_TOPIC_ENTRIES_MAX_PER_GROUP} topics
+            {editor.entries.length}/{HANDOFF_TOPIC_ENTRIES_MAX_PER_GROUP} topics
           </CardDescription>
         ) : null}
-        <CardAction className="-mt-0.5 shrink-0 sm:justify-self-end">
+        <CardAction className="-mt-0.5 flex shrink-0 flex-wrap items-center justify-end gap-2 sm:justify-self-end">
+          <Button type="button" variant="outline" size="sm" disabled={actionsDisabled} onClick={onOpenAttachDialog}>
+            Handoff settings
+          </Button>
           <Button
             type="button"
             variant="destructive"
             size="sm"
-            disabled={deletingGroup || loading || Boolean(loadError)}
-            onClick={() => setDeleteGroupDialogOpen(true)}
+            disabled={actionsDisabled}
+            onClick={() => editor.setDeleteGroupDialogOpen(true)}
           >
             Delete group
           </Button>
         </CardAction>
       </CardHeader>
       <ConfirmDestructiveDialog
-        open={deleteGroupDialogOpen}
-        onOpenChange={setDeleteGroupDialogOpen}
+        open={editor.deleteGroupDialogOpen}
+        onOpenChange={editor.setDeleteGroupDialogOpen}
         title="Delete this group?"
         description="It removes all topics and detaches from every agent."
         confirmLabel="Delete group"
         pendingConfirmLabel="Deleting…"
-        isConfirming={deletingGroup}
-        onConfirm={handleConfirmDeleteGroup}
+        isConfirming={editor.deletingGroup}
+        onConfirm={editor.handleConfirmDeleteGroup}
       />
       <CardContent className="space-y-6">
-        {loading ? (
+        {editor.loading ? (
           <PageLoader layout="agentTabPanel" label="Loading group" />
-        ) : loadError ? (
-          <p className="text-sm text-destructive">{loadError}</p>
+        ) : editor.loadError ? (
+          <p className="text-sm text-destructive">{editor.loadError}</p>
         ) : (
-          <HandoffTopicGroupTopicsBlock groupId={groupId} entries={entries} reloadGroup={loadGroup} onWorkspaceStale={onSaved} />
+          <HandoffTopicGroupEditorContent
+            groupId={groupId}
+            entries={editor.entries}
+            reloadGroup={editor.loadGroup}
+            onWorkspaceStale={onSaved}
+          />
         )}
       </CardContent>
     </Card>

@@ -21,6 +21,7 @@ describe("useAgentConfigFormDirty helpers", () => {
     context_groups: ["ctx1"],
     asset_groups: [],
     handoff_topic_groups: [],
+    handoff_notify_user_ids: [],
     auto_assign_conversation_labels: true,
   };
   const tool: WorkspaceCustomToolListItem = {

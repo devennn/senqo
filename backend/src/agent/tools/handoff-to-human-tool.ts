@@ -4,6 +4,7 @@ import type { AgentToolRuntimeContext } from "./shared.js";
 import { updateConversationHandlingMode } from "../../repositories/conversations.js";
 import { createConversationMessage } from "../../repositories/whatsapp.js";
 import { THREAD_EVENT_HANDOFF_TO_HUMAN } from "../../lib/conversation-thread-events.js";
+import { scheduleHandoffNotify } from "../../services/handoff-notify.js";
 
 export function createHandoffToHumanTool(context: AgentToolRuntimeContext) {
   return tool({
@@ -47,6 +48,13 @@ export function createHandoffToHumanTool(context: AgentToolRuntimeContext) {
           `[HandoffToHumanTool] Failed query: unable to save handoff thread event conversationId=${context.sessionId}`,
         );
       }
+      // Alerts are best-effort; never gate the mode switch on WhatsApp notify.
+      scheduleHandoffNotify({
+        workspaceId: context.workspaceId,
+        conversationId: context.sessionId,
+        agentConfigId: context.agentConfigId,
+        reason: trimmedReason || null,
+      });
       return {
         ok: true,
         message:

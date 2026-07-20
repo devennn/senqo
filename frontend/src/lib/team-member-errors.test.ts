@@ -6,4 +6,9 @@ describe("teamMemberErrorMessage", () => {
   it("returns registration guidance for user_not_found", () => {
     expect(teamMemberErrorMessage("user_not_found")).toMatch(/must register/i);
   });
+
+  // Connection-line collision → clear copy so users pick a personal number instead.
+  it("returns connection collision guidance for phone_is_connection", () => {
+    expect(teamMemberErrorMessage("phone_is_connection")).toMatch(/WhatsApp connection/i);
+  });
 });

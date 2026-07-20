@@ -25,6 +25,11 @@ function parseAssetGroupIds(raw: unknown): string[] {
   return raw.map((x) => String(x)).filter(Boolean);
 }
 
+function parseHandoffNotifyUserIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map((x) => String(x).trim()).filter(Boolean))];
+}
+
 type AgentConfigRow = {
   id: string;
   profileName: string;
@@ -38,6 +43,7 @@ type AgentConfigRow = {
   handoffTopicGroups: unknown;
   contextGroups: unknown;
   assetGroups: unknown;
+  handoffNotifyUserIds: unknown;
 };
 
 function mapAgentConfigRow(row: AgentConfigRow): AgentConfigRecord {
@@ -56,6 +62,7 @@ function mapAgentConfigRow(row: AgentConfigRow): AgentConfigRecord {
     handoff_topic_groups: parseHandoffTopicGroupIds(row.handoffTopicGroups),
     context_groups: parseContextGroupIds(row.contextGroups),
     asset_groups: parseAssetGroupIds(row.assetGroups),
+    handoff_notify_user_ids: parseHandoffNotifyUserIds(row.handoffNotifyUserIds),
   };
 }
 
@@ -75,6 +82,7 @@ export async function listAgentConfigs(workspaceId: string): Promise<AgentConfig
         handoffTopicGroups: agentConfigs.handoffTopicGroups,
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
+        handoffNotifyUserIds: agentConfigs.handoffNotifyUserIds,
       })
       .from(agentConfigs)
       .where(
@@ -112,6 +120,7 @@ export async function getAgentConfigById(
         handoffTopicGroups: agentConfigs.handoffTopicGroups,
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
+        handoffNotifyUserIds: agentConfigs.handoffNotifyUserIds,
       })
       .from(agentConfigs)
       .where(
@@ -169,6 +178,7 @@ export async function updateAgentConfig(payload: {
   handoff_topic_groups: string[];
   context_groups: string[];
   asset_groups: string[];
+  handoff_notify_user_ids: string[];
 }): Promise<{ ok: boolean; message: string }> {
   try {
     await db
@@ -183,6 +193,7 @@ export async function updateAgentConfig(payload: {
         handoffTopicGroups: payload.handoff_topic_groups,
         contextGroups: payload.context_groups,
         assetGroups: payload.asset_groups,
+        handoffNotifyUserIds: payload.handoff_notify_user_ids,
       })
       .where(
         and(

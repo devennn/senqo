@@ -1,31 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkspace } from "@/context/workspace";
-import type { WorkspaceHandoffTopicGroupSummary } from "@/types/repositories";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
-import { HandoffTopicCreateGroupForm } from "@/pages/dashboard/components/handoff-topic-create-group-form";
+import { AgentHandoffAttachDialog } from "@/pages/dashboard/components/agent-handoff-attach-dialog";
+import { HandoffTopicCreateGroupDialog } from "@/pages/dashboard/components/handoff-topic-create-group-dialog";
 import { HandoffTopicGroupsSidebar } from "@/pages/dashboard/components/handoff-topic-groups-sidebar";
 import { HandoffTopicGroupEditor } from "@/pages/dashboard/components/handoff-topic-group-editor";
+import type { AgentConfigRecord, WorkspaceHandoffTopicGroupSummary } from "@/types/repositories";
 
 type Props = {
   groups: WorkspaceHandoffTopicGroupSummary[];
-  reload: () => Promise<void>;
+  reload: (options?: { silent?: boolean }) => Promise<void>;
   agentId: string | undefined;
+  agents: AgentConfigRecord[];
 };
 
-export function HandoffTopicGroupsPanel({ groups, reload, agentId }: Props) {
+export function HandoffTopicGroupsPanel({ groups, reload, agentId, agents }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { wsPath } = useWorkspace();
   const [createOpen, setCreateOpen] = useState(false);
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [settingsGroupId, setSettingsGroupId] = useState<string | null>(null);
 
   function handoffPanelHref(id: string | undefined, handoffGroupId: string): string {
     const params = new URLSearchParams();
@@ -43,15 +40,18 @@ export function HandoffTopicGroupsPanel({ groups, reload, agentId }: Props) {
   }, [groups, urlGroupId]);
 
   const firstGroupId = groups[0]?.id;
-
-  const groupHref = useMemo(
-    () => (id: string) => handoffPanelHref(agentId, id),
-    [agentId],
-  );
-
+  const groupHref = useMemo(() => (id: string) => handoffPanelHref(agentId, id), [agentId]);
   const sidebarSelectedId = canonicalGroupId ?? firstGroupId;
-
   const editorGroupId = groups.length > 0 ? canonicalGroupId ?? firstGroupId : undefined;
+  const settingsGroup = useMemo(() => {
+    const id = settingsGroupId ?? editorGroupId;
+    return groups.find((g) => g.id === id) ?? null;
+  }, [groups, settingsGroupId, editorGroupId]);
+
+  function openHandoffSettings(groupId: string) {
+    setSettingsGroupId(groupId);
+    setAttachDialogOpen(true);
+  }
 
   useEffect(() => {
     if (searchParams.get("handoff") !== "new") return;
@@ -83,6 +83,7 @@ export function HandoffTopicGroupsPanel({ groups, reload, agentId }: Props) {
           selectedGroupId={sidebarSelectedId}
           onAddGroup={() => setCreateOpen(true)}
           groupHref={groupHref}
+          onOpenAttachDialog={openHandoffSettings}
         />
 
         <div>
@@ -94,7 +95,7 @@ export function HandoffTopicGroupsPanel({ groups, reload, agentId }: Props) {
                   <InlineHelpHint label="Handoff groups overview">
                     <p>
                       Choose Add group, name the folder in the dialog, then select it from the list and add topics.
-                      Attach groups on Profile when editing an agent.
+                      Use Handoff settings on a group to choose agents and notify.
                     </p>
                   </InlineHelpHint>
                 </CardTitle>
@@ -106,33 +107,28 @@ export function HandoffTopicGroupsPanel({ groups, reload, agentId }: Props) {
           )}
 
           {editorGroupId !== undefined && (
-            <HandoffTopicGroupEditor key={editorGroupId} groupId={editorGroupId} onSaved={reload} />
+            <HandoffTopicGroupEditor
+              key={editorGroupId}
+              groupId={editorGroupId}
+              onSaved={reload}
+              onOpenAttachDialog={() => openHandoffSettings(editorGroupId)}
+            />
           )}
         </div>
       </div>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md" showCloseButton>
-          <DialogHeader>
-            <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1 pr-8">
-              <span>New handoff group</span>
-              <InlineHelpHint label="What is a handoff group">
-                <p>
-                  Choose a short workspace-wide name (for example Escalations). Then add topics in the group editor after you create it.
-                </p>
-              </InlineHelpHint>
-            </DialogTitle>
-            <DialogDescription>
-              Create a workspace folder for related human takeover topics.
-            </DialogDescription>
-          </DialogHeader>
-          <HandoffTopicCreateGroupForm
-            active={createOpen}
-            onSuccess={handleCreated}
-            onCancel={() => setCreateOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      <AgentHandoffAttachDialog
+        open={attachDialogOpen}
+        onOpenChange={setAttachDialogOpen}
+        group={settingsGroup}
+        agents={agents}
+        onSaved={() => reload({ silent: true })}
+      />
+      <HandoffTopicCreateGroupDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={handleCreated}
+      />
     </>
   );
 }

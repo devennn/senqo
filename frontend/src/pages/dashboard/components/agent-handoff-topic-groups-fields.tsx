@@ -22,7 +22,8 @@ export function AgentHandoffTopicGroupsFields({
           </Label>
           <InlineHelpHint label="About handing off conversations">
             <p>
-              Situations where the assistant should switch the chat to a teammate. Pick the topic lists this agent follows; edit them on the Human handoff tab.
+              Situations where this agent should switch the chat to a teammate. Selected topic groups are
+              included in the agent prompt. Add or edit topics on the Human handoff tab.
             </p>
           </InlineHelpHint>
         </div>
@@ -33,19 +34,20 @@ export function AgentHandoffTopicGroupsFields({
         ) : null}
       </div>
       {groups.length > 0 ? (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
           {groups.map((group) => (
             <label
               key={group.id}
-              className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-sm"
+              className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-border/70 px-3 py-2 text-sm"
             >
               <input
                 type="checkbox"
+                className="shrink-0"
                 name="handoffTopicGroups"
                 value={group.id}
                 defaultChecked={selectedIds.has(group.id)}
               />
-              <span className="flex min-w-0 flex-col">
+              <span className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <span className="truncate font-medium">{group.name}</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {group.entry_count} {group.entry_count === 1 ? "topic" : "topics"}
@@ -63,7 +65,7 @@ export function AgentHandoffTopicGroupsFields({
           >
             Human handoff
           </Link>{" "}
-          tab to define takeover situations, then return here to attach them.
+          tab to add topic groups, then return here to attach them.
         </p>
       )}
     </fieldset>

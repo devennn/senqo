@@ -108,7 +108,7 @@ function formatGroupedWorkspaceContext(groups: ContextGroupForInstructions[]): s
   return chunks.filter((s) => s.trim().length > 0).join("\n\n");
 }
 
-function formatHandoffTopicsInstruction(groups: HandoffTopicGroupForInstructions[]): string {
+export function formatHandoffTopicsInstruction(groups: HandoffTopicGroupForInstructions[]): string {
   if (groups.length === 0) return "";
   const chunks: string[] = [
     "When the customer's message clearly matches a topic below, call `handoff_to_human` and pass a short `reason` that names the topic. This reason is shown to teammates in conversation history. Do not continue with normal resolution once a handoff is appropriate.",

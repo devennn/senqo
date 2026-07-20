@@ -154,6 +154,7 @@ import {
   cancelTaskById,
 } from "../repositories/tasks.js";
 import { addMember, listMembers } from "../repositories/team.js";
+import { userHasVerifiedHandoffPhone } from "../repositories/handoff-phones.js";
 import {
   updateProfile,
   getProfileForSettings,
@@ -162,10 +163,17 @@ import {
 import {
   getWorkspaceRow,
   isWorkspaceOwner,
+  isWorkspaceTeammate,
   updateWorkspaceNameAsOwner,
   listUserWorkspaces,
   createWorkspaceForUser,
 } from "../repositories/workspaces.js";
+import {
+  clearHandoffPhoneRegistration,
+  confirmHandoffPhoneVerification,
+  startHandoffPhoneVerification,
+} from "../services/handoff-phone-verify.js";
+import { scheduleHandoffNotify } from "../services/handoff-notify.js";
 import { listAgentMessages } from "../repositories/agent-messages.js";
 import {
   scheduleAgentTask,
@@ -328,6 +336,7 @@ const updateAgentSchema = z.object({
   handoffTopicGroups: z.array(z.string().uuid()).max(40).optional(),
   contextGroups: z.array(z.string().uuid()).max(40).optional(),
   assetGroups: z.array(z.string().uuid()).max(40).optional(),
+  handoffNotifyUserIds: z.array(z.string().uuid()).max(40).optional(),
 });
 
 app.put("/agents/:id", async (c) => {
@@ -414,6 +423,22 @@ app.put("/agents/:id", async (c) => {
     assetGroups = validated.normalized;
   }
 
+  let handoffNotifyUserIds = existing.handoff_notify_user_ids;
+  if (body.data.handoffNotifyUserIds !== undefined) {
+    const uniqueIds = [...new Set(body.data.handoffNotifyUserIds)];
+    for (const userId of uniqueIds) {
+      const teammate = await isWorkspaceTeammate(workspaceId, userId);
+      if (!teammate) {
+        return c.json({ error: "invalid_handoff_notify_user" }, 400);
+      }
+      const verified = await userHasVerifiedHandoffPhone(workspaceId, userId);
+      if (!verified) {
+        return c.json({ error: "handoff_notify_user_unverified" }, 400);
+      }
+    }
+    handoffNotifyUserIds = uniqueIds;
+  }
+
   await updateAgentConfig({
     id: agentId,
     workspace_id: workspaceId,
@@ -426,6 +451,7 @@ app.put("/agents/:id", async (c) => {
     handoff_topic_groups: handoffTopicGroups,
     context_groups: contextGroups,
     asset_groups: assetGroups,
+    handoff_notify_user_ids: handoffNotifyUserIds,
   });
   if (body.data.attachedConnectionIds !== undefined) {
     await syncAgentWhatsappConnections(
@@ -1903,6 +1929,12 @@ app.patch("/conversations/:id/handling-mode", async (c) => {
         `[UserRoutes/patchConversationHandlingMode] Failed query: unable to save manual toggle event conversationId=${conversationId}`,
       );
     }
+    // Alerts are best-effort; mode switch already succeeded above.
+    scheduleHandoffNotify({
+      workspaceId,
+      conversationId,
+      reason: "Manual handoff",
+    });
   }
   return c.json({ ok: true, handlingMode: parsed.data.handlingMode });
 });
@@ -2160,6 +2192,114 @@ app.post("/team", async (c) => {
         : result.message === "user_disabled"
           ? 403
           : 409;
+    return c.json({ error: result.message }, status);
+  }
+  return c.json({ ok: true });
+});
+
+const handoffPhoneUserSchema = z.object({
+  userId: z.string().uuid(),
+  whatsappConnectionId: z.string().uuid(),
+});
+
+const handoffPhoneRegisterSchema = handoffPhoneUserSchema.extend({
+  phone: z.string().min(1).max(32),
+});
+
+const handoffPhoneConfirmSchema = handoffPhoneUserSchema.extend({
+  code: z.string().min(1).max(16),
+});
+
+async function assertCanManageHandoffPhone(
+  workspaceId: string,
+  actorUserId: string,
+  targetUserId: string,
+): Promise<boolean> {
+  if (actorUserId === targetUserId) return true;
+  return isWorkspaceOwner(workspaceId, actorUserId);
+}
+
+app.post("/team/handoff-phone", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const actorUserId = c.get("userId");
+  const parsed = handoffPhoneRegisterSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const allowed = await assertCanManageHandoffPhone(
+    workspaceId,
+    actorUserId,
+    parsed.data.userId,
+  );
+  if (!allowed) return c.json({ error: "forbidden" }, 403);
+
+  const teammate = await isWorkspaceTeammate(workspaceId, parsed.data.userId);
+  if (!teammate) return c.json({ error: "user_not_teammate" }, 404);
+
+  const result = await startHandoffPhoneVerification({
+    workspaceId,
+    userId: parsed.data.userId,
+    phone: parsed.data.phone,
+    whatsappConnectionId: parsed.data.whatsappConnectionId,
+  });
+  if (!result.ok) {
+    const status =
+      result.message === "no_whatsapp_connection" ||
+      result.message === "invalid_phone" ||
+      result.message === "invalid_connection" ||
+      result.message === "phone_is_connection" ||
+      result.message === "send_failed"
+        ? 400
+        : 500;
+    return c.json({ error: result.message }, status);
+  }
+  return c.json({ ok: true });
+});
+
+app.post("/team/handoff-phone/confirm", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const actorUserId = c.get("userId");
+  const parsed = handoffPhoneConfirmSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const allowed = await assertCanManageHandoffPhone(
+    workspaceId,
+    actorUserId,
+    parsed.data.userId,
+  );
+  if (!allowed) return c.json({ error: "forbidden" }, 403);
+
+  const result = await confirmHandoffPhoneVerification({
+    workspaceId,
+    userId: parsed.data.userId,
+    whatsappConnectionId: parsed.data.whatsappConnectionId,
+    code: parsed.data.code,
+  });
+  if (!result.ok) {
+    return c.json({ error: result.message }, 400);
+  }
+  return c.json({ ok: true });
+});
+
+app.delete("/team/handoff-phone", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const actorUserId = c.get("userId");
+  const parsed = handoffPhoneUserSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const allowed = await assertCanManageHandoffPhone(
+    workspaceId,
+    actorUserId,
+    parsed.data.userId,
+  );
+  if (!allowed) return c.json({ error: "forbidden" }, 403);
+
+  const result = await clearHandoffPhoneRegistration({
+    workspaceId,
+    userId: parsed.data.userId,
+    whatsappConnectionId: parsed.data.whatsappConnectionId,
+  });
+  if (!result.ok) {
+    const status = result.message === "invalid_connection" ? 400 : 500;
     return c.json({ error: result.message }, status);
   }
   return c.json({ ok: true });

@@ -234,6 +234,7 @@ export const agentConfigs = pgTable(
     handoffTopicGroups: jsonb("handoff_topic_groups").default([]),
     contextGroups: jsonb("context_groups").default([]),
     assetGroups: jsonb("asset_groups").default([]),
+    handoffNotifyUserIds: jsonb("handoff_notify_user_ids").default([]),
   },
   (t) => [
     index("idx_agent_configs_workspace_active").on(
@@ -692,6 +693,68 @@ export const workspaceHandoffTopicEntries = pgTable(
       .notNull()
       .defaultNow(),
   },
+);
+
+export const workspaceHandoffPhones = pgTable(
+  "workspace_handoff_phones",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    whatsappConnectionId: uuid("whatsapp_connection_id")
+      .notNull()
+      .references(() => whatsappConnections.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    status: text("status").notNull().default("pending"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("workspace_handoff_phones_workspace_user_connection_uidx").on(
+      t.workspaceId,
+      t.userId,
+      t.whatsappConnectionId,
+    ),
+  ],
+);
+
+export const workspaceHandoffPhoneVerifications = pgTable(
+  "workspace_handoff_phone_verifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    whatsappConnectionId: uuid("whatsapp_connection_id")
+      .notNull()
+      .references(() => whatsappConnections.id, { onDelete: "cascade" }),
+    phone: text("phone").notNull(),
+    codeHash: text("code_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("workspace_handoff_phone_verifications_workspace_user_connection_uidx").on(
+      t.workspaceId,
+      t.userId,
+      t.whatsappConnectionId,
+    ),
+  ],
 );
 
 export const workspaceContextGroups = pgTable("workspace_context_groups", {

@@ -142,6 +142,7 @@ export function buildAgentConfigFormBaseline(input: {
     workspaceContextGroups: contextSorted,
     assetGroups: assetSorted,
     handoffTopicGroups: handoffSorted,
+    handoffNotifyUserIds: sortedCopy(input.agent.handoff_notify_user_ids ?? []),
     attachedConnectionIds,
     autoAssignConversationLabels: input.agent.auto_assign_conversation_labels !== false,
   };
@@ -158,6 +159,7 @@ export function readAgentConfigFormSnapshot(form: HTMLFormElement): AgentConfigF
     workspaceContextGroups: sortedCopy(fd.getAll("contextGroups").map(String)),
     assetGroups: sortedCopy(fd.getAll("assetGroups").map(String)),
     handoffTopicGroups: sortedCopy(fd.getAll("handoffTopicGroups").map(String)),
+    handoffNotifyUserIds: sortedCopy(fd.getAll("handoffNotifyUserIds").map(String)),
     attachedConnectionIds: sortedCopy(fd.getAll("attachedConnectionIds").map(String)),
     autoAssignConversationLabels: fd.get("autoAssignConversationLabels") === "on",
   };

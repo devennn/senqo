@@ -28,8 +28,15 @@ export type AgentConfigFormNormalizedSnapshot = {
   workspaceContextGroups: readonly string[];
   assetGroups: readonly string[];
   handoffTopicGroups: readonly string[];
+  handoffNotifyUserIds: readonly string[];
   attachedConnectionIds: readonly string[];
   autoAssignConversationLabels: boolean;
+};
+
+export type HandoffNotifyRecipientOption = {
+  userId: string;
+  email: string | null;
+  phone: string;
 };
 
 export type AgentConfigFormProps = {

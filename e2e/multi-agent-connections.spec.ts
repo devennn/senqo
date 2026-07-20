@@ -35,6 +35,7 @@ function agentPayload(agentIdsWithConnection: string[]) {
         skills: [],
         response_template_groups: [],
         handoff_topic_groups: [],
+        handoff_notify_user_ids: [],
         context_groups: [],
         asset_groups: [],
         auto_assign_conversation_labels: true,

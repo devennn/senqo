@@ -26,7 +26,7 @@ describe("useAgents", () => {
   // Confirms the hook fetches the agent list and auxiliary data (tools, skills, connections) on mount.
   // Ensures the agent setup page has all data needed to configure an agent.
   it("fetches agent list on mount and returns data state", async () => {
-    mockGet.mockResolvedValueOnce({ agents: [{ id: "a1", profile_name: "Bot", behavior: "", tools: [], skills: [], response_template_groups: [], handoff_topic_groups: [], context_groups: [], asset_groups: [], auto_assign_conversation_labels: false }], agentIdsWithConnection: [], responseTemplateGroups: [], handoffTopicGroups: [], workspaceContextGroups: [], workspaceAssetGroups: [] });
+    mockGet.mockResolvedValueOnce({ agents: [{ id: "a1", profile_name: "Bot", behavior: "", tools: [], skills: [], response_template_groups: [], handoff_topic_groups: [], context_groups: [], asset_groups: [], handoff_notify_user_ids: [], auto_assign_conversation_labels: false }], agentIdsWithConnection: [], responseTemplateGroups: [], handoffTopicGroups: [], workspaceContextGroups: [], workspaceAssetGroups: [] });
     mockGet.mockResolvedValueOnce({ tools: [] });
     mockGet.mockResolvedValueOnce({ skills: [] });
     mockGet.mockResolvedValueOnce({ connections: [] });

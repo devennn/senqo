@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { HANDOFF_TOPIC_UI_PAGE_SIZE } from "@/lib/agent-handoff-topic-limits";
+import { HandoffTopicGroupRowMenu } from "@/pages/dashboard/components/handoff-topic-group-row-menu";
 import { TablePagination } from "@/pages/dashboard/components/table-pagination";
 import type { WorkspaceHandoffTopicGroupSummary } from "@/types/repositories";
 
@@ -12,9 +13,16 @@ type Props = {
   selectedGroupId: string | undefined;
   onAddGroup: () => void;
   groupHref: (id: string) => string;
+  onOpenAttachDialog: (groupId: string) => void;
 };
 
-export function HandoffTopicGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupHref }: Props) {
+export function HandoffTopicGroupsSidebar({
+  groups,
+  selectedGroupId,
+  onAddGroup,
+  groupHref,
+  onOpenAttachDialog,
+}: Props) {
   const pageSize = HANDOFF_TOPIC_UI_PAGE_SIZE;
   const [page, setPage] = useState(1);
 
@@ -45,7 +53,10 @@ export function HandoffTopicGroupsSidebar({ groups, selectedGroupId, onAddGroup,
               <p>
                 Workspace-wide named folders for human takeover topics. Each row lists a trigger phrase plus guidance for the AI.
               </p>
-              <p>Attach groups per agent on Profile. Changes apply to every agent using the group.</p>
+              <p>
+                Use the row menu or Handoff settings to choose which agents use this group and who to notify. Topic edits
+                apply to every agent using the group.
+              </p>
             </>
           </InlineHelpHint>
         </CardTitle>
@@ -60,20 +71,26 @@ export function HandoffTopicGroupsSidebar({ groups, selectedGroupId, onAddGroup,
         {groups.length > 0 ? (
           <>
             {listGroups.map((group) => (
-              <Link
+              <div
                 key={group.id}
-                to={groupHref(group.id)}
-                className={`block rounded-md border px-3 py-2 text-sm ${
+                className={`flex items-center gap-1 rounded-md border ${
                   selectedGroupId === group.id
                     ? "border-primary bg-primary/5 text-foreground"
                     : "border-border/70 text-muted-foreground"
                 }`}
               >
-                <p className="truncate font-medium">{group.name}</p>
-                <p className="truncate text-xs">
-                  {group.entry_count} {group.entry_count === 1 ? "topic" : "topics"}
-                </p>
-              </Link>
+                <Link to={groupHref(group.id)} className="min-w-0 flex-1 px-3 py-2 text-sm">
+                  <p className="truncate font-medium">{group.name}</p>
+                  <p className="truncate text-xs">
+                    {group.entry_count} {group.entry_count === 1 ? "topic" : "topics"}
+                  </p>
+                </Link>
+                <div className="pr-1">
+                  <HandoffTopicGroupRowMenu
+                    onOpenHandoffSettings={() => onOpenAttachDialog(group.id)}
+                  />
+                </div>
+              </div>
             ))}
             {groups.length > pageSize ? (
               <TablePagination page={safePage} total={groups.length} pageSize={pageSize} onPage={setPage} />

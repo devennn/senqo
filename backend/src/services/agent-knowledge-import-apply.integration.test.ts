@@ -50,6 +50,7 @@ const AGENT_ROW = {
   auto_assign_conversation_labels: false,
   response_template_groups: ["tpl-existing"],
   handoff_topic_groups: [],
+  handoff_notify_user_ids: [],
   context_groups: ["ctx-existing"],
   asset_groups: [],
 };

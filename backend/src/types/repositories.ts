@@ -79,6 +79,7 @@ export type AgentConfigRecord = {
   handoff_topic_groups: string[];
   context_groups: string[];
   asset_groups: string[];
+  handoff_notify_user_ids: string[];
 };
 
 export type WorkspaceStorageCategory = "asset" | "media";
@@ -608,9 +609,29 @@ export type WorkspaceSummary = {
   role: "owner" | "member" | "superadmin";
 };
 
+export type HandoffPhoneStatus = "pending" | "verified";
+
+export type TeamMemberHandoffPhone = {
+  connectionId: string;
+  connectionName: string;
+  phone: string;
+  status: HandoffPhoneStatus;
+};
+
 export type TeamMemberRecord = {
   id: string;
+  userId: string;
   email: string | null;
   role: string;
   joined_at: string | null;
+  handoffPhones: TeamMemberHandoffPhone[];
+};
+
+export type WorkspaceHandoffPhoneRecord = {
+  workspaceId: string;
+  userId: string;
+  whatsappConnectionId: string;
+  phone: string;
+  status: HandoffPhoneStatus;
+  verifiedAt: string | null;
 };

@@ -64,6 +64,34 @@
       "when": 1780540924807,
       "tag": "0008_conversations_per_connection_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780540924808,
+      "tag": "0009_workspace_handoff_phones",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780540924809,
+      "tag": "0010_agent_handoff_notify_user",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780540924810,
+      "tag": "0011_handoff_phone_connection",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780540924811,
+      "tag": "0012_agent_handoff_notify_users",
+      "breakpoints": true
     }
   ]
 }

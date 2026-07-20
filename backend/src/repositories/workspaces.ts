@@ -6,6 +6,8 @@ import {
   users,
 } from "../db/schema/index.js";
 import { isInstanceAdmin, findUserById, findUserByEmail } from "./auth-users.js";
+import { listHandoffPhonesForUsers } from "./handoff-phones.js";
+import { listConnections } from "./whatsapp.js";
 import type { WorkspaceSummary, TeamMemberRecord } from "../types/repositories.js";
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
@@ -220,6 +222,22 @@ export async function listWorkspaceMembers(
   workspaceId: string,
 ): Promise<TeamMemberRecord[]> {
   try {
+    const [workspace] = await db
+      .select({
+        ownerUserId: workspaces.ownerUserId,
+        createdAt: workspaces.createdAt,
+      })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1);
+
+    if (!workspace) {
+      console.info(
+        `[${scope}/listWorkspaceMembers] Failed query: workspace not found workspaceId=${workspaceId}`,
+      );
+      return [];
+    }
+
     const rows = await db
       .select({
         id: workspaceMembers.id,
@@ -233,14 +251,56 @@ export async function listWorkspaceMembers(
       .orderBy(desc(workspaceMembers.createdAt));
 
     const members: TeamMemberRecord[] = [];
+    const ownerUser = await findUserById(workspace.ownerUserId);
+    members.push({
+      id: workspace.ownerUserId,
+      userId: workspace.ownerUserId,
+      email: ownerUser?.email ?? null,
+      role: "owner",
+      joined_at: workspace.createdAt.toISOString(),
+      handoffPhones: [],
+    });
+
     for (const row of rows) {
+      if (row.userId === workspace.ownerUserId) continue;
       const user = await findUserById(row.userId);
       members.push({
         id: row.id,
+        userId: row.userId,
         email: user?.email ?? row.inviteEmail ?? null,
         role: row.role,
         joined_at: row.createdAt.toISOString(),
+        handoffPhones: [],
       });
+    }
+
+    const [phones, connections] = await Promise.all([
+      listHandoffPhonesForUsers(
+        workspaceId,
+        members.map((m) => m.userId),
+      ),
+      listConnections(workspaceId),
+    ]);
+    const connectionNameById = new Map(
+      connections.map((c) => [
+        c.id,
+        c.display_name?.trim() || c.phone_number?.trim() || c.id,
+      ]),
+    );
+    const phonesByUser = new Map<string, typeof phones>();
+    for (const phone of phones) {
+      const list = phonesByUser.get(phone.userId) ?? [];
+      list.push(phone);
+      phonesByUser.set(phone.userId, list);
+    }
+    for (const member of members) {
+      const userPhones = phonesByUser.get(member.userId) ?? [];
+      member.handoffPhones = userPhones.map((p) => ({
+        connectionId: p.whatsappConnectionId,
+        connectionName: connectionNameById.get(p.whatsappConnectionId) ?? p.whatsappConnectionId,
+        phone: p.phone,
+        status: p.status,
+      }));
     }
 
     console.info(`[${scope}/listWorkspaceMembers] Success: workspaceId=${workspaceId}`);
@@ -248,6 +308,45 @@ export async function listWorkspaceMembers(
   } catch (error) {
     console.error(`[${scope}/listWorkspaceMembers] Unexpected error: ${String(error)}`);
     return [];
+  }
+}
+
+/** True when userId is the workspace owner or a workspace_members row (not instance-admin bypass). */
+export async function isWorkspaceTeammate(
+  workspaceId: string,
+  userId: string,
+): Promise<boolean> {
+  try {
+    const [owner] = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
+      .where(
+        and(eq(workspaces.id, workspaceId), eq(workspaces.ownerUserId, userId)),
+      )
+      .limit(1);
+    if (owner) {
+      console.info(
+        `[${scope}/isWorkspaceTeammate] Success: owner workspaceId=${workspaceId} userId=${userId}`,
+      );
+      return true;
+    }
+    const [member] = await db
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, userId),
+        ),
+      )
+      .limit(1);
+    console.info(
+      `[${scope}/isWorkspaceTeammate] Success: workspaceId=${workspaceId} userId=${userId} member=${!!member}`,
+    );
+    return !!member;
+  } catch (error) {
+    console.error(`[${scope}/isWorkspaceTeammate] Unexpected error: ${String(error)}`);
+    return false;
   }
 }
 
