@@ -74,7 +74,13 @@ export function AssetGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupH
               </Link>
             ))}
             {groups.length > pageSize ? (
-              <TablePagination page={safePage} total={groups.length} pageSize={pageSize} onPage={setPage} />
+              <TablePagination
+                page={safePage}
+                total={groups.length}
+                pageSize={pageSize}
+                onPage={setPage}
+                compact
+              />
             ) : null}
           </>
         ) : (

@@ -50,4 +50,15 @@ describe("table-pagination", () => {
     );
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
   });
+
+  // Compact sidebar mode uses a single row: range text + icon chevrons + page fraction.
+  it("compact → shows range and icon nav under compact layout", () => {
+    render(
+      <TablePagination page={1} total={8} pageSize={7} onPage={vi.fn()} compact />,
+    );
+    expect(screen.getByText("1–7 of 8")).toBeInTheDocument();
+    expect(screen.getByText("1/2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
+  });
 });

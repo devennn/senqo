@@ -64,7 +64,13 @@ export function HandoffTopicGroupTopicsBlock({ groupId, entries, reloadGroup, on
           ))
         )}
         {entries.length > pageSize ? (
-          <TablePagination page={safePage} total={entries.length} pageSize={pageSize} onPage={setPage} />
+          <TablePagination
+            page={safePage}
+            total={entries.length}
+            pageSize={pageSize}
+            onPage={setPage}
+            compact
+          />
         ) : null}
       </div>
       <HandoffTopicAddEntry

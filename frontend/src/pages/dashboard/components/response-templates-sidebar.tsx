@@ -85,6 +85,7 @@ export function ResponseTemplatesSidebar({ groups, selectedGroupId, onAddGroup, 
                 total={groups.length}
                 pageSize={pageSize}
                 onPage={setPage}
+                compact
               />
             ) : null}
           </>

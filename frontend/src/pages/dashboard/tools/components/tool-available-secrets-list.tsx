@@ -69,14 +69,13 @@ export function ToolAvailableSecretsList({ secrets, loading, secretsSettingsPath
               ))}
             </ul>
             {secrets.length > TOOL_SECRETS_PAGE_SIZE ? (
-              <div className="[&_p]:text-xs">
-                <TablePagination
-                  page={page}
-                  total={secrets.length}
-                  pageSize={TOOL_SECRETS_PAGE_SIZE}
-                  onPage={setPage}
-                />
-              </div>
+              <TablePagination
+                page={page}
+                total={secrets.length}
+                pageSize={TOOL_SECRETS_PAGE_SIZE}
+                onPage={setPage}
+                compact
+              />
             ) : null}
           </>
         )}

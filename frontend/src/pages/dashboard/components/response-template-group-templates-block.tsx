@@ -75,6 +75,7 @@ export function ResponseTemplateGroupTemplatesBlock({ groupId, entries, reloadGr
             total={entries.length}
             pageSize={pageSize}
             onPage={setPage}
+            compact
           />
         ) : null}
       </div>
