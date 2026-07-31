@@ -17,6 +17,7 @@ import AgentPage from "@/pages/dashboard/Agent";
 import ConnectPage from "@/pages/dashboard/Connect";
 import LabelsPage from "@/pages/dashboard/Labels";
 import TasksPage from "@/pages/dashboard/Tasks";
+import ReportsPage from "@/pages/dashboard/Reports";
 import SettingsLayout from "@/pages/settings/SettingsLayout";
 import ProfilePage from "@/pages/settings/Profile";
 import WorkspacePage from "@/pages/settings/Workspace";
@@ -76,6 +77,7 @@ export default function App() {
               <Route path="connect" element={<ConnectPage />} />
               <Route path="labels" element={<LabelsPage />} />
               <Route path="tasks" element={<TasksPage />} />
+              <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<SettingsLayout />}>
                 <Route index element={<Navigate to="profile" replace />} />
                 <Route path="profile" element={<ProfilePage />} />

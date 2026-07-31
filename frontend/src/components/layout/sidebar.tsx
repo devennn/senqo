@@ -10,6 +10,7 @@ import {
   ListChecks,
   Tags,
   LayoutGrid,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/layout/profile-menu";
@@ -20,6 +21,7 @@ const navItemDefs = [
   { path: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/crm", icon: Contact, label: "CRM" },
   { path: "/tasks", icon: ListChecks, label: "Tasks" },
+  { path: "/reports", icon: BarChart3, label: "Reports" },
   { path: "/agent", icon: Bot, label: "Agent" },
   { path: "/labels", icon: Tags, label: "Labels" },
   { path: "/connect", icon: Plug, label: "Connect" },

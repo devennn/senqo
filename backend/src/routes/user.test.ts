@@ -261,6 +261,10 @@ vi.mock("../repositories/agent-messages.js", () => ({
   listAgentMessages: vi.fn(),
 }));
 
+vi.mock("../repositories/reports.js", () => ({
+  getAgentPerformanceReport: vi.fn(),
+}));
+
 vi.mock("../services/agent-knowledge-import.js", () => ({
   runAgentKnowledgeImportApply: vi.fn(),
   runAgentKnowledgeImportPreview: vi.fn(),
@@ -309,6 +313,7 @@ import { listWorkspaceSecrets, createWorkspaceSecret, deleteWorkspaceSecret } fr
 import { listApiKeys, createApiKey, deleteApiKey } from "../repositories/api-keys.js";
 import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentConfig } from "../repositories/agent.js";
 import { validateHandoffTopicGroupIdsForWorkspace } from "../repositories/handoff-topic-groups.js";
+import { getAgentPerformanceReport } from "../repositories/reports.js";
 import { scheduleHandoffNotify } from "../services/handoff-notify.js";
 import { findUserById } from "../repositories/auth-users.js";
 import { getProfileForSettings, updateProfile } from "../repositories/profiles.js";
@@ -342,6 +347,7 @@ const createAgentConfigMock = vi.mocked(createAgentConfig);
 const getAgentConfigByIdMock = vi.mocked(getAgentConfigById);
 const updateAgentConfigMock = vi.mocked(updateAgentConfig);
 const validateHandoffTopicGroupIdsMock = vi.mocked(validateHandoffTopicGroupIdsForWorkspace);
+const getAgentPerformanceReportMock = vi.mocked(getAgentPerformanceReport);
 const scheduleHandoffNotifyMock = vi.mocked(scheduleHandoffNotify);
 const findUserByIdMock = vi.mocked(findUserById);
 const getProfileForSettingsMock = vi.mocked(getProfileForSettings);
@@ -795,6 +801,106 @@ describe("PUT /profile", () => {
       first_name: "Bob",
       last_name: "Jones",
     });
+  });
+});
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+
+describe("GET /reports/agents", () => {
+  // Happy path returns agent and topic aggregates for a valid date range.
+  it("returns report JSON for a valid from/to range", async () => {
+    getAgentPerformanceReportMock.mockResolvedValue({
+      ok: true,
+      report: {
+        agents: [
+          {
+            id: "agent-1",
+            name: "Front desk",
+            conversationsHandled: 10,
+            aiReplies: 20,
+            handoffs: 2,
+            inHumanMode: 1,
+          },
+        ],
+        topics: [
+          {
+            id: "topic-1",
+            topicName: "Refund request",
+            groupName: "Billing",
+            handoffs: 2,
+          },
+        ],
+        summary: {
+          conversationsHandled: 10,
+          aiReplies: 20,
+          handoffs: 2,
+          inHumanMode: 1,
+        },
+      },
+    });
+
+    const res = await app.request("/reports/agents?from=2026-07-01&to=2026-07-31", {
+      headers: AUTH,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(getAgentPerformanceReportMock).toHaveBeenCalledWith(
+      "ws-1",
+      "2026-07-01",
+      "2026-07-31",
+    );
+    expect(body.agents[0].name).toBe("Front desk");
+    expect(body.topics[0].topicName).toBe("Refund request");
+    expect(body.summary.handoffs).toBe(2);
+  });
+
+  // Missing or malformed dates must 400 before hitting the repository.
+  it("returns 400 when from/to are missing", async () => {
+    const res = await app.request("/reports/agents", { headers: AUTH });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_date_range" });
+    expect(getAgentPerformanceReportMock).not.toHaveBeenCalled();
+  });
+
+  // Future end date is rejected so reports cannot query ahead of today.
+  it("returns 400 when to is in the future", async () => {
+    const res = await app.request("/reports/agents?from=2099-01-01&to=2099-01-31", {
+      headers: AUTH,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_date_range" });
+    expect(getAgentPerformanceReportMock).not.toHaveBeenCalled();
+  });
+
+  // from after to is invalid — verifies range ordering before the repository runs.
+  it("returns 400 when from is after to", async () => {
+    const res = await app.request("/reports/agents?from=2026-07-31&to=2026-07-01", {
+      headers: AUTH,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_date_range" });
+    expect(getAgentPerformanceReportMock).not.toHaveBeenCalled();
+  });
+
+  // Repository failure surfaces as 500 — verifies the route error path.
+  it("returns 500 when the report repository fails", async () => {
+    getAgentPerformanceReportMock.mockResolvedValue({
+      ok: false,
+      message: "db down",
+    });
+    const res = await app.request("/reports/agents?from=2026-07-01&to=2026-07-31", {
+      headers: AUTH,
+    });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "reports_failed" });
+  });
+
+  // Missing auth must 401 — reports are workspace-scoped.
+  it("returns 401 without auth", async () => {
+    const res = await app.request("/reports/agents?from=2026-07-01&to=2026-07-31");
+    expect(res.status).toBe(401);
+    expect(getAgentPerformanceReportMock).not.toHaveBeenCalled();
   });
 });
 

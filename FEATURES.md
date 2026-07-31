@@ -11,6 +11,10 @@
 - Conversation labels — apply workspace labels; filter inbox by label
 - Delete conversation — permanently remove thread, messages, and AI history (CRM contact preserved)
 
+## Reports
+
+- Agent performance — workspace summary and per-agent table for conversations handled, AI replies, handoffs, handoff rate, and chats still in human mode; handoff topics ranked by volume (query by From/To date; defaults to last 30 days)
+
 ## AI agents
 
 - Agent profiles — create, rename, and archive configurable agents with custom behavior instructions
@@ -30,7 +34,7 @@
 - Import docs — per-agent menu action: upload PDF/CSV/Markdown, AI drafts context/skills/templates in one background job at a time, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs (or Import in progress) to show the same processing/review UI
 - Workspace context — structured factual snippets organized into groups
 - Response templates — canned Q&A pairs used as authoritative replies
-- Handoff topics — escalation definitions for when to transfer to a human (create/edit groups on Agent setup → Human handoff; attach groups to an agent on Profile → Knowledge → Topics that need a human so they are included in the agent prompt; from a group, Handoff settings can also attach agents and choose notify people)
+- Handoff topics — escalation definitions for when to transfer to a human (create/edit groups on Agent setup → Human handoff; attach groups to an agent on Profile → Knowledge → Topics that need a human so they are included in the agent prompt with entry ids for `handoff_to_human`; from a group, Handoff settings can also attach agents and choose notify people)
 - Handoff notify people — via the Handoff settings dialog on a topic group, pick one or more teammates with verified handoff phones for the selected agents; each gets an alert from the conversation’s WhatsApp line when they registered on that same line
 - Skills — markdown playbooks for specialized workflows
 - Asset groups — sendable files (images, video, audio, documents) the agent reasons about

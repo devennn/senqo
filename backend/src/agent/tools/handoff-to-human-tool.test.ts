@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockUpdateMode = vi.fn();
 const mockCreateMessage = vi.fn();
 const mockScheduleNotify = vi.fn();
+const mockValidateTopic = vi.fn();
 
 vi.mock("../../repositories/conversations.js", () => ({
   updateConversationHandlingMode: (...args: unknown[]) => mockUpdateMode(...args),
@@ -10,6 +11,10 @@ vi.mock("../../repositories/conversations.js", () => ({
 
 vi.mock("../../repositories/whatsapp.js", () => ({
   createConversationMessage: (...args: unknown[]) => mockCreateMessage(...args),
+}));
+
+vi.mock("../../repositories/handoff-topic-groups.js", () => ({
+  validateHandoffTopicEntryForAgent: (...args: unknown[]) => mockValidateTopic(...args),
 }));
 
 vi.mock("../../services/handoff-notify.js", () => ({
@@ -21,6 +26,7 @@ describe("createHandoffToHumanTool", () => {
     vi.clearAllMocks();
     mockUpdateMode.mockResolvedValue({ ok: true });
     mockCreateMessage.mockResolvedValue({ ok: true });
+    mockValidateTopic.mockResolvedValue({ ok: true });
   });
 
   // Mode flips to human and returns ok even when notify is a no-op / would fail later.
@@ -50,6 +56,63 @@ describe("createHandoffToHumanTool", () => {
         ok: true,
       }),
     );
+  });
+
+  // Valid topicEntryId is persisted on the handoff thread event for reports aggregation.
+  it("persists handoff_topic_entry_id when topicEntryId is valid", async () => {
+    const { createHandoffToHumanTool } = await import("./handoff-to-human-tool.js");
+    const handoffTool = createHandoffToHumanTool({
+      workspaceId: "ws-1",
+      sessionId: "conv-1",
+      agentConfigId: "agent-1",
+    });
+    const topicEntryId = "11111111-1111-4111-8111-111111111111";
+
+    const result = await handoffTool.execute!(
+      { reason: "Refunds", topicEntryId },
+      { toolCallId: "tc-4", messages: [] },
+    );
+
+    expect(mockValidateTopic).toHaveBeenCalledWith("ws-1", "agent-1", topicEntryId);
+    expect(mockCreateMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Human handoff",
+      expect.objectContaining({
+        handoff_topic_entry_id: topicEntryId,
+        handoff_tool_reason: "Refunds",
+      }),
+      null,
+    );
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+  });
+
+  // Invalid topicEntryId must fail before flipping handling mode.
+  it("returns ok false when topicEntryId is not attached to the agent", async () => {
+    mockValidateTopic.mockResolvedValue({ ok: false, message: "Unknown or unattached handoff topic." });
+    const { createHandoffToHumanTool } = await import("./handoff-to-human-tool.js");
+    const handoffTool = createHandoffToHumanTool({
+      workspaceId: "ws-1",
+      sessionId: "conv-1",
+      agentConfigId: "agent-1",
+    });
+
+    const result = await handoffTool.execute!(
+      {
+        reason: "Refunds",
+        topicEntryId: "22222222-2222-4222-8222-222222222222",
+      },
+      { toolCallId: "tc-5", messages: [] },
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: "Unknown or unattached handoff topic.",
+      }),
+    );
+    expect(mockUpdateMode).not.toHaveBeenCalled();
   });
 
   // Mode update succeeds even when the thread-event persist fails; notify still scheduled.

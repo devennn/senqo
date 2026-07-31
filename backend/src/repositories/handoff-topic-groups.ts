@@ -551,7 +551,7 @@ export async function validateHandoffTopicGroupIdsForWorkspace(
 
 export type HandoffTopicGroupForInstructions = {
   name: string;
-  entries: { topic: string; description: string }[];
+  entries: { id: string; topic: string; description: string }[];
 };
 
 export async function listHandoffTopicsForInstructions(
@@ -583,6 +583,7 @@ export async function listHandoffTopicsForInstructions(
 
     const entryRows = await db
       .select({
+        id: workspaceHandoffTopicEntries.id,
         groupId: workspaceHandoffTopicEntries.groupId,
         title: workspaceHandoffTopicEntries.title,
         description: workspaceHandoffTopicEntries.description,
@@ -610,6 +611,7 @@ export async function listHandoffTopicsForInstructions(
       result.push({
         name,
         entries: rowsByGroup.map((x) => ({
+          id: x.id,
           topic: x.title,
           description: x.description,
         })),
@@ -625,6 +627,83 @@ export async function listHandoffTopicsForInstructions(
       `[${scope}/listHandoffTopicsForInstructions] Unexpected error: ${String(error)}`,
     );
     return [];
+  }
+}
+
+/**
+ * True when the entry exists in this workspace and its group is attached to the agent.
+ */
+export async function validateHandoffTopicEntryForAgent(
+  workspaceId: string,
+  agentConfigId: string,
+  topicEntryId: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const agentRows = await db
+      .select({
+        handoffTopicGroups: agentConfigs.handoffTopicGroups,
+      })
+      .from(agentConfigs)
+      .where(
+        and(
+          eq(agentConfigs.workspaceId, workspaceId),
+          eq(agentConfigs.id, agentConfigId),
+          isNull(agentConfigs.archivedAt),
+        ),
+      )
+      .limit(1);
+
+    if (agentRows.length === 0) {
+      console.error(
+        `[${scope}/validateHandoffTopicEntryForAgent] Failed query: agent not found agentId=${agentConfigId}`,
+      );
+      return { ok: false, message: "Agent not found." };
+    }
+
+    const groupIds = normalizeHandoffTopicGroupIds(agentRows[0].handoffTopicGroups);
+    if (groupIds.length === 0) {
+      console.error(
+        `[${scope}/validateHandoffTopicEntryForAgent] Failed query: agent has no handoff groups agentId=${agentConfigId}`,
+      );
+      return { ok: false, message: "Topic is not attached to this agent." };
+    }
+
+    const entryRows = await db
+      .select({
+        id: workspaceHandoffTopicEntries.id,
+        groupId: workspaceHandoffTopicEntries.groupId,
+      })
+      .from(workspaceHandoffTopicEntries)
+      .innerJoin(
+        workspaceHandoffTopicGroups,
+        eq(workspaceHandoffTopicEntries.groupId, workspaceHandoffTopicGroups.id),
+      )
+      .where(
+        and(
+          eq(workspaceHandoffTopicEntries.id, topicEntryId),
+          eq(workspaceHandoffTopicGroups.workspaceId, workspaceId),
+          inArray(workspaceHandoffTopicEntries.groupId, groupIds),
+        ),
+      )
+      .limit(1);
+
+    if (entryRows.length === 0) {
+      console.error(
+        `[${scope}/validateHandoffTopicEntryForAgent] Failed query: entry not allowed entryId=${topicEntryId}`,
+      );
+      return { ok: false, message: "Unknown or unattached handoff topic." };
+    }
+
+    console.info(
+      `[${scope}/validateHandoffTopicEntryForAgent] Success: agentId=${agentConfigId} entryId=${topicEntryId}`,
+    );
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[${scope}/validateHandoffTopicEntryForAgent] Unexpected error: ${message}`,
+    );
+    return { ok: false, message };
   }
 }
 

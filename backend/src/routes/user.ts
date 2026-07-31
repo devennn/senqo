@@ -175,6 +175,7 @@ import {
 } from "../services/handoff-phone-verify.js";
 import { scheduleHandoffNotify } from "../services/handoff-notify.js";
 import { listAgentMessages } from "../repositories/agent-messages.js";
+import { getAgentPerformanceReport } from "../repositories/reports.js";
 import {
   scheduleAgentTask,
   cancelScheduledTask,
@@ -276,6 +277,38 @@ app.delete("/api-keys/:id", async (c) => {
   const deleted = await deleteApiKey(workspaceId, apiKeyId);
   if (!deleted) return c.json({ error: "api_key_delete_failed" }, 500);
   return c.json({ ok: true });
+});
+
+// ── Reports ─────────────────────────────────────────────────────────────────
+
+const reportDateSchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+app.get("/reports/agents", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const parsed = reportDateSchema.safeParse({
+    from: c.req.query("from"),
+    to: c.req.query("to"),
+  });
+  if (!parsed.success) {
+    return c.json({ error: "invalid_date_range" }, 400);
+  }
+  const { from, to } = parsed.data;
+  if (from > to) {
+    return c.json({ error: "invalid_date_range" }, 400);
+  }
+  const todayYmd = new Date().toISOString().slice(0, 10);
+  if (from > todayYmd || to > todayYmd) {
+    return c.json({ error: "invalid_date_range" }, 400);
+  }
+
+  const result = await getAgentPerformanceReport(workspaceId, from, to);
+  if (!result.ok) {
+    return c.json({ error: "reports_failed" }, 500);
+  }
+  return c.json(result.report);
 });
 
 // ── Agents ──────────────────────────────────────────────────────────────────

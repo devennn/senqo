@@ -111,7 +111,7 @@ function formatGroupedWorkspaceContext(groups: ContextGroupForInstructions[]): s
 export function formatHandoffTopicsInstruction(groups: HandoffTopicGroupForInstructions[]): string {
   if (groups.length === 0) return "";
   const chunks: string[] = [
-    "When the customer's message clearly matches a topic below, call `handoff_to_human` and pass a short `reason` that names the topic. This reason is shown to teammates in conversation history. Do not continue with normal resolution once a handoff is appropriate.",
+    "When the customer's message clearly matches a topic below, call `handoff_to_human` with `topicEntryId` set to that topic's id and a short `reason` that names the topic. The reason is shown to teammates in conversation history. Do not continue with normal resolution once a handoff is appropriate.",
     "---",
   ];
 
@@ -120,7 +120,7 @@ export function formatHandoffTopicsInstruction(groups: HandoffTopicGroupForInstr
     grp.entries.forEach((e) => {
       const desc =
         e.description.trim().length > 0 ? e.description.trim() : "(no extra detail)";
-      chunks.push(`- "${e.topic.trim()}" — ${desc}`);
+      chunks.push(`- id=\`${e.id}\` "${e.topic.trim()}" — ${desc}`);
     });
     chunks.push("---");
   }

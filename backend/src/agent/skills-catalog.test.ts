@@ -58,11 +58,15 @@ describe("formatHandoffTopicsInstruction", () => {
     const text = formatHandoffTopicsInstruction([
       {
         name: "Billing",
-        entries: [{ topic: "Refunds", description: "Customer wants money back" }],
+        entries: [
+          { id: "entry-1", topic: "Refunds", description: "Customer wants money back" },
+        ],
       },
     ]);
     expect(text).toContain("call `handoff_to_human`");
+    expect(text).toContain("topicEntryId");
     expect(text).toContain("#### Billing");
+    expect(text).toContain("id=`entry-1`");
     expect(text).toContain('"Refunds"');
     expect(text).toContain("Customer wants money back");
   });
@@ -92,7 +96,9 @@ describe("buildAgentInstructions handoff topics", () => {
     mockListHandoff.mockResolvedValue([
       {
         name: "Escalations",
-        entries: [{ topic: "Legal threat", description: "Escalate immediately" }],
+        entries: [
+          { id: "entry-legal", topic: "Legal threat", description: "Escalate immediately" },
+        ],
       },
     ]);
 
@@ -102,6 +108,7 @@ describe("buildAgentInstructions handoff topics", () => {
     expect(mockListHandoff).toHaveBeenCalledWith("ws-1", ["hg-1"]);
     expect(prompt).toContain("### Handoff Guidance");
     expect(prompt).toContain("#### Escalations");
+    expect(prompt).toContain("id=`entry-legal`");
     expect(prompt).toContain('"Legal threat"');
     expect(prompt).toContain("Escalate immediately");
   });
@@ -128,6 +135,6 @@ describe("buildAgentInstructions handoff topics", () => {
     expect(mockListHandoff).toHaveBeenCalledWith("ws-1", []);
     expect(prompt).toContain("### Handoff Guidance");
     expect(prompt).not.toContain("#### ");
-    expect(prompt).not.toContain("call `handoff_to_human` and pass a short");
+    expect(prompt).not.toContain("topicEntryId");
   });
 });
