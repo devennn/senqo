@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import {
   HANDOFF_TOPIC_ENTRIES_MAX_PER_GROUP,
@@ -17,6 +18,8 @@ type Props = {
 };
 
 export function HandoffTopicGroupTopicsBlock({ groupId, entries, reloadGroup, onWorkspaceStale }: Props) {
+  const [searchParams] = useSearchParams();
+  const focusEntryId = searchParams.get("handoffEntryId");
   const [page, setPage] = useState(1);
   const pageSize = HANDOFF_TOPIC_UI_PAGE_SIZE;
 
@@ -28,6 +31,13 @@ export function HandoffTopicGroupTopicsBlock({ groupId, entries, reloadGroup, on
     const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
     setPage((p) => Math.min(Math.max(p, 1), totalPages));
   }, [entries.length, pageSize]);
+
+  useEffect(() => {
+    if (!focusEntryId) return;
+    const idx = entries.findIndex((entry) => entry.id === focusEntryId);
+    if (idx < 0) return;
+    setPage(Math.floor(idx / pageSize) + 1);
+  }, [entries, focusEntryId, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
   const safePage = Math.min(Math.max(page, 1), totalPages);
@@ -58,6 +68,7 @@ export function HandoffTopicGroupTopicsBlock({ groupId, entries, reloadGroup, on
               groupId={groupId}
               entry={entry}
               labelIndex={startOffset + idx + 1}
+              focusOpen={entry.id === focusEntryId}
               onAfterMutation={reloadGroup}
               onWorkspaceStale={onWorkspaceStale}
             />

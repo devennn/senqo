@@ -44,6 +44,7 @@ const sampleReport = {
       id: "topic-1",
       topicName: "Refund request",
       groupName: "Billing",
+      groupId: "group-1",
       handoffs: 2,
     },
   ],
@@ -116,6 +117,18 @@ describe("Reports page", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Handoff topics" })).toBeInTheDocument();
       expect(screen.getAllByText("Refund request").length).toBeGreaterThan(0);
+    });
+  });
+
+  // Topic names link into Agent setup → Human handoff for the matching group/entry.
+  it("links configured handoff topics to the agent handoff editor", async () => {
+    renderPage();
+    await waitFor(() => {
+      const links = screen.getAllByRole("link", { name: "Refund request" });
+      expect(links[0]).toHaveAttribute(
+        "href",
+        "/ws-1/agent?tab=handoff&handoffGroupId=group-1&handoffEntryId=topic-1",
+      );
     });
   });
 });

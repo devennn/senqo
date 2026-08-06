@@ -15,7 +15,7 @@ import type {
   AgentPerformanceSummary,
   HandoffTopicPerformanceRow,
 } from "../types/reports.js";
-import { REPORTS_OTHER_TOPIC_ID } from "../types/reports.js";
+import { REPORTS_NO_TOPIC_LABEL, REPORTS_OTHER_TOPIC_ID } from "../types/reports.js";
 
 const scope = "ReportsRepository";
 
@@ -187,13 +187,17 @@ export async function getAgentPerformanceReport(
       .map((r) => r.entryId)
       .filter((id): id is string => typeof id === "string" && id.length > 0);
 
-    const entryMeta = new Map<string, { topicName: string; groupName: string }>();
+    const entryMeta = new Map<
+      string,
+      { topicName: string; groupName: string; groupId: string }
+    >();
     if (entryIds.length > 0) {
       const entryRows = await db
         .select({
           id: workspaceHandoffTopicEntries.id,
           topicName: workspaceHandoffTopicEntries.title,
           groupName: workspaceHandoffTopicGroups.name,
+          groupId: workspaceHandoffTopicGroups.id,
         })
         .from(workspaceHandoffTopicEntries)
         .innerJoin(
@@ -208,7 +212,11 @@ export async function getAgentPerformanceReport(
         );
 
       for (const row of entryRows) {
-        entryMeta.set(row.id, { topicName: row.topicName, groupName: row.groupName });
+        entryMeta.set(row.id, {
+          topicName: row.topicName,
+          groupName: row.groupName,
+          groupId: row.groupId,
+        });
       }
     }
 
@@ -226,15 +234,17 @@ export async function getAgentPerformanceReport(
       topics.push({
         id: entryId,
         topicName: meta.topicName,
-        groupName: meta.groupName,
+        groupName: meta.groupName.trim() || "-",
+        groupId: meta.groupId,
         handoffs: count,
       });
     }
     if (otherHandoffs > 0) {
       topics.push({
         id: REPORTS_OTHER_TOPIC_ID,
-        topicName: "Other",
-        groupName: "—",
+        topicName: REPORTS_NO_TOPIC_LABEL,
+        groupName: "-",
+        groupId: null,
         handoffs: otherHandoffs,
       });
     }

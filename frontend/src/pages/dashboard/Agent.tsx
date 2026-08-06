@@ -134,6 +134,7 @@ export default function AgentPage() {
     }
     if (next !== "handoff") {
       p.delete("handoffGroupId");
+      p.delete("handoffEntryId");
       p.delete("handoff");
     }
     if (next !== "context") {

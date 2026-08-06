@@ -22,7 +22,7 @@ const {
 } = await import("../db/schema/index.js");
 const { THREAD_EVENT_HANDOFF_TO_HUMAN } = await import("../lib/conversation-thread-events.js");
 const { getAgentPerformanceReport } = await import("./reports.js");
-const { REPORTS_OTHER_TOPIC_ID } = await import("../types/reports.js");
+const { REPORTS_NO_TOPIC_LABEL, REPORTS_OTHER_TOPIC_ID } = await import("../types/reports.js");
 
 const userId = randomUUID();
 const workspaceId = randomUUID();
@@ -200,14 +200,16 @@ describe.skipIf(!hasDb)("getAgentPerformanceReport (real DB)", () => {
     expect(result.report.topics).toEqual([
       {
         id: REPORTS_OTHER_TOPIC_ID,
-        topicName: "Other",
-        groupName: "—",
+        topicName: REPORTS_NO_TOPIC_LABEL,
+        groupName: "-",
+        groupId: null,
         handoffs: 1,
       },
       {
         id: entryId,
         topicName: "Refund request",
         groupName: "Billing",
+        groupId,
         handoffs: 1,
       },
     ]);

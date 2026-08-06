@@ -84,8 +84,8 @@ describe("getAgentPerformanceReport", () => {
     expect(result.report.summary.handoffs).toBe(3);
   });
 
-  // Topic aggregates without a known entry id → Other bucket for unmatched handoffs.
-  it("rolls unmatched topic entry ids into Other", async () => {
+  // Topic aggregates without a known entry id → No topic bucket for unmatched handoffs.
+  it("rolls unmatched topic entry ids into No topic", async () => {
     mockSelect
       .mockReturnValueOnce(chainSelect([{ id: "agent-1", profileName: "Bot" }]))
       .mockReturnValueOnce(chainSelect([]))
@@ -103,12 +103,13 @@ describe("getAgentPerformanceReport", () => {
             id: "11111111-1111-4111-8111-111111111111",
             topicName: "Refund request",
             groupName: "Billing",
+            groupId: "group-1",
           },
         ]),
       );
 
     const { getAgentPerformanceReport } = await import("./reports.js");
-    const { REPORTS_OTHER_TOPIC_ID } = await import("../types/reports.js");
+    const { REPORTS_NO_TOPIC_LABEL, REPORTS_OTHER_TOPIC_ID } = await import("../types/reports.js");
     const result = await getAgentPerformanceReport("ws-1", "2026-07-01", "2026-07-31");
 
     expect(result.ok).toBe(true);
@@ -116,14 +117,16 @@ describe("getAgentPerformanceReport", () => {
     expect(result.report.topics).toEqual([
       {
         id: REPORTS_OTHER_TOPIC_ID,
-        topicName: "Other",
-        groupName: "—",
+        topicName: REPORTS_NO_TOPIC_LABEL,
+        groupName: "-",
+        groupId: null,
         handoffs: 4,
       },
       {
         id: "11111111-1111-4111-8111-111111111111",
         topicName: "Refund request",
         groupName: "Billing",
+        groupId: "group-1",
         handoffs: 2,
       },
     ]);

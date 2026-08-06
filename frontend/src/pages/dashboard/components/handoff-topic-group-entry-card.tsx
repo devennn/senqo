@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -11,6 +11,7 @@ type Props = {
   groupId: string;
   entry: WorkspaceHandoffTopicEntryRecord;
   labelIndex: number;
+  focusOpen?: boolean;
   onAfterMutation: () => Promise<void>;
   onWorkspaceStale: () => void | Promise<void>;
 };
@@ -19,10 +20,12 @@ export function HandoffTopicGroupEntryCard({
   groupId,
   entry,
   labelIndex,
+  focusOpen = false,
   onAfterMutation,
   onWorkspaceStale,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(focusOpen);
   const [topic, setTopic] = useState(entry.topic);
   const [description, setDescription] = useState(entry.description);
   const [saving, setSaving] = useState(false);
@@ -34,16 +37,18 @@ export function HandoffTopicGroupEntryCard({
     setDescription(entry.description);
     setSaveError(null);
   }, [entry.id, entry.topic, entry.description]);
-
+  useEffect(() => {
+    if (!focusOpen) return;
+    setExpanded(true);
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [focusOpen]);
   useEffect(() => {
     if (!saveError) return;
     setExpanded(true);
   }, [saveError]);
-
   const isDirty = useMemo(() => {
     return topic.trim() !== entry.topic.trim() || description.trim() !== entry.description.trim();
   }, [description, entry.description, entry.topic, topic]);
-
   const panelId = `ho-entry-panel-${entry.id}`;
   const triggerId = `ho-entry-trigger-${entry.id}`;
 
@@ -79,7 +84,7 @@ export function HandoffTopicGroupEntryCard({
   }
 
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20">
+    <div ref={rootRef} className="rounded-lg border border-border/60 bg-muted/20">
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"

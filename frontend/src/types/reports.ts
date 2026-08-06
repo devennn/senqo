@@ -23,5 +23,13 @@ export type HandoffTopicPerformanceRow = {
   id: string;
   topicName: string;
   groupName: string;
+  /** Present for real topics; null for the unmatched bucket. */
+  groupId: string | null;
   handoffs: number;
 };
+
+/** Synthetic topic id for handoffs without a valid topicEntryId. */
+export const REPORTS_OTHER_TOPIC_ID = "other";
+
+/** Display label for handoffs that did not match a configured topic. */
+export const REPORTS_NO_TOPIC_LABEL = "No topic";
