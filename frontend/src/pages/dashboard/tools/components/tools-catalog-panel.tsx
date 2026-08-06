@@ -20,7 +20,7 @@ export function ToolsCatalogPanel({ navigation }: Props) {
   const navigate = useNavigate();
   const toolId = searchParams.get("toolId");
   const mode = searchParams.get("mode");
-  const { tools, loading, fetchTool, createTool, updateTool, deleteTool, testTool, toToolsUrl } =
+  const { tools, loading, fetchTool, createTool, generateTool, updateTool, deleteTool, testTool, toToolsUrl } =
     useCustomTools(navigation);
   const { items: secrets, loading: secretsLoading } = useWorkspaceSecrets();
   const [selected, setSelected] = useState<ToolWithSource | null>(null);
@@ -54,6 +54,7 @@ export function ToolsCatalogPanel({ navigation }: Props) {
         {mode === "new" && (
           <ToolCreateForm
             onCreate={createTool}
+            onGenerate={generateTool}
             cancelTo={toToolsUrl(selectedId ? { toolId: selectedId } : {})}
             secretsSettingsPath={secretsSettingsPath}
           />

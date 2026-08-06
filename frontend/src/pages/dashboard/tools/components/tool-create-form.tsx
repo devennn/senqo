@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { Label } from "@/components/ui/label";
 import { CUSTOM_TOOL_SOURCE_TEMPLATE } from "@/lib/custom-tool-template";
+import type { CustomToolGenerateDraft } from "@/types/custom-tool-generate";
+import { ToolAiGenerateDialog } from "@/pages/dashboard/tools/components/tool-ai-generate-dialog";
 import { ToolCodeEditor } from "@/pages/dashboard/tools/components/tool-code-editor";
 import { ToolRequiredEnvField } from "@/pages/dashboard/tools/components/tool-required-env-field";
 
@@ -16,16 +18,37 @@ type Props = {
     sourceCode: string,
     requiredEnv: string[],
   ) => Promise<void>;
+  onGenerate: (prompt: string) => Promise<CustomToolGenerateDraft>;
   cancelTo: string;
   secretsSettingsPath: string;
 };
 
-export function ToolCreateForm({ onCreate, cancelTo, secretsSettingsPath }: Props) {
+export function ToolCreateForm({ onCreate, onGenerate, cancelTo, secretsSettingsPath }: Props) {
   const [displayName, setDisplayName] = useState("My Custom Tool");
   const [description, setDescription] = useState("");
   const [requiredEnvInput, setRequiredEnvInput] = useState("");
   const [sourceCode, setSourceCode] = useState(CUSTOM_TOOL_SOURCE_TEMPLATE);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  async function handleGenerate(prompt: string) {
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const draft = await onGenerate(prompt);
+      setDisplayName(draft.displayName);
+      setDescription(draft.description);
+      setRequiredEnvInput(draft.requiredEnv.join(", "));
+      setSourceCode(draft.sourceCode);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not generate tool code.";
+      setGenerateError(message);
+      throw error instanceof Error ? error : new Error(message);
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -50,17 +73,33 @@ export function ToolCreateForm({ onCreate, cancelTo, secretsSettingsPath }: Prop
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            void handleSubmit(e);
+          }}
+          className="space-y-4"
+        >
           <div className="space-y-2">
-            <Label>Name</Label>
-            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
+            <Label htmlFor="tool-create-name">
+              Name <span className="text-destructive" aria-hidden>*</span>
+            </Label>
+            <Input
+              id="tool-create-name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+            />
           </div>
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label htmlFor="tool-create-description">
+              Description <span className="text-destructive" aria-hidden>*</span>
+            </Label>
             <Input
+              id="tool-create-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What the AI should know about when to use this tool"
+              required
             />
           </div>
           <ToolRequiredEnvField
@@ -70,7 +109,9 @@ export function ToolCreateForm({ onCreate, cancelTo, secretsSettingsPath }: Prop
           />
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label>Execute code</Label>
+              <Label>
+                Execute code <span className="text-destructive" aria-hidden>*</span>
+              </Label>
               <InlineHelpHint label="Execute code help">
                 <p>
                   Export <code>async function execute(input, ctx)</code>. Use an inline input type
@@ -78,11 +119,18 @@ export function ToolCreateForm({ onCreate, cancelTo, secretsSettingsPath }: Prop
                   the sidebar for the full guide.
                 </p>
               </InlineHelpHint>
+              <div className="ml-auto">
+                <ToolAiGenerateDialog
+                  generating={generating}
+                  error={generateError}
+                  onGenerate={handleGenerate}
+                />
+              </div>
             </div>
             <ToolCodeEditor value={sourceCode} onChange={setSourceCode} />
           </div>
           <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" disabled={saving}>
+            <Button type="submit" size="sm" disabled={saving || generating}>
               {saving ? "Saving…" : "Create tool"}
             </Button>
             <Link to={cancelTo}>

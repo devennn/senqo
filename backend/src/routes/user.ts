@@ -95,6 +95,7 @@ import {
 import { normalizeRequiredEnvNames, stripLegacyToolExports } from "../lib/custom-tool-source.js";
 import { resolveCustomToolEnv } from "../services/custom-tool-env.js";
 import { hashCustomToolSource } from "../services/custom-tool-compile.js";
+import { generateCustomToolDraft } from "../services/custom-tool-generate.js";
 import { runCustomTool } from "../services/tool-sandbox/run.js";
 import {
   listWorkspaceSkills,
@@ -1177,6 +1178,15 @@ app.get("/custom-tools", async (c) => {
   return c.json({ tools });
 });
 
+app.post("/custom-tools/generate", async (c) => {
+  const body = (await c.req.json()) as { prompt?: string };
+  const result = await generateCustomToolDraft(String(body.prompt ?? ""));
+  if (!result.ok) {
+    return c.json({ error: "generate_failed", message: result.message }, 400);
+  }
+  return c.json(result.draft);
+});
+
 app.get("/custom-tools/:id", async (c) => {
   const workspaceId = c.get("workspaceId");
   const tool = await getWorkspaceCustomToolById(workspaceId, c.req.param("id"));
@@ -1192,13 +1202,13 @@ app.post("/custom-tools", async (c) => {
     sourceCode?: string;
     requiredEnv?: string[];
   };
-  if (!body.displayName?.trim() || !body.sourceCode?.trim()) {
-    return c.json({ error: "tool_name_and_source_required" }, 400);
+  if (!body.displayName?.trim() || !body.description?.trim() || !body.sourceCode?.trim()) {
+    return c.json({ error: "tool_name_description_and_source_required" }, 400);
   }
   const result = await upsertWorkspaceCustomTool({
     workspaceId,
     displayName: body.displayName,
-    description: body.description ?? "",
+    description: body.description,
     sourceCode: body.sourceCode,
     requiredEnv: body.requiredEnv,
   });

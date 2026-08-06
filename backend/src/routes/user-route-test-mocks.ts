@@ -30,6 +30,10 @@ vi.mock("../services/custom-tool-compile.js", () => ({
   hashCustomToolSource: vi.fn(),
 }));
 
+vi.mock("../services/custom-tool-generate.js", () => ({
+  generateCustomToolDraft: vi.fn(),
+}));
+
 vi.mock("../services/tool-sandbox/run.js", () => ({
   runCustomTool: vi.fn(),
 }));

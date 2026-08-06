@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
+import type { CustomToolGenerateDraft } from "@/types/custom-tool-generate";
 import type {
   WorkspaceCustomToolDetailRecord,
   WorkspaceCustomToolListItem,
@@ -80,6 +81,10 @@ export function useCustomTools(navConfig: ToolsNavConfig) {
     [reload, navigate, toToolsUrl],
   );
 
+  const generateTool = useCallback(async (prompt: string): Promise<CustomToolGenerateDraft> => {
+    return api.post<CustomToolGenerateDraft>("/api/user/custom-tools/generate", { prompt });
+  }, []);
+
   const updateTool = useCallback(
     async (
       id: string,
@@ -134,6 +139,7 @@ export function useCustomTools(navConfig: ToolsNavConfig) {
     reload,
     fetchTool,
     createTool,
+    generateTool,
     updateTool,
     deleteTool,
     testTool,

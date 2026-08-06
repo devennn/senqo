@@ -40,6 +40,10 @@ vi.mock("../services/custom-tool-compile.js", () => ({
   hashCustomToolSource: vi.fn(),
 }));
 
+vi.mock("../services/custom-tool-generate.js", () => ({
+  generateCustomToolDraft: vi.fn(),
+}));
+
 vi.mock("../services/tool-sandbox/run.js", () => ({
   runCustomTool: vi.fn(),
 }));
@@ -315,6 +319,7 @@ import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentCon
 import { validateHandoffTopicGroupIdsForWorkspace } from "../repositories/handoff-topic-groups.js";
 import { getAgentPerformanceReport } from "../repositories/reports.js";
 import { scheduleHandoffNotify } from "../services/handoff-notify.js";
+import { generateCustomToolDraft } from "../services/custom-tool-generate.js";
 import { findUserById } from "../repositories/auth-users.js";
 import { getProfileForSettings, updateProfile } from "../repositories/profiles.js";
 import { getWorkspaceRow } from "../repositories/workspaces.js";
@@ -349,6 +354,7 @@ const updateAgentConfigMock = vi.mocked(updateAgentConfig);
 const validateHandoffTopicGroupIdsMock = vi.mocked(validateHandoffTopicGroupIdsForWorkspace);
 const getAgentPerformanceReportMock = vi.mocked(getAgentPerformanceReport);
 const scheduleHandoffNotifyMock = vi.mocked(scheduleHandoffNotify);
+const generateCustomToolDraftMock = vi.mocked(generateCustomToolDraft);
 const findUserByIdMock = vi.mocked(findUserById);
 const getProfileForSettingsMock = vi.mocked(getProfileForSettings);
 const updateProfileMock = vi.mocked(updateProfile);
@@ -1043,5 +1049,55 @@ describe("PATCH /conversations/:id/handling-mode", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, handlingMode: "human" });
+  });
+});
+
+describe("POST /custom-tools/generate", () => {
+  // Happy path: authenticated generate returns the AI draft fields for the create form.
+  it("returns draft when generate succeeds", async () => {
+    generateCustomToolDraftMock.mockResolvedValue({
+      ok: true,
+      draft: {
+        displayName: "Lookup Contact",
+        description: "Find a CRM contact by phone",
+        requiredEnv: ["CRM_API_KEY"],
+        sourceCode: "export async function execute() { return { ok: true }; }",
+      },
+    });
+
+    const res = await app.request("/custom-tools/generate", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ prompt: "CRM GET /contacts?phone=" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      displayName: "Lookup Contact",
+      description: "Find a CRM contact by phone",
+      requiredEnv: ["CRM_API_KEY"],
+      sourceCode: "export async function execute() { return { ok: true }; }",
+    });
+    expect(generateCustomToolDraftMock).toHaveBeenCalledWith("CRM GET /contacts?phone=");
+  });
+
+  // Service failure must surface as 400 with generate_failed so the UI can show the message.
+  it("returns 400 when generate fails", async () => {
+    generateCustomToolDraftMock.mockResolvedValue({
+      ok: false,
+      message: "Could not generate tool code.",
+    });
+
+    const res = await app.request("/custom-tools/generate", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ prompt: "bad" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "generate_failed",
+      message: "Could not generate tool code.",
+    });
   });
 });

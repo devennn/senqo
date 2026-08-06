@@ -53,9 +53,10 @@ export function ToolCatalogHowTo({ secretsSettingsPath }: Props) {
       </CardHeader>
       <CardContent>
         <ol className="list-decimal space-y-1.5 pl-4 text-sm text-muted-foreground">
+          <li>Optional: Generate with AI on the Execute code row.</li>
           <li>Name the tool and write a Description for the AI.</li>
           <li>List env names; store values in Settings → Secrets.</li>
-          <li>Write execute code — input types are inferred from TypeScript.</li>
+          <li>Write or review execute code — input types are inferred from TypeScript.</li>
           <li>Test, then enable on Profile → Capability.</li>
         </ol>
       </CardContent>

@@ -266,6 +266,7 @@ npx playwright show-report
 |------|---------------|
 | `e2e/senqo.spec.ts` | Sign-up, sign-in, unauthenticated redirect |
 | `e2e/custom-tools.spec.ts` | Tool editor save state, dirty detection, test input |
+| `e2e/custom-tools-ai-generate.spec.ts` | Create tool AI generate fill, disabled state, error |
 | `e2e/instance-auth.spec.ts` | Invite signup flow, blocked registration, superadmin panel |
 
 ## Tech stack
