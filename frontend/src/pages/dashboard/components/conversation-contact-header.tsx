@@ -59,22 +59,33 @@ export function ConversationContactHeader({
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-lg font-bold tracking-tight">{displayName}</h1>
         {groupSubtitle ? (
-          <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-            <Users className="size-3.5 shrink-0" />
-            <span>{groupSubtitle}</span>
-          </p>
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <p className="flex min-w-0 items-center gap-1.5 truncate">
+              <Users className="size-3.5 shrink-0" />
+              <span className="truncate">{groupSubtitle}</span>
+            </p>
+            {labels.length > 0 ? (
+              <ConversationLabelBadges labels={labels} maxVisible={labels.length} />
+            ) : null}
+          </div>
         ) : phone ? (
-          <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-            <Phone className="size-3.5 shrink-0" />
-            <span>{phone}</span>
-          </p>
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <p className="flex min-w-0 items-center gap-1.5 truncate">
+              <Phone className="size-3.5 shrink-0" />
+              <span className="truncate">{phone}</span>
+            </p>
+            {labels.length > 0 ? (
+              <ConversationLabelBadges labels={labels} maxVisible={labels.length} />
+            ) : null}
+          </div>
+        ) : labels.length > 0 ? (
+          <div className="mt-0.5">
+            <ConversationLabelBadges labels={labels} maxVisible={labels.length} />
+          </div>
         ) : null}
       </div>
       {conversation ? (
         <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-end gap-1.5 sm:max-w-[min(32rem,50vw)]">
-          {labels.length > 0 ? (
-            <ConversationLabelBadges labels={labels} maxVisible={labels.length} className="justify-end" />
-          ) : null}
           {labelCatalog.length > 0 ? (
             <Button
               type="button"

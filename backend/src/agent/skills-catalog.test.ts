@@ -6,6 +6,7 @@ const mockListTemplates = vi.fn();
 const mockListContext = vi.fn();
 const mockListAssets = vi.fn();
 const mockListLabels = vi.fn();
+const mockListLabelBadges = vi.fn();
 const mockListCustomTools = vi.fn();
 
 vi.mock("../repositories/agent.js", () => ({
@@ -30,6 +31,7 @@ vi.mock("../repositories/workspace-asset-groups.js", () => ({
 
 vi.mock("../repositories/conversation-labels.js", () => ({
   listConversationLabels: (...args: unknown[]) => mockListLabels(...args),
+  listLabelBadgesForConversations: (...args: unknown[]) => mockListLabelBadges(...args),
 }));
 
 vi.mock("../repositories/skills.js", () => ({
@@ -48,7 +50,97 @@ beforeEach(() => {
   mockListContext.mockResolvedValue([]);
   mockListAssets.mockResolvedValue([]);
   mockListLabels.mockResolvedValue([]);
+  mockListLabelBadges.mockResolvedValue(new Map());
+  mockListHandoff.mockResolvedValue([]);
   mockListCustomTools.mockResolvedValue([]);
+});
+
+describe("formatConversationLabelsInstruction", () => {
+  // Multi-intent / multi-topic threads need explicit multi-label and recent-history rules.
+  it("instructs multi-label assignment using recent thread context", async () => {
+    const { formatConversationLabelsInstruction } = await import("./skills-catalog.js");
+    const text = formatConversationLabelsInstruction(
+      [
+        {
+          id: "lbl-delivery",
+          workspace_id: "ws-1",
+          name: "Delivery",
+          description: "Food delivery platforms",
+          created_at: "",
+          updated_at: "",
+        },
+        {
+          id: "lbl-menu",
+          workspace_id: "ws-1",
+          name: "Menu",
+          description: "Menu questions",
+          created_at: "",
+          updated_at: "",
+        },
+      ],
+      [{ id: "lbl-delivery", name: "Delivery", source: "ai" }],
+    );
+
+    expect(text).toContain("previous 10 messages");
+    expect(text).toContain("multiple intents");
+    expect(text).toContain("full set");
+    expect(text).toContain("definition");
+    expect(text).toContain("not the name alone");
+    expect(text).toContain("MUST call `apply_conversation_labels`");
+    expect(text).toContain("Do not answer and skip labeling");
+    expect(text).toContain("lbl-delivery");
+    expect(text).toContain("lbl-menu");
+    expect(text).toContain('Currently on this conversation:');
+    expect(text).toContain('source=ai');
+  });
+
+  // Empty catalog must not inject label guidance into the prompt.
+  it("returns empty string when workspace has no labels", async () => {
+    const { formatConversationLabelsInstruction } = await import("./skills-catalog.js");
+    expect(formatConversationLabelsInstruction([])).toBe("");
+  });
+});
+
+describe("buildAgentInstructions conversation labels", () => {
+  // Auto-assign on must inject catalog + current conversation labels for the session.
+  it("includes catalog and current labels when auto-assign is enabled", async () => {
+    mockGetAgent.mockResolvedValue({
+      id: "agent-1",
+      profile_name: "Bot",
+      behavior: "",
+      tools: [],
+      skills: [],
+      response_template_groups: [],
+      handoff_topic_groups: [],
+      context_groups: [],
+      asset_groups: [],
+      auto_assign_conversation_labels: true,
+    });
+    mockListLabels.mockResolvedValue([
+      {
+        id: "lbl-vip",
+        workspace_id: "ws-1",
+        name: "VIP",
+        description: "High-value customer",
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    mockListLabelBadges.mockResolvedValue(
+      new Map([
+        ["conv-1", [{ id: "lbl-vip", name: "VIP", source: "user" as const }]],
+      ]),
+    );
+
+    const { buildAgentInstructions } = await import("./skills-catalog.js");
+    const prompt = await buildAgentInstructions("ws-1", "agent-1", false, "conv-1");
+
+    expect(mockListLabelBadges).toHaveBeenCalledWith("ws-1", ["conv-1"]);
+    expect(prompt).toContain("### Conversation labels");
+    expect(prompt).toContain("lbl-vip");
+    expect(prompt).toContain('source=user');
+    expect(prompt).toContain("previous 10 messages");
+  });
 });
 
 describe("formatHandoffTopicsInstruction", () => {

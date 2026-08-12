@@ -17,11 +17,17 @@ type Props = {
   | "handoffTopicGroups"
 >;
 
-function tabHref(wsPath: (path: string) => string, agentId: string, tab: string): string {
+function agentTabHref(wsPath: (path: string) => string, agentId: string, tab: string): string {
   const params = new URLSearchParams();
   params.set("tab", tab);
   params.set("agentId", agentId);
   return `${wsPath("/agent")}?${params.toString()}`;
+}
+
+function knowledgeTabHref(wsPath: (path: string) => string, tab: string): string {
+  const params = new URLSearchParams();
+  params.set("tab", tab);
+  return `${wsPath("/knowledge")}?${params.toString()}`;
 }
 
 export function AgentConfigFormKnowledgeBlock({
@@ -42,11 +48,11 @@ export function AgentConfigFormKnowledgeBlock({
       selectedHandoffTopicGroups={new Set(
         Array.isArray(agent.handoff_topic_groups) ? agent.handoff_topic_groups : [],
       )}
-      templatesTabHref={tabHref(wsPath, agent.id, "templates")}
-      contextTabHref={tabHref(wsPath, agent.id, "context")}
-      assetsTabHref={tabHref(wsPath, agent.id, "assets")}
-      handoffTabHref={tabHref(wsPath, agent.id, "handoff")}
-      toolsTabHref={tabHref(wsPath, agent.id, "tools")}
+      templatesTabHref={knowledgeTabHref(wsPath, "templates")}
+      contextTabHref={knowledgeTabHref(wsPath, "context")}
+      assetsTabHref={agentTabHref(wsPath, agent.id, "assets")}
+      handoffTabHref={knowledgeTabHref(wsPath, "handoff")}
+      toolsTabHref={agentTabHref(wsPath, agent.id, "tools")}
       workspaceContextDirty={sectionDirty.workspaceContext}
       assetGroupsDirty={sectionDirty.assetGroups}
       responseTemplatesDirty={sectionDirty.responseTemplates}

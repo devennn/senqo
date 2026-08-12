@@ -120,14 +120,14 @@ describe("Reports page", () => {
     });
   });
 
-  // Topic names link into Agent setup → Human handoff for the matching group/entry.
+  // Topic names link into Knowledge → Human handoff for the matching group/entry.
   it("links configured handoff topics to the agent handoff editor", async () => {
     renderPage();
     await waitFor(() => {
       const links = screen.getAllByRole("link", { name: "Refund request" });
       expect(links[0]).toHaveAttribute(
         "href",
-        "/ws-1/agent?tab=handoff&handoffGroupId=group-1&handoffEntryId=topic-1",
+        "/ws-1/knowledge?tab=handoff&handoffGroupId=group-1&handoffEntryId=topic-1",
       );
     });
   });

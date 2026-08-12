@@ -18,7 +18,7 @@ describe("AgentHandoffTopicGroupsFields", () => {
             },
           ]}
           selectedIds={new Set(["g1"])}
-          handoffTabHref="/ws/agent?tab=handoff"
+          handoffTabHref="/ws/knowledge?tab=handoff"
           subsectionDirty={false}
           saving={false}
         />
@@ -36,7 +36,7 @@ describe("AgentHandoffTopicGroupsFields", () => {
         <AgentHandoffTopicGroupsFields
           groups={[]}
           selectedIds={new Set()}
-          handoffTabHref="/ws/agent?tab=handoff"
+          handoffTabHref="/ws/knowledge?tab=handoff"
           subsectionDirty={false}
           saving={false}
         />
@@ -45,7 +45,7 @@ describe("AgentHandoffTopicGroupsFields", () => {
 
     expect(screen.getByRole("link", { name: /Human handoff/i })).toHaveAttribute(
       "href",
-      "/ws/agent?tab=handoff",
+      "/ws/knowledge?tab=handoff",
     );
   });
 
@@ -56,7 +56,7 @@ describe("AgentHandoffTopicGroupsFields", () => {
         <AgentHandoffTopicGroupsFields
           groups={[]}
           selectedIds={new Set()}
-          handoffTabHref="/ws/agent?tab=handoff"
+          handoffTabHref="/ws/knowledge?tab=handoff"
           subsectionDirty
           saving={false}
         />

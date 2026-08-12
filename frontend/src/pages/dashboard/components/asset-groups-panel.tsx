@@ -72,9 +72,9 @@ export function AssetGroupsPanel({ groups, reload, agentId }: Props) {
           {groups.length === 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>No asset groups yet</span>
-                  <InlineHelpHint label="Asset groups overview">
+                <CardTitle className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">No asset groups yet</span>
+                  <InlineHelpHint className="size-7 shrink-0" label="Asset groups overview">
                     <p>Use Add group, name the folder, then upload files with a short description of what each file is about. Attach groups on Profile.</p>
                   </InlineHelpHint>
                 </CardTitle>

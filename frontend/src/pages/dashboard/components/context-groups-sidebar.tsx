@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
-import { CONTEXT_GROUPS_UI_PAGE_SIZE } from "@/lib/context-groups-limits";
+import { CONTEXT_ENTRIES_MAX_PER_GROUP, CONTEXT_GROUPS_UI_PAGE_SIZE } from "@/lib/context-groups-limits";
+import { KnowledgeGroupListMeta } from "@/pages/dashboard/components/knowledge-group-list-meta";
 import { TablePagination } from "@/pages/dashboard/components/table-pagination";
 import type { WorkspaceContextGroupSummary } from "@/types/repositories";
 
@@ -38,21 +40,28 @@ export function ContextGroupsSidebar({ groups, selectedGroupId, onAddGroup, grou
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          Context groups
-          <InlineHelpHint label="About context groups">
-            <>
-              <p>Browse workspace-wide named groups of facts (title + body).</p>
-              <p>Attach whichever groups fit an agent on the Profile tab.</p>
-            </>
-          </InlineHelpHint>
-        </CardTitle>
-        <CardDescription>Select a group to view or edit.</CardDescription>
-        <CardAction className="-mt-0.5 shrink-0">
-          <Button type="button" size="sm" onClick={onAddGroup}>
-            Add group
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">Context groups</span>
+            <InlineHelpHint className="size-7" label="About context groups">
+              <>
+                <p>Browse workspace-wide named groups of facts (title + body).</p>
+                <p>Attach whichever groups fit an agent on Agent → Profile → Attached knowledge.</p>
+              </>
+            </InlineHelpHint>
+          </CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="Add group"
+            onClick={onAddGroup}
+          >
+            <Plus className="size-4" aria-hidden />
           </Button>
-        </CardAction>
+        </div>
+        <CardDescription>Select a group to view or edit.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {groups.length > 0 ? (
@@ -61,16 +70,20 @@ export function ContextGroupsSidebar({ groups, selectedGroupId, onAddGroup, grou
               <Link
                 key={group.id}
                 to={groupHref(group.id)}
-                className={`block rounded-md border px-3 py-2 text-sm ${
+                className={`flex items-baseline justify-between gap-2 rounded-md border px-3 py-2 text-sm ${
                   selectedGroupId === group.id
                     ? "border-primary bg-primary/5 text-foreground"
                     : "border-border/70 text-muted-foreground"
                 }`}
               >
-                <p className="truncate font-medium">{group.name}</p>
-                <p className="truncate text-xs">
-                  {group.entry_count} {group.entry_count === 1 ? "entry" : "entries"}
-                </p>
+                <p className="min-w-0 truncate font-medium">{group.name}</p>
+                <KnowledgeGroupListMeta
+                  className="shrink-0"
+                  entryCount={group.entry_count}
+                  entryMax={CONTEXT_ENTRIES_MAX_PER_GROUP}
+                  entryLabelSingular="entry"
+                  entryLabelPlural="entries"
+                />
               </Link>
             ))}
             {groups.length > pageSize ? (

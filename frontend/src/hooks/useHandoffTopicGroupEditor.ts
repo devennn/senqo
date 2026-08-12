@@ -11,6 +11,7 @@ export function useHandoffTopicGroupEditor(groupId: string, onSaved: () => Promi
   const [loadError, setLoadError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [baselineName, setBaselineName] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [entries, setEntries] = useState<WorkspaceHandoffTopicEntryRecord[]>([]);
   const [savingGroupName, setSavingGroupName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -23,6 +24,7 @@ export function useHandoffTopicGroupEditor(groupId: string, onSaved: () => Promi
     );
     setGroupName(res.group.name);
     setBaselineName(res.group.name);
+    setUpdatedAt(res.group.updated_at);
     setEntries([...res.group.entries].sort((a, b) => a.sort_order - b.sort_order));
   }, [groupId]);
 
@@ -86,6 +88,7 @@ export function useHandoffTopicGroupEditor(groupId: string, onSaved: () => Promi
     loadError,
     groupName,
     setGroupName,
+    updatedAt,
     entries,
     nameDirty,
     nameEditing,

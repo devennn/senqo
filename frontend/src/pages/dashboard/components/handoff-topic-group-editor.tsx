@@ -7,15 +7,22 @@ import { HandoffTopicGroupEditorContent } from "@/pages/dashboard/components/han
 import { HandoffTopicGroupNameFields } from "@/pages/dashboard/components/handoff-topic-group-name-fields";
 import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
+import { KnowledgeUpdatedAtLine } from "@/pages/dashboard/components/knowledge-updated-at-line";
 import { PageLoader } from "@/components/ui/spinner";
 
 type Props = {
   groupId: string;
+  usedByNames?: string[];
   onSaved: () => Promise<void>;
   onOpenAttachDialog: () => void;
 };
 
-export function HandoffTopicGroupEditor({ groupId, onSaved, onOpenAttachDialog }: Props) {
+export function HandoffTopicGroupEditor({
+  groupId,
+  usedByNames = [],
+  onSaved,
+  onOpenAttachDialog,
+}: Props) {
   const editor = useHandoffTopicGroupEditor(groupId, onSaved);
   const actionsDisabled = editor.deletingGroup || editor.loading || Boolean(editor.loadError);
 
@@ -53,7 +60,14 @@ export function HandoffTopicGroupEditor({ groupId, onSaved, onOpenAttachDialog }
         />
         {!editor.loading && !editor.loadError ? (
           <CardDescription>
-            {editor.entries.length}/{HANDOFF_TOPIC_ENTRIES_MAX_PER_GROUP} topics
+            <KnowledgeUpdatedAtLine
+              entryCount={editor.entries.length}
+              entryMax={HANDOFF_TOPIC_ENTRIES_MAX_PER_GROUP}
+              entryLabelSingular="topic"
+              entryLabelPlural="topics"
+              updatedAt={editor.updatedAt}
+              usedByNames={usedByNames}
+            />
           </CardDescription>
         ) : null}
         <CardAction className="-mt-0.5 flex shrink-0 flex-wrap items-center justify-end gap-2 sm:justify-self-end">

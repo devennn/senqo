@@ -44,7 +44,7 @@ export function AgentConfigKnowledgeCapabilityFields({
       >
         <SectionTabButton
           id="knowledge"
-          label="Knowledge"
+          label="Attached knowledge"
           selected={sectionTab === "knowledge"}
           onClick={() => setSectionTab("knowledge")}
         />
@@ -70,13 +70,6 @@ export function AgentConfigKnowledgeCapabilityFields({
           subsectionDirty={workspaceContextDirty}
           saving={saving}
         />
-        <AgentAssetGroupsFields
-          groups={workspaceAssetGroups}
-          selectedIds={selectedAssetGroups}
-          assetsTabHref={assetsTabHref}
-          subsectionDirty={assetGroupsDirty}
-          saving={saving}
-        />
         <AgentResponseTemplateGroupsFields
           groups={responseTemplateGroups}
           selectedIds={selectedResponseTemplateGroups}
@@ -97,7 +90,15 @@ export function AgentConfigKnowledgeCapabilityFields({
         id="agent-profile-section-capability"
         aria-labelledby="agent-profile-section-tab-capability"
         hidden={sectionTab !== "capability"}
+        className="space-y-5"
       >
+        <AgentAssetGroupsFields
+          groups={workspaceAssetGroups}
+          selectedIds={selectedAssetGroups}
+          assetsTabHref={assetsTabHref}
+          subsectionDirty={assetGroupsDirty}
+          saving={saving}
+        />
         <AgentToolsFields
           tools={availableTools}
           skills={availableSkills}

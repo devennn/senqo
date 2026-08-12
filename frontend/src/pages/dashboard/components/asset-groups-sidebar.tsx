@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { ASSET_GROUPS_UI_PAGE_SIZE } from "@/lib/asset-groups-limits";
 import { TablePagination } from "@/pages/dashboard/components/table-pagination";
@@ -38,21 +39,28 @@ export function AssetGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupH
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          Asset groups
-          <InlineHelpHint label="About asset groups">
-            <>
-              <p>Browse workspace file sets (images, videos, documents) with a short note on what each file is about.</p>
-              <p>Attach whichever groups fit an agent on the Profile tab.</p>
-            </>
-          </InlineHelpHint>
-        </CardTitle>
-        <CardDescription>Select a group to view or edit files.</CardDescription>
-        <CardAction className="-mt-0.5 shrink-0">
-          <Button type="button" size="sm" onClick={onAddGroup}>
-            Add group
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">Asset groups</span>
+            <InlineHelpHint className="size-7" label="About asset groups">
+              <>
+                <p>Browse workspace file sets (images, videos, documents) with a short note on what each file is about.</p>
+                <p>Attach whichever groups fit an agent on the Profile tab.</p>
+              </>
+            </InlineHelpHint>
+          </CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="Add group"
+            onClick={onAddGroup}
+          >
+            <Plus className="size-4" aria-hidden />
           </Button>
-        </CardAction>
+        </div>
+        <CardDescription>Select a group to view or edit files.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {groups.length > 0 ? (
@@ -61,14 +69,14 @@ export function AssetGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupH
               <Link
                 key={group.id}
                 to={groupHref(group.id)}
-                className={`block rounded-md border px-3 py-2 text-sm ${
+                className={`flex items-baseline justify-between gap-2 rounded-md border px-3 py-2 text-sm ${
                   selectedGroupId === group.id
                     ? "border-primary bg-primary/5 text-foreground"
                     : "border-border/70 text-muted-foreground"
                 }`}
               >
-                <p className="truncate font-medium">{group.name}</p>
-                <p className="truncate text-xs">
+                <p className="min-w-0 truncate font-medium">{group.name}</p>
+                <p className="shrink-0 text-xs">
                   {group.asset_count} {group.asset_count === 1 ? "file" : "files"}
                 </p>
               </Link>

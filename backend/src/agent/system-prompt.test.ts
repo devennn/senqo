@@ -122,4 +122,14 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("`get_weather`");
     expect(prompt).toContain("Look up weather for a city.");
   });
+
+  // Confirms multi-label / recent-thread guidance is present in the system prompt.
+  it("instructs apply_conversation_labels for one or more labels using recent messages", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("MUST call `apply_conversation_labels`");
+    expect(prompt).toContain("description/definition");
+    expect(prompt).toContain("previous 10 messages");
+    expect(prompt).toContain("multiple labels in one call");
+    expect(prompt).toContain("Do not answer and skip labeling");
+  });
 });

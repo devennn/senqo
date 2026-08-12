@@ -2,7 +2,51 @@ import type { ModelMessage } from "ai";
 import type {
   AgentStepFinishToolCallLog,
   AgentStepFinishToolResultLog,
+  ApplyConversationLabelsRunSummary,
 } from "../types/agent.js";
+
+export function emptyApplyConversationLabelsRunSummary(): ApplyConversationLabelsRunSummary {
+  return {
+    called: false,
+    labelIds: [],
+    ok: null,
+    appliedCount: null,
+    error: null,
+  };
+}
+
+/** Builds a labels summary from the last `apply_conversation_labels` tool call in a run. */
+export function summarizeApplyConversationLabelsCalls(
+  calls: Array<{ args: unknown; output: unknown }>,
+): ApplyConversationLabelsRunSummary {
+  if (calls.length === 0) return emptyApplyConversationLabelsRunSummary();
+
+  const last = calls[calls.length - 1];
+  const args =
+    last.args && typeof last.args === "object"
+      ? (last.args as { labelIds?: unknown })
+      : null;
+  const labelIds = Array.isArray(args?.labelIds)
+    ? args.labelIds.filter((id): id is string => typeof id === "string")
+    : [];
+
+  const output =
+    last.output && typeof last.output === "object"
+      ? (last.output as { ok?: unknown; appliedCount?: unknown; error?: unknown })
+      : null;
+  const ok = typeof output?.ok === "boolean" ? output.ok : null;
+  const appliedCount =
+    typeof output?.appliedCount === "number" ? output.appliedCount : null;
+  const error = typeof output?.error === "string" ? output.error : null;
+
+  return {
+    called: true,
+    labelIds,
+    ok,
+    appliedCount,
+    error,
+  };
+}
 
 const maxLogLength = 280;
 
@@ -138,8 +182,21 @@ export function formatAgentStructuredOutputBlock(
     structuredOutput: unknown;
     outboundPrepared: unknown;
     outboundSent: number;
+    conversationLabels?: ApplyConversationLabelsRunSummary;
   },
 ): string {
+  const labels = input.conversationLabels ?? emptyApplyConversationLabelsRunSummary();
+  const structuredWithLabels =
+    input.structuredOutput && typeof input.structuredOutput === "object"
+      ? {
+          ...(input.structuredOutput as Record<string, unknown>),
+          conversation_labels: labels,
+        }
+      : {
+          structuredOutput: input.structuredOutput,
+          conversation_labels: labels,
+        };
+
   return [
     `[${scope}]`,
     agentLogRuleHeavy,
@@ -148,9 +205,10 @@ export function formatAgentStructuredOutputBlock(
     kvLine("session", input.sessionId),
     kvLine("dry run", String(input.dryRun)),
     kvLine("whatsapp sent", String(input.outboundSent)),
+    kvLine("labels applied", labels.called && labels.ok === true ? "yes" : "no"),
     agentLogRuleLight,
     "  Full LLM output",
-    prettyJsonForLog(input.structuredOutput, { maxLength: 20_000 }),
+    prettyJsonForLog(structuredWithLabels, { maxLength: 20_000 }),
     agentLogRuleLight,
     "  Outbound after prepare/dedupe",
     prettyJsonForLog(input.outboundPrepared, { maxLength: 8_000 }),

@@ -13,13 +13,23 @@ import { ResponseTemplateGroupNameFields } from "@/pages/dashboard/components/re
 import { ResponseTemplateGroupTemplatesBlock } from "@/pages/dashboard/components/response-template-group-templates-block";
 import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
+import { KnowledgeUpdatedAtLine } from "@/pages/dashboard/components/knowledge-updated-at-line";
 import { PageLoader } from "@/components/ui/spinner";
 
-export function ResponseTemplateGroupEditor({ groupId, onSaved }: { groupId: string; onSaved: () => Promise<void> }) {
+export function ResponseTemplateGroupEditor({
+  groupId,
+  usedByNames = [],
+  onSaved,
+}: {
+  groupId: string;
+  usedByNames?: string[];
+  onSaved: () => Promise<void>;
+}) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [baselineName, setBaselineName] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [entries, setEntries] = useState<WorkspaceResponseTemplateEntryRecord[]>([]);
   const [savingGroupName, setSavingGroupName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -32,6 +42,7 @@ export function ResponseTemplateGroupEditor({ groupId, onSaved }: { groupId: str
     );
     setGroupName(res.group.name);
     setBaselineName(res.group.name);
+    setUpdatedAt(res.group.updated_at);
     const ordered = [...res.group.entries].sort((a, b) => a.sort_order - b.sort_order);
     setEntries(ordered);
   }, [groupId]);
@@ -122,7 +133,14 @@ export function ResponseTemplateGroupEditor({ groupId, onSaved }: { groupId: str
         />
         {!loading && !loadError ? (
           <CardDescription>
-            {entries.length}/{RESPONSE_TEMPLATE_ENTRIES_MAX_PER_GROUP} entries
+            <KnowledgeUpdatedAtLine
+              entryCount={entries.length}
+              entryMax={RESPONSE_TEMPLATE_ENTRIES_MAX_PER_GROUP}
+              entryLabelSingular="entry"
+              entryLabelPlural="entries"
+              updatedAt={updatedAt}
+              usedByNames={usedByNames}
+            />
           </CardDescription>
         ) : null}
         <CardAction className="-mt-0.5 shrink-0 sm:justify-self-end">

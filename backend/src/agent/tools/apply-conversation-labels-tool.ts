@@ -10,9 +10,13 @@ import {
 export function createApplyConversationLabelsTool(context: AgentToolRuntimeContext) {
   return tool({
     description:
-      "Update AI-sourced labels for this conversation. Pass label UUIDs from the workspace catalog that match the thread. Replaces only labels the AI previously applied; user-applied labels are not removed. Pass an empty array to clear all AI labels.",
+      "Required before final output when any catalog label definition matches this thread and AI labels are not already the correct full set. Pass every matching workspace label UUID in labelIds (one or many). Replaces only labels the AI previously applied; user-applied labels are not removed. Include still-relevant existing AI labels plus newly matching ones. Pass an empty array only to clear all AI labels. Do not skip this tool just to answer faster when a match is missing.",
     inputSchema: z.object({
-      labelIds: z.array(z.string().uuid()),
+      labelIds: z
+        .array(z.string().uuid())
+        .describe(
+          "Full set of AI label UUIDs that should remain on this conversation after this turn. May include multiple labels when the message or recent thread matches more than one.",
+        ),
     }),
     execute: async ({ labelIds }) => {
       if (!context.agentConfigId) {

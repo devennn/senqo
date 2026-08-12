@@ -1,33 +1,42 @@
 import { cn } from "@/lib/utils";
 
-export type AgentSetupTab = "profile" | "skills" | "tools" | "assets";
+export type KnowledgeTab = "context" | "templates" | "handoff";
 
 type Props = {
-  value: AgentSetupTab;
-  onChange: (tab: AgentSetupTab) => void;
+  value: KnowledgeTab;
+  onChange: (tab: KnowledgeTab) => void;
 };
 
-export function AgentSetupTabBar({ value, onChange }: Props) {
+export function KnowledgeTabBar({ value, onChange }: Props) {
   return (
     <div
       role="tablist"
-      aria-label="Agent setup sections"
+      aria-label="Knowledge sections"
       className="mt-6 flex w-full gap-1 border-b border-border sm:gap-2"
     >
-      <TabButton id="profile" label="Profile" selected={value === "profile"} onClick={() => onChange("profile")} />
-      <TabButton id="skills" label="Skill Catalog" selected={value === "skills"} onClick={() => onChange("skills")} />
-      <TabButton id="tools" label="Tool Catalog" selected={value === "tools"} onClick={() => onChange("tools")} />
-      <TabButton id="assets" label="Assets" selected={value === "assets"} onClick={() => onChange("assets")} />
+      <TabButton id="context" label="Context" selected={value === "context"} onClick={() => onChange("context")} />
+      <TabButton
+        id="templates"
+        label="Response templates"
+        selected={value === "templates"}
+        onClick={() => onChange("templates")}
+      />
+      <TabButton
+        id="handoff"
+        label="Human handoff"
+        selected={value === "handoff"}
+        onClick={() => onChange("handoff")}
+      />
     </div>
   );
 }
 
-function TabButton(props: { id: AgentSetupTab; label: string; selected: boolean; onClick: () => void }) {
+function TabButton(props: { id: KnowledgeTab; label: string; selected: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       role="tab"
-      id={`agent-tab-${props.id}`}
+      id={`knowledge-tab-${props.id}`}
       aria-selected={props.selected}
       tabIndex={props.selected ? 0 : -1}
       onClick={props.onClick}

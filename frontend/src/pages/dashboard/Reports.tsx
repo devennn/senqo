@@ -113,7 +113,7 @@ export default function ReportsPage() {
                   <InlineHelpHint label="About handoff topic reports">
                     <p>
                       Topics ranked by how often agents handed conversations to a human for that
-                      topic in the selected date range. Click a topic to open it under Agent setup →
+                      topic in the selected date range. Click a topic to open it under Knowledge →
                       Human handoff. “No topic” means the handoff had no matching configured topic.
                     </p>
                   </InlineHelpHint>

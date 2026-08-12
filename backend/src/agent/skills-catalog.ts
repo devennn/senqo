@@ -11,7 +11,10 @@ import {
   listWorkspaceContextForInstructions,
   type ContextGroupForInstructions,
 } from "../repositories/workspace-context-groups.js";
-import { listConversationLabels } from "../repositories/conversation-labels.js";
+import {
+  listConversationLabels,
+  listLabelBadgesForConversations,
+} from "../repositories/conversation-labels.js";
 import { listWorkspaceAssetsForInstructions } from "../repositories/workspace-asset-groups.js";
 import {
   findWorkspaceSkillByNameOrKey,
@@ -19,13 +22,19 @@ import {
   readWorkspaceSkillContent,
 } from "../repositories/skills.js";
 import type { LoadSkillResult, SkillSummary } from "../types/agent.js";
+import type {
+  ConversationLabelBadge,
+  ConversationLabelRecord,
+} from "../types/repositories.js";
 import {
   buildAgentSystemPrompt,
   DEFAULT_TOOL_KEYS,
   resolveEnabledToolKeys,
 } from "./system-prompt.js";
 
-export async function listSkillSummaries(workspaceId: string): Promise<SkillSummary[]> {
+export async function listSkillSummaries(
+  workspaceId: string,
+): Promise<SkillSummary[]> {
   const skills = await listActiveWorkspaceSkills(workspaceId);
   return skills.map((skill) => ({
     id: skill.id,
@@ -49,14 +58,19 @@ export async function loadSkillByName(
     return { ok: false, error: `Skill not found: ${skillName}` };
   }
 
-  const content = await readWorkspaceSkillContent(workspaceId, matched.storage_path);
+  const content = await readWorkspaceSkillContent(
+    workspaceId,
+    matched.storage_path,
+  );
   if (!content) {
     return { ok: false, error: `Unable to load skill content: ${skillName}` };
   }
   return { ok: true, content };
 }
 
-function formatGroupedResponseTemplates(groups: ResponseTemplateGroupForInstructions[]): string {
+function formatGroupedResponseTemplates(
+  groups: ResponseTemplateGroupForInstructions[],
+): string {
   if (groups.length === 0) return "";
   const chunks: string[] = [
     "These groups and entries are embedded in this system message for this agent (not loaded via a tool).",
@@ -77,21 +91,40 @@ function formatGroupedResponseTemplates(groups: ResponseTemplateGroupForInstruct
   return chunks.filter((s) => s.trim().length > 0).join("\n\n");
 }
 
-async function formatConversationLabelsInstruction(workspaceId: string): Promise<string> {
-  const labels = await listConversationLabels(workspaceId);
+export function formatConversationLabelsInstruction(
+  labels: ConversationLabelRecord[],
+  currentLabels: ConversationLabelBadge[] = [],
+): string {
   if (labels.length === 0) return "";
-  const lines = labels.map(
+  const catalogLines = labels.map(
     (l) =>
       `- ${l.id}: "${l.name}" — ${l.description.trim().length > 0 ? l.description.trim() : "(no description)"}`,
   );
+  const currentLines =
+    currentLabels.length === 0
+      ? ["(none yet)"]
+      : currentLabels.map((l) => `- ${l.id}: "${l.name}" (source=${l.source})`);
   return [
-    "Classify this chat when it clearly matches; use exact UUIDs in `apply_conversation_labels`:",
-    ...lines,
-    "Call `apply_conversation_labels` with the matching labelIds (or [] to clear AI-assigned labels only). User-applied labels in the dashboard are never removed by this tool.",
+    "Classify this conversation with the workspace labels below. Use exact UUIDs in `apply_conversation_labels`.",
+    "How to decide:",
+    "- In the Catalog, the quoted name is the label; the text after — is the definition. Match the thread against that definition (not the name alone).",
+    "- Weigh the latest customer message together with roughly the previous 10 messages in this thread (not only the newest line). Topics can shift or stack across turns.",
+    "- One message may express multiple intents — assign every label whose definition clearly matches.",
+    "- One run may apply multiple labels; `labelIds` is a full set, not a single pick.",
+    "- Current labels on this chat are listed below so you know what is already tagged (ai vs user).",
+    "- Required: before your final structured output, if any Catalog definition matches this thread and the AI-sourced labels are not already the correct full set, you MUST call `apply_conversation_labels` in this turn. Do not answer and skip labeling.",
+    "- When you call it, pass the full set of AI labels that should remain: keep still-relevant existing AI labels, add newly matching ones, and omit AI labels that no longer fit. Pass [] only to clear all AI-assigned labels. User-applied labels are never removed by this tool.",
+    "- Only skip the tool when the desired AI label set is already correct (including when nothing matches and no AI labels are present).",
+    "Catalog:",
+    ...catalogLines,
+    "Currently on this conversation:",
+    ...currentLines,
   ].join("\n");
 }
 
-function formatGroupedWorkspaceContext(groups: ContextGroupForInstructions[]): string {
+function formatGroupedWorkspaceContext(
+  groups: ContextGroupForInstructions[],
+): string {
   if (groups.length === 0) return "";
   const chunks: string[] = [
     "Treat entries as stable workspace facts. When response templates cover the same topic, use the template Answer exactly and do not contradict them.",
@@ -108,7 +141,9 @@ function formatGroupedWorkspaceContext(groups: ContextGroupForInstructions[]): s
   return chunks.filter((s) => s.trim().length > 0).join("\n\n");
 }
 
-export function formatHandoffTopicsInstruction(groups: HandoffTopicGroupForInstructions[]): string {
+export function formatHandoffTopicsInstruction(
+  groups: HandoffTopicGroupForInstructions[],
+): string {
   if (groups.length === 0) return "";
   const chunks: string[] = [
     "When the customer's message clearly matches a topic below, call `handoff_to_human` with `topicEntryId` set to that topic's id and a short `reason` that names the topic. The reason is shown to teammates in conversation history. Do not continue with normal resolution once a handoff is appropriate.",
@@ -119,7 +154,9 @@ export function formatHandoffTopicsInstruction(groups: HandoffTopicGroupForInstr
     chunks.push(`#### ${grp.name}`);
     grp.entries.forEach((e) => {
       const desc =
-        e.description.trim().length > 0 ? e.description.trim() : "(no extra detail)";
+        e.description.trim().length > 0
+          ? e.description.trim()
+          : "(no extra detail)";
       chunks.push(`- id=\`${e.id}\` "${e.topic.trim()}" — ${desc}`);
     });
     chunks.push("---");
@@ -128,7 +165,9 @@ export function formatHandoffTopicsInstruction(groups: HandoffTopicGroupForInstr
   return chunks.filter((s) => s.trim().length > 0).join("\n\n");
 }
 
-function emptyAgentSystemPromptInput(dryRun: boolean): Parameters<typeof buildAgentSystemPrompt>[0] {
+function emptyAgentSystemPromptInput(
+  dryRun: boolean,
+): Parameters<typeof buildAgentSystemPrompt>[0] {
   return {
     dryRun,
     enabledToolKeys: [...DEFAULT_TOOL_KEYS],
@@ -147,6 +186,7 @@ export async function buildAgentInstructions(
   workspaceId: string,
   agentConfigId?: string,
   dryRun = false,
+  conversationId?: string,
 ): Promise<string> {
   if (!agentConfigId) {
     return buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun));
@@ -158,20 +198,41 @@ export async function buildAgentInstructions(
   }
 
   const contextGroupIds = activeConfig.context_groups ?? [];
-  const groupedContext = await listWorkspaceContextForInstructions(workspaceId, contextGroupIds);
+  const groupedContext = await listWorkspaceContextForInstructions(
+    workspaceId,
+    contextGroupIds,
+  );
   const workspaceContext = formatGroupedWorkspaceContext(groupedContext);
 
   const groupIds = activeConfig.response_template_groups ?? [];
-  const groupedTemplates = await listResponseTemplatesForInstructions(workspaceId, groupIds);
+  const groupedTemplates = await listResponseTemplatesForInstructions(
+    workspaceId,
+    groupIds,
+  );
   const responseTemplates = formatGroupedResponseTemplates(groupedTemplates);
 
   const handoffGroupIds = activeConfig.handoff_topic_groups ?? [];
-  const handoffGrouped = await listHandoffTopicsForInstructions(workspaceId, handoffGroupIds);
+  const handoffGrouped = await listHandoffTopicsForInstructions(
+    workspaceId,
+    handoffGroupIds,
+  );
   const handoffTopics = formatHandoffTopicsInstruction(handoffGrouped);
 
   let conversationLabels = "";
   if (activeConfig.auto_assign_conversation_labels) {
-    conversationLabels = await formatConversationLabelsInstruction(workspaceId);
+    const labels = await listConversationLabels(workspaceId);
+    let currentLabels: ConversationLabelBadge[] = [];
+    if (conversationId) {
+      const byConversation = await listLabelBadgesForConversations(
+        workspaceId,
+        [conversationId],
+      );
+      currentLabels = byConversation.get(conversationId) ?? [];
+    }
+    conversationLabels = formatConversationLabelsInstruction(
+      labels,
+      currentLabels,
+    );
   }
 
   const assetGroupRows = await listWorkspaceAssetsForInstructions(
@@ -187,12 +248,26 @@ export async function buildAgentInstructions(
   }));
 
   const customToolKeys = Array.isArray(activeConfig.tools)
-    ? activeConfig.tools.map(String).filter((key) => !DEFAULT_TOOL_KEYS.includes(key as (typeof DEFAULT_TOOL_KEYS)[number]))
+    ? activeConfig.tools
+        .map(String)
+        .filter(
+          (key) =>
+            !DEFAULT_TOOL_KEYS.includes(
+              key as (typeof DEFAULT_TOOL_KEYS)[number],
+            ),
+        )
     : [];
-  const { listWorkspaceCustomToolsByKeys } = await import("../repositories/workspace-custom-tools.js");
-  const customTools = await listWorkspaceCustomToolsByKeys(workspaceId, customToolKeys);
+  const { listWorkspaceCustomToolsByKeys } =
+    await import("../repositories/workspace-custom-tools.js");
+  const customTools = await listWorkspaceCustomToolsByKeys(
+    workspaceId,
+    customToolKeys,
+  );
   const customToolDescriptions = Object.fromEntries(
-    customTools.map((tool) => [tool.tool_key, tool.description || tool.display_name]),
+    customTools.map((tool) => [
+      tool.tool_key,
+      tool.description || tool.display_name,
+    ]),
   );
 
   return buildAgentSystemPrompt({

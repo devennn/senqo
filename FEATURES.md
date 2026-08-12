@@ -30,16 +30,18 @@
 - Built-in tools — platform tools (schedule tasks, handoff, labels, load skills) always on; WhatsApp replies come from structured `messages` (up to 3 bubbles) sent by the runtime after the agent run
 - Demo tool — new workspaces get a seeded `get_weather` custom tool (Open-Meteo, no API key)
 
-## Knowledge base (agent)
+## Knowledge base
 
-- Import docs — per-agent menu action: upload PDF/CSV/Markdown, AI drafts context/skills/templates in one background job at a time, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs (or Import in progress) to show the same processing/review UI
-- Workspace context — structured factual snippets organized into groups
-- Response templates — canned Q&A pairs used as authoritative replies
-- Handoff topics — escalation definitions for when to transfer to a human (create/edit groups on Agent setup → Human handoff; attach groups to an agent on Profile → Knowledge → Topics that need a human so they are included in the agent prompt with entry ids for `handoff_to_human`; from a group, Handoff settings can also attach agents and choose notify people)
+- Knowledge page — top-level nav for authoring Context, Response templates, and Human handoff (Agent keeps Profile, Skill/Tool catalogs, and Assets)
+- Import docs — Knowledge page action: pick an agent, upload PDF/CSV/Markdown, AI drafts context/skills/templates in one background job at a time, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs to continue
+- Workspace context — structured factual snippets organized into groups (Knowledge → Context); list rows show entry count vs group limit; the editor shows last updated and which agents attach the group; groups older than 90 days show a may-be-outdated hint
+- Response templates — canned Q&A pairs used as authoritative replies (Knowledge → Response templates); list rows show entry count vs group limit; editor shows last-updated / used-by / outdated hints
+- Handoff topics — escalation definitions for when to transfer to a human (create/edit groups on Knowledge → Human handoff; attach groups to an agent on Profile → Attached knowledge → Topics that need a human so they are included in the agent prompt with entry ids for `handoff_to_human`; from a group, Handoff settings can also attach agents and choose notify people); list rows show topic count vs group limit; editor shows last-updated / used-by / outdated hints
 - Handoff notify people — via the Handoff settings dialog on a topic group, pick one or more teammates with verified handoff phones for the selected agents; each gets an alert from the conversation’s WhatsApp line when they registered on that same line
-- Skills — markdown playbooks for specialized workflows
-- Asset groups — sendable files (images, video, audio, documents) the agent reasons about
+- Skills — markdown playbooks for specialized workflows (Agent → Skill Catalog)
+- Asset groups — sendable files (images, video, audio, documents) the agent reasons about (Agent → Assets; attach on Profile → Capability)
 - Auto-assign labels — agent can classify conversations with workspace labels
+- Agent attach — Profile → Attached knowledge selects context/template/handoff groups; Profile → Capability selects assets, tools, and skills
 
 ## Contacts (CRM)
 

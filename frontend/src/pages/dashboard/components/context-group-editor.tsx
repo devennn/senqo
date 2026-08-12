@@ -10,13 +10,23 @@ import { ContextGroupFactsBlock } from "@/pages/dashboard/components/context-gro
 import { ContextGroupNameFields } from "@/pages/dashboard/components/context-group-name-fields";
 import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
+import { KnowledgeUpdatedAtLine } from "@/pages/dashboard/components/knowledge-updated-at-line";
 import { PageLoader } from "@/components/ui/spinner";
 
-export function ContextGroupEditor({ groupId, onSaved }: { groupId: string; onSaved: () => Promise<void> }) {
+export function ContextGroupEditor({
+  groupId,
+  usedByNames = [],
+  onSaved,
+}: {
+  groupId: string;
+  usedByNames?: string[];
+  onSaved: () => Promise<void>;
+}) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("");
   const [baselineName, setBaselineName] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [entries, setEntries] = useState<WorkspaceContextEntryRecord[]>([]);
   const [savingGroupName, setSavingGroupName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -27,6 +37,7 @@ export function ContextGroupEditor({ groupId, onSaved }: { groupId: string; onSa
     const res = await api.get<{ group: WorkspaceContextGroupWithEntries }>(`/api/user/workspace-context-groups/${groupId}`);
     setGroupName(res.group.name);
     setBaselineName(res.group.name);
+    setUpdatedAt(res.group.updated_at);
     setEntries([...res.group.entries].sort((a, b) => a.sort_order - b.sort_order));
   }, [groupId]);
 
@@ -116,7 +127,14 @@ export function ContextGroupEditor({ groupId, onSaved }: { groupId: string; onSa
         />
         {!loading && !loadError ? (
           <CardDescription>
-            {entries.length}/{CONTEXT_ENTRIES_MAX_PER_GROUP} entries
+            <KnowledgeUpdatedAtLine
+              entryCount={entries.length}
+              entryMax={CONTEXT_ENTRIES_MAX_PER_GROUP}
+              entryLabelSingular="entry"
+              entryLabelPlural="entries"
+              updatedAt={updatedAt}
+              usedByNames={usedByNames}
+            />
           </CardDescription>
         ) : null}
         <CardAction className="-mt-0.5 shrink-0 sm:justify-self-end">

@@ -19,9 +19,9 @@ export function ConversationLabelBadges({
       {visible.map((l) => (
         <Badge
           key={l.id}
-          variant="secondary"
+          variant="outline"
           title={l.source === "ai" ? "Applied by AI" : "Applied by you"}
-          className="max-w-[9rem] truncate font-normal"
+          className="max-w-[9rem] truncate border-border bg-muted/60 font-normal text-muted-foreground"
         >
           {l.name}
         </Badge>

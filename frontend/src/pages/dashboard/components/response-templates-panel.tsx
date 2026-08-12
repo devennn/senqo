@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkspace } from "@/context/workspace";
-import type { WorkspaceResponseTemplateGroupSummary } from "@/types/repositories";
+import type { AgentConfigRecord, WorkspaceResponseTemplateGroupSummary } from "@/types/repositories";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -11,18 +11,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
+import { agentsUsingKnowledgeGroup } from "@/lib/knowledge-used-by";
 import { ResponseTemplateCreateGroupForm } from "@/pages/dashboard/components/response-template-create-group-form";
 import { ResponseTemplatesSidebar } from "@/pages/dashboard/components/response-templates-sidebar";
 import { ResponseTemplateGroupEditor } from "@/pages/dashboard/components/response-template-group-editor";
 
 type Props = {
   groups: WorkspaceResponseTemplateGroupSummary[];
+  agents: AgentConfigRecord[];
   reload: () => Promise<void>;
   agentId: string | undefined;
   refreshKey?: number;
 };
 
-export function ResponseTemplatesPanel({ groups, reload, agentId, refreshKey = 0 }: Props) {
+export function ResponseTemplatesPanel({ groups, agents, reload, agentId, refreshKey = 0 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { wsPath } = useWorkspace();
@@ -33,7 +35,7 @@ export function ResponseTemplatesPanel({ groups, reload, agentId, refreshKey = 0
     params.set("tab", "templates");
     if (id) params.set("agentId", id);
     params.set("templateGroupId", templateGroupId);
-    return `${wsPath("/agent")}?${params.toString()}`;
+    return `${wsPath("/knowledge")}?${params.toString()}`;
   }
 
   const urlGroupId = searchParams.get("templateGroupId") ?? undefined;
@@ -90,12 +92,12 @@ export function ResponseTemplatesPanel({ groups, reload, agentId, refreshKey = 0
           {groups.length === 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>No template groups yet</span>
-                  <InlineHelpHint label="Template groups overview">
+                <CardTitle className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">No template groups yet</span>
+                  <InlineHelpHint className="size-7 shrink-0" label="Template groups overview">
                     <p>
                       Choose Add group, name the folder in the dialog, then select it from the list and add entries.
-                      Attach groups on Profile when editing an agent.
+                      Attach groups on Agent → Profile → Attached knowledge.
                     </p>
                   </InlineHelpHint>
                 </CardTitle>
@@ -110,6 +112,7 @@ export function ResponseTemplatesPanel({ groups, reload, agentId, refreshKey = 0
             <ResponseTemplateGroupEditor
               key={`${editorGroupId}-${refreshKey}`}
               groupId={editorGroupId}
+              usedByNames={agentsUsingKnowledgeGroup(agents, editorGroupId, "templates")}
               onSaved={reload}
             />
           )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAgents } from "@/hooks/useAgents";
 import { useWorkspace } from "@/context/workspace";
@@ -11,12 +11,11 @@ import { AgentSetupTabBar, type AgentSetupTab } from "@/pages/dashboard/componen
 import { SkillsCatalogPanel } from "@/pages/dashboard/skills/components/skills-catalog-panel";
 import { ToolsCatalogPanel } from "@/pages/dashboard/tools/components/tools-catalog-panel";
 import type { ToolsNavConfig } from "@/hooks/useCustomTools";
-import { ResponseTemplatesPanel } from "@/pages/dashboard/components/response-templates-panel";
-import { HandoffTopicGroupsPanel } from "@/pages/dashboard/components/handoff-topic-groups-panel";
-import { ContextGroupsPanel } from "@/pages/dashboard/components/context-groups-panel";
 import { AssetGroupsPanel } from "@/pages/dashboard/components/asset-groups-panel";
 import { PageLoader } from "@/components/ui/spinner";
 import { TRANSIENT_SUCCESS_FEEDBACK_MS } from "@/lib/transient-feedback";
+
+const KNOWLEDGE_LEGACY_TABS = new Set(["context", "templates", "handoff"]);
 
 function AgentErrorBanner({ error }: { error: string | null }) {
   if (!error) return null;
@@ -47,12 +46,18 @@ function AgentSuccessBanner({ success }: { success: string | null }) {
   );
 }
 
+function parseAgentTab(tabParam: string | null): AgentSetupTab {
+  if (tabParam === "skills") return "skills";
+  if (tabParam === "tools") return "tools";
+  if (tabParam === "assets") return "assets";
+  return "profile";
+}
+
 export default function AgentPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { workspaceId, wsPath } = useWorkspace();
   const { data, loading, reload, createAgent, renameAgent, archiveAgent } = useAgents();
-  const [workspaceDataRefreshKey, setWorkspaceDataRefreshKey] = useState(0);
   const selectedId = searchParams.get("agentId") ?? data.agents[0]?.id;
   const selectedAgent = data.agents.find((a) => a.id === selectedId) ?? data.agents[0] ?? null;
   const agentConnectionOptions = useMemo(
@@ -68,20 +73,14 @@ export default function AgentPage() {
   const error = searchParams.get("error");
   const success = searchParams.get("success");
   const tabParam = searchParams.get("tab");
-  const tab: AgentSetupTab =
-    tabParam === "skills"
-      ? "skills"
-      : tabParam === "tools"
-        ? "tools"
-        : tabParam === "templates"
-          ? "templates"
-          : tabParam === "handoff"
-            ? "handoff"
-            : tabParam === "context"
-              ? "context"
-              : tabParam === "assets"
-                ? "assets"
-                : "profile";
+  const tab = parseAgentTab(tabParam);
+
+  useEffect(() => {
+    if (!tabParam || !KNOWLEDGE_LEGACY_TABS.has(tabParam)) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("agentId");
+    navigate(`${wsPath("/knowledge")}?${next.toString()}`, { replace: true });
+  }, [tabParam, searchParams, navigate, wsPath]);
 
   useEffect(() => {
     if (!success) return;
@@ -97,16 +96,6 @@ export default function AgentPage() {
     }, TRANSIENT_SUCCESS_FEEDBACK_MS);
     return () => window.clearTimeout(timerId);
   }, [success, setSearchParams]);
-
-  useEffect(() => {
-    const legacyEditGroupId = searchParams.get("editGroup");
-    if (tab !== "templates" || !legacyEditGroupId) return;
-    const p = new URLSearchParams(searchParams);
-    p.delete("editGroup");
-    p.set("tab", "templates");
-    p.set("templateGroupId", legacyEditGroupId);
-    setSearchParams(p, { replace: true });
-  }, [searchParams, setSearchParams, tab]);
 
   const skillsNavigation = useMemo<SkillsNavConfig>(() => {
     const fixedSearchParams: Record<string, string> = { tab: "skills" };
@@ -126,20 +115,6 @@ export default function AgentPage() {
       p.delete("tab");
     } else {
       p.set("tab", next);
-    }
-    if (next !== "templates") {
-      p.delete("editGroup");
-      p.delete("template");
-      p.delete("templateGroupId");
-    }
-    if (next !== "handoff") {
-      p.delete("handoffGroupId");
-      p.delete("handoffEntryId");
-      p.delete("handoff");
-    }
-    if (next !== "context") {
-      p.delete("contextGroupId");
-      p.delete("context");
     }
     if (next !== "assets") {
       p.delete("assetGroupId");
@@ -165,7 +140,7 @@ export default function AgentPage() {
               <div>
                 <h1 className="text-2xl font-extrabold tracking-tight">Agent setup</h1>
                 <p className="mt-1.5 text-base text-muted-foreground">
-                  Configure agents (profile), workspace context, skills, templates, handoff topics, sendable assets, and tools per agent.
+                  Configure agents, attach knowledge, skills, tools, and sendable assets.
                 </p>
               </div>
               <div className="sm:shrink-0">
@@ -177,41 +152,11 @@ export default function AgentPage() {
             <AgentSuccessBanner success={success} />
             {tab === "skills" ? (
               <div className="mt-6">
-                <SkillsCatalogPanel
-                  navigation={skillsNavigation}
-                  refreshKey={workspaceDataRefreshKey}
-                />
+                <SkillsCatalogPanel navigation={skillsNavigation} />
               </div>
             ) : tab === "tools" ? (
               <div className="mt-6">
                 <ToolsCatalogPanel navigation={toolsNavigation} />
-              </div>
-            ) : tab === "context" ? (
-              <div className="mt-6">
-                <ContextGroupsPanel
-                  groups={data.workspaceContextGroups}
-                  reload={reload}
-                  agentId={selectedId ?? undefined}
-                  refreshKey={workspaceDataRefreshKey}
-                />
-              </div>
-            ) : tab === "handoff" ? (
-              <div className="mt-6">
-                <HandoffTopicGroupsPanel
-                  groups={data.handoffTopicGroups}
-                  reload={reload}
-                  agentId={selectedId ?? undefined}
-                  agents={data.agents}
-                />
-              </div>
-            ) : tab === "templates" ? (
-              <div className="mt-6">
-                <ResponseTemplatesPanel
-                  groups={data.responseTemplateGroups}
-                  reload={reload}
-                  agentId={selectedId ?? undefined}
-                  refreshKey={workspaceDataRefreshKey}
-                />
               </div>
             ) : tab === "assets" ? (
               <div className="mt-6">
@@ -229,10 +174,6 @@ export default function AgentPage() {
                   attachedAgentIds={data.agentIdsWithConnection}
                   renameAgent={renameAgent}
                   archiveAgent={archiveAgent}
-                  onImportApplied={() => {
-                    void reload({ silent: true });
-                    setWorkspaceDataRefreshKey((key) => key + 1);
-                  }}
                 />
                 <AgentConfigForm
                   key={`${selectedAgent.id}-${selectedAgent.updated_at}`}

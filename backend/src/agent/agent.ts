@@ -6,6 +6,7 @@ import {
   formatAgentStructuredOutputBlock,
   inferStepAction,
   previewMessage,
+  summarizeApplyConversationLabelsCalls,
   summarizeText,
 } from "../agent/logging.js";
 import {
@@ -160,6 +161,7 @@ export async function runAgentSession(
     input.workspaceId,
     input.agentConfigId,
     isDryRun,
+    sessionId,
   );
   const config = input.agentConfigId
     ? await getAgentConfigById(input.workspaceId, input.agentConfigId)
@@ -184,6 +186,9 @@ export async function runAgentSession(
   console.info(
     `[${logScope}/tools] active=${activeTools.length > 0 ? activeTools.join(",") : "none"}`,
   );
+
+  const applyConversationLabelsCalls: Array<{ args: unknown; output: unknown }> =
+    [];
 
   const agent = new ToolLoopAgent({
     model: getChatLLM(),
@@ -228,6 +233,17 @@ export async function runAgentSession(
           : textPreview
             ? "drafting response"
             : "reasoning";
+
+      for (const call of toolCalls) {
+        if (call.toolName !== "apply_conversation_labels") continue;
+        const matching = toolResults.find(
+          (result) => result.toolCallId === call.toolCallId,
+        );
+        applyConversationLabelsCalls.push({
+          args: call.input,
+          output: matching?.output,
+        });
+      }
 
       console.info(
         formatAgentStepFinishBlock(logScope, {
@@ -337,6 +353,10 @@ export async function runAgentSession(
     deliveries = sent.deliveries;
   }
 
+  const conversationLabels = summarizeApplyConversationLabelsCalls(
+    applyConversationLabelsCalls,
+  );
+
   console.info(
     formatAgentStructuredOutputBlock(logScope, {
       sessionId,
@@ -344,6 +364,7 @@ export async function runAgentSession(
       structuredOutput,
       outboundPrepared: outboundMessages,
       outboundSent,
+      conversationLabels,
     }),
   );
 
@@ -358,6 +379,7 @@ export async function runAgentSession(
           messages: structuredOutput?.messages ?? [],
           reasoning_for_operators: reasoningForOperators,
           handoff_enabled: handoffEnabled,
+          conversation_labels: conversationLabels,
         },
         providerOptions: {
           source: AGENT_RUN_LOG_SOURCE,

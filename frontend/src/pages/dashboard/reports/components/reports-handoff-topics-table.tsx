@@ -30,7 +30,7 @@ function topicHref(
   params.set("tab", "handoff");
   params.set("handoffGroupId", topic.groupId);
   params.set("handoffEntryId", topic.id);
-  return `${wsPath("/agent")}?${params.toString()}`;
+  return `${wsPath("/knowledge")}?${params.toString()}`;
 }
 
 function TopicName({ topic }: { topic: HandoffTopicPerformanceRow }) {

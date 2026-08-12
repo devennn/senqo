@@ -7,6 +7,7 @@ import { AgentHandoffAttachDialog } from "@/pages/dashboard/components/agent-han
 import { HandoffTopicCreateGroupDialog } from "@/pages/dashboard/components/handoff-topic-create-group-dialog";
 import { HandoffTopicGroupsSidebar } from "@/pages/dashboard/components/handoff-topic-groups-sidebar";
 import { HandoffTopicGroupEditor } from "@/pages/dashboard/components/handoff-topic-group-editor";
+import { agentsUsingKnowledgeGroup } from "@/lib/knowledge-used-by";
 import type { AgentConfigRecord, WorkspaceHandoffTopicGroupSummary } from "@/types/repositories";
 
 type Props = {
@@ -29,7 +30,7 @@ export function HandoffTopicGroupsPanel({ groups, reload, agentId, agents }: Pro
     params.set("tab", "handoff");
     if (id) params.set("agentId", id);
     params.set("handoffGroupId", handoffGroupId);
-    return `${wsPath("/agent")}?${params.toString()}`;
+    return `${wsPath("/knowledge")}?${params.toString()}`;
   }
 
   const urlGroupId = searchParams.get("handoffGroupId") ?? undefined;
@@ -90,9 +91,9 @@ export function HandoffTopicGroupsPanel({ groups, reload, agentId, agents }: Pro
           {groups.length === 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>No handoff groups yet</span>
-                  <InlineHelpHint label="Handoff groups overview">
+                <CardTitle className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">No handoff groups yet</span>
+                  <InlineHelpHint className="size-7 shrink-0" label="Handoff groups overview">
                     <p>
                       Choose Add group, name the folder in the dialog, then select it from the list and add topics.
                       Use Handoff settings on a group to choose agents and notify.
@@ -110,6 +111,7 @@ export function HandoffTopicGroupsPanel({ groups, reload, agentId, agents }: Pro
             <HandoffTopicGroupEditor
               key={editorGroupId}
               groupId={editorGroupId}
+              usedByNames={agentsUsingKnowledgeGroup(agents, editorGroupId, "handoff")}
               onSaved={reload}
               onOpenAttachDialog={() => openHandoffSettings(editorGroupId)}
             />

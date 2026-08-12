@@ -56,6 +56,15 @@ export type AgentStepFinishToolResultLog = {
   output: unknown;
 };
 
+/** Summary of `apply_conversation_labels` for the final agent-run log. */
+export type ApplyConversationLabelsRunSummary = {
+  called: boolean;
+  labelIds: string[];
+  ok: boolean | null;
+  appliedCount: number | null;
+  error: string | null;
+};
+
 export type AgentToolKey =
   | "load_skills"
   | "create_task"

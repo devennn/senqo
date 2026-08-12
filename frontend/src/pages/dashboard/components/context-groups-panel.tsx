@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWorkspace } from "@/context/workspace";
-import type { WorkspaceContextGroupSummary } from "@/types/repositories";
+import type { AgentConfigRecord, WorkspaceContextGroupSummary } from "@/types/repositories";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -11,19 +11,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
+import { agentsUsingKnowledgeGroup } from "@/lib/knowledge-used-by";
 import { ContextCreateGroupForm } from "@/pages/dashboard/components/context-create-group-form";
 import { ContextGroupEditor } from "@/pages/dashboard/components/context-group-editor";
 import { ContextGroupsSidebar } from "@/pages/dashboard/components/context-groups-sidebar";
 
 type Props = {
   groups: WorkspaceContextGroupSummary[];
+  agents: AgentConfigRecord[];
   reload: () => Promise<void>;
   agentId: string | undefined;
   refreshKey?: number;
 };
 
 
-export function ContextGroupsPanel({ groups, reload, agentId, refreshKey = 0 }: Props) {
+export function ContextGroupsPanel({ groups, agents, reload, agentId, refreshKey = 0 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { wsPath } = useWorkspace();
@@ -34,7 +36,7 @@ export function ContextGroupsPanel({ groups, reload, agentId, refreshKey = 0 }: 
     params.set("tab", "context");
     if (id) params.set("agentId", id);
     params.set("contextGroupId", contextGroupId);
-    return `${wsPath("/agent")}?${params.toString()}`;
+    return `${wsPath("/knowledge")}?${params.toString()}`;
   }
 
   const urlGroupId = searchParams.get("contextGroupId") ?? undefined;
@@ -88,10 +90,10 @@ export function ContextGroupsPanel({ groups, reload, agentId, refreshKey = 0 }: 
           {groups.length === 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span>No context groups yet</span>
-                  <InlineHelpHint label="Context groups overview">
-                    <p>Use Add group, name the folder, then add fact entries (title + body). Attach groups on Profile.</p>
+                <CardTitle className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">No context groups yet</span>
+                  <InlineHelpHint className="size-7 shrink-0" label="Context groups overview">
+                    <p>Use Add group, name the folder, then add fact entries (title + body). Attach groups on Agent → Profile.</p>
                   </InlineHelpHint>
                 </CardTitle>
                 <p className="mt-2 text-[0.9rem] leading-relaxed text-muted-foreground">Use Add group to open the creation dialog.</p>
@@ -103,6 +105,7 @@ export function ContextGroupsPanel({ groups, reload, agentId, refreshKey = 0 }: 
             <ContextGroupEditor
               key={`${editorGroupId}-${refreshKey}`}
               groupId={editorGroupId}
+              usedByNames={agentsUsingKnowledgeGroup(agents, editorGroupId, "context")}
               onSaved={reload}
             />
           ) : null}

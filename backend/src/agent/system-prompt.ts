@@ -13,7 +13,7 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   load_skills: "Load workspace skill content by name when needed.",
   handoff_to_human: "Transfer the conversation to a human teammate.",
   apply_conversation_labels:
-    "Assign AI conversation labels using workspace label UUIDs.",
+    "Required when a Conversation labels catalog definition matches and AI labels are not already correct: assign one or more labels via workspace UUIDs (full set per call).",
 };
 
 function formatAvailableTools(
@@ -72,7 +72,7 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
 - Use \`load_skills\` when workspace skill content is needed beyond embedded context and templates.
 - Use \`handoff_to_human\` when configured handoff topics match or human judgment is required. When you hand off, set \`handoff_enabled\` to true, prefer empty \`messages\` (or one short courtesy bubble), and do not continue normal resolution.
 - When you do not hand off, set \`handoff_enabled\` to false. Do not set \`handoff_enabled\` true unless you called \`handoff_to_human\`.
-- Use \`apply_conversation_labels\` when the conversation clearly matches a configured label.
+- Before final output, you MUST call \`apply_conversation_labels\` when any Conversation labels catalog definition matches this thread and the AI-sourced label set is not already correct (match each label's description/definition, not the name alone). Weigh the latest message with roughly the previous 10 messages; a single message or thread may need multiple labels in one call. Pass the full AI label set that should remain. Only skip when that set is already correct. Do not answer and skip labeling when a match is missing from AI labels.
 - In your final structured output, fill \`reasoning_for_operators\` for workspace operators only — never put this text in \`messages\`. For trivial small talk, one brief sentence. When the reply uses facts or policy, say what grounded it: recent customer messages, response templates, workspace context, loaded skills, and behavior rules. Say if handoff_to_human, apply_conversation_labels, or create_task materially drove the outcome.
 
 ## Available Tools

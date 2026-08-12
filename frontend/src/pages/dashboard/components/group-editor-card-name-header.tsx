@@ -35,7 +35,7 @@ export function GroupEditorCardNameHeader({
 }: Props) {
   return (
     <CardTitle className={cn("flex w-full min-w-0 flex-col gap-3", className)}>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 leading-snug">
+      <div className="flex min-w-0 items-center gap-x-2 leading-snug">
         {icon}
         {loading ? (
           <span className="sr-only">Loading</span>
@@ -50,7 +50,9 @@ export function GroupEditorCardNameHeader({
             {groupName.trim() || "Untitled group"}
           </button>
         )}
-        <InlineHelpHint label={helpLabel}>{helpContent}</InlineHelpHint>
+        <InlineHelpHint className="size-7 shrink-0" label={helpLabel}>
+          {helpContent}
+        </InlineHelpHint>
       </div>
       {!loading && !loadError && nameEditing ? nameFields : null}
     </CardTitle>

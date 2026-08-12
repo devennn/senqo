@@ -23,7 +23,7 @@ export function AgentAssetGroupsFields({
           <InlineHelpHint label="About agent assets">
             <p>
               Files the agent can send on WhatsApp. Each file needs a specific &quot;what is this about&quot; description the AI
-              reads in its instructions; the agent decides when to send. Select groups here; edit files on the Assets tab.
+              reads in its instructions; the agent decides when to send. Select groups here; edit files on Agent → Assets.
             </p>
           </InlineHelpHint>
         </div>

@@ -14,6 +14,7 @@ import AuthCallbackPage from "@/pages/auth/Callback";
 import DashboardPage from "@/pages/dashboard/Dashboard";
 import CrmPage from "@/pages/dashboard/Crm";
 import AgentPage from "@/pages/dashboard/Agent";
+import KnowledgePage from "@/pages/dashboard/Knowledge";
 import ConnectPage from "@/pages/dashboard/Connect";
 import LabelsPage from "@/pages/dashboard/Labels";
 import TasksPage from "@/pages/dashboard/Tasks";
@@ -74,6 +75,7 @@ export default function App() {
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="crm" element={<CrmPage />} />
               <Route path="agent" element={<AgentPage />} />
+              <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="connect" element={<ConnectPage />} />
               <Route path="labels" element={<LabelsPage />} />
               <Route path="tasks" element={<TasksPage />} />

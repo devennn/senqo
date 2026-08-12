@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
-import { RESPONSE_TEMPLATE_UI_PAGE_SIZE } from "@/lib/response-template-limits";
+import {
+  RESPONSE_TEMPLATE_ENTRIES_MAX_PER_GROUP,
+  RESPONSE_TEMPLATE_UI_PAGE_SIZE,
+} from "@/lib/response-template-limits";
+import { KnowledgeGroupListMeta } from "@/pages/dashboard/components/knowledge-group-list-meta";
 import { TablePagination } from "@/pages/dashboard/components/table-pagination";
 import type { WorkspaceResponseTemplateGroupSummary } from "@/types/repositories";
 
@@ -38,26 +43,33 @@ export function ResponseTemplatesSidebar({ groups, selectedGroupId, onAddGroup, 
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          Template groups
-          <InlineHelpHint label="About template groups">
-            <>
-              <p>
-                Browse workspace-wide named groups such as Operations or FAQs. Each group lists saved entries (intent +
-                verbatim reply).
-              </p>
-              <p>
-                Attach whichever groups fit an agent on the Profile tab. Changes here affect every agent using the group.
-              </p>
-            </>
-          </InlineHelpHint>
-        </CardTitle>
-        <CardDescription>Select a group to view or edit.</CardDescription>
-        <CardAction className="-mt-0.5 shrink-0">
-          <Button type="button" size="sm" onClick={onAddGroup}>
-            Add group
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">Template groups</span>
+            <InlineHelpHint className="size-7" label="About template groups">
+              <>
+                <p>
+                  Browse workspace-wide named groups such as Operations or FAQs. Each group lists saved entries (intent +
+                  verbatim reply).
+                </p>
+                <p>
+                  Attach groups on Agent → Profile → Attached knowledge. Changes here affect every agent using the group.
+                </p>
+              </>
+            </InlineHelpHint>
+          </CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="Add group"
+            onClick={onAddGroup}
+          >
+            <Plus className="size-4" aria-hidden />
           </Button>
-        </CardAction>
+        </div>
+        <CardDescription>Select a group to view or edit.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         {groups.length > 0 ? (
@@ -66,17 +78,20 @@ export function ResponseTemplatesSidebar({ groups, selectedGroupId, onAddGroup, 
               <Link
                 key={group.id}
                 to={groupHref(group.id)}
-                className={`block rounded-md border px-3 py-2 text-sm ${
+                className={`flex items-baseline justify-between gap-2 rounded-md border px-3 py-2 text-sm ${
                   selectedGroupId === group.id
                     ? "border-primary bg-primary/5 text-foreground"
                     : "border-border/70 text-muted-foreground"
                 }`}
               >
-                <p className="truncate font-medium">{group.name}</p>
-                <p className="truncate text-xs">
-                  {group.entry_count}{" "}
-                  {group.entry_count === 1 ? "entry" : "entries"}
-                </p>
+                <p className="min-w-0 truncate font-medium">{group.name}</p>
+                <KnowledgeGroupListMeta
+                  className="shrink-0"
+                  entryCount={group.entry_count}
+                  entryMax={RESPONSE_TEMPLATE_ENTRIES_MAX_PER_GROUP}
+                  entryLabelSingular="entry"
+                  entryLabelPlural="entries"
+                />
               </Link>
             ))}
             {groups.length > pageSize ? (

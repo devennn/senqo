@@ -11,7 +11,6 @@ export function AgentList({
   attachedAgentIds,
   renameAgent,
   archiveAgent,
-  onImportApplied,
 }: AgentListProps) {
   const pageSize = AGENTS_UI_PAGE_SIZE;
   const [page, setPage] = useState(1);
@@ -56,7 +55,6 @@ export function AgentList({
                   hasBeenUsed={hasBeenUsed}
                   renameAgent={renameAgent}
                   archiveAgent={archiveAgent}
-                  onImportApplied={onImportApplied}
                 />
               );
             })}

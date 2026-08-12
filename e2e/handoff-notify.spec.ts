@@ -199,7 +199,7 @@ test.describe("Agent handoff notify", () => {
     };
     await seedSession(page);
     await mockApis(page, state);
-    await page.goto(`/${WORKSPACE_ID}/agent?tab=handoff&agentId=${AGENT_ID}`);
+    await page.goto(`/${WORKSPACE_ID}/knowledge?tab=handoff`);
     await page.getByRole("button", { name: "Handoff settings" }).click();
 
     const dialog = page.getByRole("dialog");
@@ -223,7 +223,7 @@ test.describe("Agent handoff notify", () => {
     const state = { notifyUserIds: [] as string[], recipients: [] };
     await seedSession(page);
     await mockApis(page, state);
-    await page.goto(`/${WORKSPACE_ID}/agent?tab=handoff&agentId=${AGENT_ID}`);
+    await page.goto(`/${WORKSPACE_ID}/knowledge?tab=handoff`);
     await page.getByRole("button", { name: "Handoff settings" }).click();
 
     await expect(
@@ -246,7 +246,7 @@ test.describe("Agent handoff notify", () => {
     };
     await seedSession(page);
     await mockApis(page, state);
-    await page.goto(`/${WORKSPACE_ID}/agent?tab=handoff&agentId=${AGENT_ID}`);
+    await page.goto(`/${WORKSPACE_ID}/knowledge?tab=handoff`);
     await page.getByRole("button", { name: "Handoff settings" }).click();
 
     const dialog = page.getByRole("dialog");
