@@ -54,11 +54,11 @@ export function TablePagination({
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-      <p>
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm text-muted-foreground">
+      <p className="min-w-0 shrink tabular-nums">
         Showing {start}–{end} of {total}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-nowrap items-center gap-2">
         <button
           type="button"
           onClick={() => onPage(safePage - 1)}
@@ -67,7 +67,7 @@ export function TablePagination({
         >
           Previous
         </button>
-        <span className="px-1 tabular-nums">
+        <span className="px-1 tabular-nums whitespace-nowrap">
           Page {safePage} of {totalPages}
         </span>
         <button

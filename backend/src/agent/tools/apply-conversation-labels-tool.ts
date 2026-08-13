@@ -19,6 +19,9 @@ export function createApplyConversationLabelsTool(context: AgentToolRuntimeConte
         ),
     }),
     execute: async ({ labelIds }) => {
+      if (context.dryRun) {
+        return { ok: true, appliedCount: labelIds.length, dryRun: true };
+      }
       if (!context.agentConfigId) {
         return { ok: false, error: "Agent configuration is required for label assignment." };
       }

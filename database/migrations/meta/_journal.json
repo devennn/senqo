@@ -92,6 +92,41 @@
       "when": 1780540924811,
       "tag": "0012_agent_handoff_notify_users",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780540924812,
+      "tag": "0013_eval_cases",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1780540924813,
+      "tag": "0014_eval_run_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1780540924814,
+      "tag": "0015_eval_run_reasoning",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1780540924815,
+      "tag": "0016_eval_expected_action",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1780540924816,
+      "tag": "0017_eval_run_handoff",
+      "breakpoints": true
     }
   ]
 }

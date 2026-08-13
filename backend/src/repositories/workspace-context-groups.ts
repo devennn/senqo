@@ -581,3 +581,62 @@ export function normalizeContextGroupIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((x) => String(x)).filter(Boolean);
 }
+
+export type WorkspaceContextEntryForEval = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  title: string;
+  bodyText: string;
+};
+
+/** Load one context fact scoped to the workspace (for eval create-from-knowledge). */
+export async function getWorkspaceContextEntryForEval(
+  workspaceId: string,
+  entryId: string,
+): Promise<WorkspaceContextEntryForEval | null> {
+  try {
+    const rows = await db
+      .select({
+        id: workspaceContextEntries.id,
+        groupId: workspaceContextEntries.groupId,
+        groupName: workspaceContextGroups.name,
+        title: workspaceContextEntries.title,
+        bodyText: workspaceContextEntries.body,
+      })
+      .from(workspaceContextEntries)
+      .innerJoin(
+        workspaceContextGroups,
+        eq(workspaceContextEntries.groupId, workspaceContextGroups.id),
+      )
+      .where(
+        and(
+          eq(workspaceContextEntries.id, entryId),
+          eq(workspaceContextGroups.workspaceId, workspaceId),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      console.error(
+        `[${scope}/getWorkspaceContextEntryForEval] Failed query: entry not found entryId=${entryId}`,
+      );
+      return null;
+    }
+
+    console.info(
+      `[${scope}/getWorkspaceContextEntryForEval] Success: workspaceId=${workspaceId} entryId=${entryId}`,
+    );
+    return {
+      id: row.id,
+      groupId: row.groupId,
+      groupName: row.groupName,
+      title: row.title,
+      bodyText: row.bodyText,
+    };
+  } catch (error) {
+    console.error(`[${scope}/getWorkspaceContextEntryForEval] Unexpected error: ${String(error)}`);
+    return null;
+  }
+}

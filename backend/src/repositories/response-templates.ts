@@ -582,3 +582,64 @@ export function normalizeResponseTemplateGroupIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((x) => String(x)).filter(Boolean);
 }
+
+export type WorkspaceResponseTemplateEntryForEval = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  questionText: string;
+  answerText: string;
+};
+
+/** Load one template entry scoped to the workspace (for eval create-from-knowledge). */
+export async function getWorkspaceResponseTemplateEntryForEval(
+  workspaceId: string,
+  entryId: string,
+): Promise<WorkspaceResponseTemplateEntryForEval | null> {
+  try {
+    const rows = await db
+      .select({
+        id: workspaceResponseTemplateEntries.id,
+        groupId: workspaceResponseTemplateEntries.groupId,
+        groupName: workspaceResponseTemplateGroups.name,
+        questionText: workspaceResponseTemplateEntries.title,
+        answerText: workspaceResponseTemplateEntries.body,
+      })
+      .from(workspaceResponseTemplateEntries)
+      .innerJoin(
+        workspaceResponseTemplateGroups,
+        eq(workspaceResponseTemplateEntries.groupId, workspaceResponseTemplateGroups.id),
+      )
+      .where(
+        and(
+          eq(workspaceResponseTemplateEntries.id, entryId),
+          eq(workspaceResponseTemplateGroups.workspaceId, workspaceId),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      console.error(
+        `[${scope}/getWorkspaceResponseTemplateEntryForEval] Failed query: entry not found entryId=${entryId}`,
+      );
+      return null;
+    }
+
+    console.info(
+      `[${scope}/getWorkspaceResponseTemplateEntryForEval] Success: workspaceId=${workspaceId} entryId=${entryId}`,
+    );
+    return {
+      id: row.id,
+      groupId: row.groupId,
+      groupName: row.groupName,
+      questionText: row.questionText,
+      answerText: row.answerText,
+    };
+  } catch (error) {
+    console.error(
+      `[${scope}/getWorkspaceResponseTemplateEntryForEval] Unexpected error: ${String(error)}`,
+    );
+    return null;
+  }
+}

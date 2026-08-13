@@ -5,6 +5,10 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
 import { ContextGroupFactEntryCardExpanded } from "@/pages/dashboard/components/context-group-fact-entry-card-expanded";
+import {
+  AddKnowledgeToEvalButton,
+  KNOWLEDGE_ROW_ACTION_BTN,
+} from "@/pages/dashboard/evals/components/add-knowledge-to-eval-button";
 import type { WorkspaceContextEntryRecord } from "@/types/repositories";
 
 type Props = {
@@ -106,7 +110,12 @@ export function ContextGroupFactEntryCard({
             <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-500">Unsaved</span>
           ) : null}
         </button>
-        <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={saving} onClick={() => setRemoveDialogOpen(true)}>
+        <AddKnowledgeToEvalButton
+          kind="context"
+          entryId={entry.id}
+          disabled={saving || title.trim().length === 0 || bodyText.trim().length === 0 || isDirty}
+        />
+        <Button type="button" variant="outline" size="sm" className={KNOWLEDGE_ROW_ACTION_BTN} disabled={saving} onClick={() => setRemoveDialogOpen(true)}>
           Remove
         </Button>
       </div>

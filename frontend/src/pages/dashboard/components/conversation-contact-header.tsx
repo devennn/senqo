@@ -6,6 +6,7 @@ import { ConversationLabelBadges } from "@/pages/dashboard/components/conversati
 import { ConversationDeleteDialog } from "@/pages/dashboard/components/conversation-delete-dialog";
 import { ConversationAgentLogsDialog } from "@/pages/dashboard/components/conversation-agent-logs-dialog";
 import { ConversationUserLabelsDialog } from "@/pages/dashboard/components/conversation-user-labels-dialog";
+import { AddConversationToEvalDialog } from "@/pages/dashboard/evals/components/add-conversation-to-eval-dialog";
 import type { ConversationHeaderData, ConversationLabelRecord } from "@/types/repositories";
 
 function initials(first: string, last: string): string {
@@ -101,6 +102,10 @@ export function ConversationContactHeader({
               {labels.length === 0 ? "Add" : "Edit"}
             </Button>
           ) : null}
+          <AddConversationToEvalDialog
+            conversationId={conversation.id}
+            conversationTitle={displayName}
+          />
           {isOwner ? <ConversationAgentLogsDialog conversationId={conversation.id} /> : null}
           {onDelete ? <ConversationDeleteDialog onDelete={onDelete} /> : null}
         </div>

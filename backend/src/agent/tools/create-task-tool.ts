@@ -23,6 +23,9 @@ export function createTaskTool(context: AgentToolRuntimeContext) {
       "Create a one-time task for follow-ups/outreach. Can auto-link the current conversation lead. When the agent has multiple WhatsApp lines, pass whatsappConnectionId or the current conversation line is used.",
     inputSchema: createTaskToolInputSchema,
     execute: async (input) => {
+      if (context.dryRun) {
+        return { ok: true, dryRun: true, message: "Dry run: task not created." };
+      }
       if (!context.agentConfigId) {
         return { ok: false, error: "No agent config id provided for task creation." };
       }

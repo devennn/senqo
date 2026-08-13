@@ -711,3 +711,62 @@ export function normalizeHandoffTopicGroupIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((x) => String(x)).filter(Boolean);
 }
+export type WorkspaceHandoffTopicEntryForEval = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  topic: string;
+  description: string;
+};
+
+export async function getWorkspaceHandoffTopicEntryForEval(
+  workspaceId: string,
+  entryId: string,
+): Promise<WorkspaceHandoffTopicEntryForEval | null> {
+  try {
+    const rows = await db
+      .select({
+        id: workspaceHandoffTopicEntries.id,
+        groupId: workspaceHandoffTopicEntries.groupId,
+        groupName: workspaceHandoffTopicGroups.name,
+        topic: workspaceHandoffTopicEntries.title,
+        description: workspaceHandoffTopicEntries.description,
+      })
+      .from(workspaceHandoffTopicEntries)
+      .innerJoin(
+        workspaceHandoffTopicGroups,
+        eq(workspaceHandoffTopicEntries.groupId, workspaceHandoffTopicGroups.id),
+      )
+      .where(
+        and(
+          eq(workspaceHandoffTopicEntries.id, entryId),
+          eq(workspaceHandoffTopicGroups.workspaceId, workspaceId),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      console.error(
+        `[${scope}/getWorkspaceHandoffTopicEntryForEval] Failed query: entry not found entryId=${entryId}`,
+      );
+      return null;
+    }
+
+    console.info(
+      `[${scope}/getWorkspaceHandoffTopicEntryForEval] Success: workspaceId=${workspaceId} entryId=${entryId}`,
+    );
+    return {
+      id: row.id,
+      groupId: row.groupId,
+      groupName: row.groupName,
+      topic: row.topic,
+      description: row.description,
+    };
+  } catch (error) {
+    console.error(
+      `[${scope}/getWorkspaceHandoffTopicEntryForEval] Unexpected error: ${String(error)}`,
+    );
+    return null;
+  }
+}

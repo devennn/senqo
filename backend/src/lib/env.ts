@@ -65,4 +65,8 @@ export const env = {
     process.env.BOOTSTRAP_WORKSPACE_NAME?.trim() || "Default Workspace",
   initialAllowPublicRegistration:
     process.env.ALLOW_PUBLIC_REGISTRATION !== "false",
+  /** Optional override for eval Spec agent; falls back to chat LLM. */
+  evalSpecModel: process.env.EVAL_SPEC_MODEL?.trim() || "",
+  /** Optional override for eval Judge agent; falls back to chat LLM. */
+  evalJudgeModel: process.env.EVAL_JUDGE_MODEL?.trim() || "",
 };

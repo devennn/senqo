@@ -1,3 +1,4 @@
+import type { ModelMessage } from "ai";
 import type { StoredUserImageUrlPart } from "./agent-multimodal.js";
 import type { AgentOutboundMessage } from "../agent/agent-output-schema.js";
 
@@ -17,12 +18,25 @@ export type RunAgentInput = {
    * text first, then each image. Persisted to `agent_messages` as stored; normalized for the model at inference.
    */
   userMediaParts?: StoredUserImageUrlPart[];
+  /**
+   * Optional prior messages for dry-run / eval replay. When set, skips DB history load
+   * and uses these messages as the conversation prefix before the inbound user turn.
+   */
+  historyOverride?: ModelMessage[];
 };
 
 export type RunAgentResult = {
   sessionId: string;
   messages: AgentOutboundMessage[];
   handoff_enabled: boolean;
+  /** True when handoff_to_human tool was invoked during the run. */
+  handoffCalled: boolean;
+  /** topicEntryId from the last handoff_to_human call, if any. */
+  handoffTopicEntryId: string | null;
+  /** reason from the last handoff_to_human call, if any. */
+  handoffReason: string | null;
+  /** Operator-only grounding notes from structured output (live chat stores as ai_reasoning). */
+  reasoningForOperators: string;
 };
 
 export type SkillSummary = {
@@ -42,6 +56,8 @@ export type AgentToolRuntimeContext = {
   agentConfigId?: string;
   /** Present for non-dry agent runs; used to correlate WhatsApp rows with operator reasoning. */
   agentRunId?: string;
+  /** When true, tools must not mutate live conversation/task state (eval / dry-run). */
+  dryRun?: boolean;
 };
 
 export type AgentStepFinishToolCallLog = {

@@ -38,3 +38,14 @@ export function getChatLLM(): LanguageModelV3 {
 export function getFormatterLLM(): LanguageModelV3 {
   return getProvider().chat(env.formatterLLM);
 }
+
+/** Spec/Judge eval models; optional env override, else chat LLM. */
+export function getEvalSpecLLM(): LanguageModelV3 {
+  const modelId = env.evalSpecModel || env.chatLLM;
+  return getProvider().chat(modelId);
+}
+
+export function getEvalJudgeLLM(): LanguageModelV3 {
+  const modelId = env.evalJudgeModel || env.chatLLM;
+  return getProvider().chat(modelId);
+}

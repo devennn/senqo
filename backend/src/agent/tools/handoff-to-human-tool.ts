@@ -32,6 +32,37 @@ export function createHandoffToHumanTool(context: AgentToolRuntimeContext) {
         console.info(`[HandoffToHumanTool] reason=${trimmedReason}`);
       }
 
+      if (context.dryRun) {
+        let resolvedTopicEntryId: string | null = null;
+        if (topicEntryId) {
+          if (!context.agentConfigId) {
+            return {
+              ok: false,
+              dryRun: true,
+              error: "Cannot attach a handoff topic without an agent configuration.",
+            };
+          }
+          const validated = await validateHandoffTopicEntryForAgent(
+            context.workspaceId,
+            context.agentConfigId,
+            topicEntryId,
+          );
+          if (!validated.ok) {
+            return { ok: false, dryRun: true, error: validated.message };
+          }
+          resolvedTopicEntryId = topicEntryId;
+        }
+        return {
+          ok: true,
+          dryRun: true,
+          handoff: true,
+          topicEntryId: resolvedTopicEntryId,
+          reason: trimmedReason || null,
+          message:
+            "Dry run: handoff acknowledged without changing conversation handling mode.",
+        };
+      }
+
       let resolvedTopicEntryId: string | null = null;
       if (topicEntryId) {
         if (!context.agentConfigId) {

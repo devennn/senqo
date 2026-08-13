@@ -205,6 +205,7 @@ import {
   listApiKeys,
 } from "../repositories/api-keys.js";
 import { THREAD_EVENT_MANUAL_TOGGLE } from "../lib/conversation-thread-events.js";
+import evalsRoute from "./evals.js";
 
 type Variables = AuthVariables & WorkspaceVariables;
 
@@ -236,6 +237,8 @@ app.post("/workspaces", async (c) => {
 });
 
 app.use("*", workspaceMiddleware);
+
+app.route("/", evalsRoute);
 
 const createApiKeySchema = z.object({
   label: z.string().trim().min(1).max(80),

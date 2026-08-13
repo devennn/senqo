@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
 import { ResponseTemplateGroupEntryCardExpanded } from "@/pages/dashboard/components/response-template-group-entry-card-expanded";
+import { AddKnowledgeToEvalButton, KNOWLEDGE_ROW_ACTION_BTN } from "@/pages/dashboard/evals/components/add-knowledge-to-eval-button";
 import type { WorkspaceResponseTemplateEntryRecord } from "@/types/repositories";
 
 type Props = {
@@ -108,7 +109,12 @@ export function ResponseTemplateGroupEntryCard({
             <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-500">Unsaved</span>
           ) : null}
         </button>
-        <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={saving} onClick={() => setRemoveDialogOpen(true)}>
+        <AddKnowledgeToEvalButton
+          kind="template"
+          entryId={entry.id}
+          disabled={saving || questionText.trim().length === 0 || answerText.trim().length === 0 || isDirty}
+        />
+        <Button type="button" variant="outline" size="sm" className={KNOWLEDGE_ROW_ACTION_BTN} disabled={saving} onClick={() => setRemoveDialogOpen(true)}>
           Remove
         </Button>
       </div>

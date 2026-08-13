@@ -29,6 +29,7 @@
 - Workspace secrets — Settings → Secrets stores encrypted env values as `ctx.env` at tool runtime
 - Built-in tools — platform tools (schedule tasks, handoff, labels, load skills) always on; WhatsApp replies come from structured `messages` (up to 3 bubbles) sent by the runtime after the agent run
 - Demo tool — new workspaces get a seeded `get_weather` custom tool (Open-Meteo, no API key)
+- Evals — per-agent test cases (manual create, Inbox → Eval capture, or Knowledge → Context / Response templates / Human handoff → Eval). Spec agent drafts cases with the agent’s business context (profile, behavior, attached workspace facts); from conversation reports cases are ready immediately (Not run until you Run); from knowledge, Spec invents the conversation while expected reply comes from the template answer or context body; from handoff topics, Spec invents the conversation and Run scores whether `handoff_to_human` was called with that topic; edit title/expected reply or chat turns; delete cases; Run replays the same production agent loop without WhatsApp send; Judge scores pass/fail into run history and answer analysis
 
 ## Knowledge base
 

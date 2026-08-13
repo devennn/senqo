@@ -12,6 +12,7 @@ import {
   Tags,
   LayoutGrid,
   BarChart3,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/layout/profile-menu";
@@ -25,6 +26,7 @@ const navItemDefs = [
   { path: "/reports", icon: BarChart3, label: "Reports" },
   { path: "/agent", icon: Bot, label: "Agent" },
   { path: "/knowledge", icon: BookOpen, label: "Knowledge" },
+  { path: "/evals", icon: FlaskConical, label: "Evals" },
   { path: "/labels", icon: Tags, label: "Labels" },
   { path: "/connect", icon: Plug, label: "Connect" },
   { path: "/settings/profile", icon: Settings, label: "Settings" },

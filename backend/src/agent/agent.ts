@@ -71,7 +71,9 @@ export async function runAgentSession(
   const agentRunId = !isDryRun ? crypto.randomUUID() : undefined;
 
   let historyMessages: ModelMessage[] = [];
-  if (!isDryRun) {
+  if (input.historyOverride) {
+    historyMessages = pruneOrphanedToolCalls(input.historyOverride);
+  } else if (!isDryRun) {
     const historicalRows = (await listAgentMessages(
       input.workspaceId,
       sessionId,
@@ -154,6 +156,10 @@ export async function runAgentSession(
       sessionId,
       messages: [],
       handoff_enabled: false,
+      handoffCalled: false,
+      handoffTopicEntryId: null,
+      handoffReason: null,
+      reasoningForOperators: "",
     };
   }
 
@@ -177,6 +183,7 @@ export async function runAgentSession(
       workspaceId: input.workspaceId,
       sessionId,
       agentConfigId: input.agentConfigId,
+      dryRun: isDryRun,
       ...(agentRunId ? { agentRunId } : {}),
     },
     enabledToolKeys,
@@ -189,6 +196,10 @@ export async function runAgentSession(
 
   const applyConversationLabelsCalls: Array<{ args: unknown; output: unknown }> =
     [];
+  const handoffToHumanCalls: Array<{
+    topicEntryId: string | null;
+    reason: string | null;
+  }> = [];
 
   const agent = new ToolLoopAgent({
     model: getChatLLM(),
@@ -235,14 +246,46 @@ export async function runAgentSession(
             : "reasoning";
 
       for (const call of toolCalls) {
-        if (call.toolName !== "apply_conversation_labels") continue;
-        const matching = toolResults.find(
-          (result) => result.toolCallId === call.toolCallId,
-        );
-        applyConversationLabelsCalls.push({
-          args: call.input,
-          output: matching?.output,
-        });
+        if (call.toolName === "apply_conversation_labels") {
+          const matching = toolResults.find(
+            (result) => result.toolCallId === call.toolCallId,
+          );
+          applyConversationLabelsCalls.push({
+            args: call.input,
+            output: matching?.output,
+          });
+        }
+        if (call.toolName === "handoff_to_human") {
+          const callRecord = call as unknown as {
+            input?: unknown;
+            args?: unknown;
+          };
+          const rawArgs =
+            callRecord.input && typeof callRecord.input === "object"
+              ? (callRecord.input as Record<string, unknown>)
+              : callRecord.args && typeof callRecord.args === "object"
+                ? (callRecord.args as Record<string, unknown>)
+                : {};
+          const matching = toolResults.find(
+            (result) => result.toolCallId === call.toolCallId,
+          );
+          const output =
+            matching?.output && typeof matching.output === "object"
+              ? (matching.output as Record<string, unknown>)
+              : {};
+          const topicRaw = output.topicEntryId ?? rawArgs.topicEntryId;
+          const reasonRaw = output.reason ?? rawArgs.reason;
+          handoffToHumanCalls.push({
+            topicEntryId:
+              typeof topicRaw === "string" && topicRaw.trim()
+                ? topicRaw.trim()
+                : null,
+            reason:
+              typeof reasonRaw === "string" && reasonRaw.trim()
+                ? reasonRaw.trim()
+                : null,
+          });
+        }
       }
 
       console.info(
@@ -328,6 +371,10 @@ export async function runAgentSession(
     ? structuredOutput.messages
     : [];
   const handoffEnabled = Boolean(structuredOutput?.handoff_enabled);
+  const handoffCalled = handoffToHumanCalls.length > 0 || handoffEnabled;
+  const lastHandoff = handoffToHumanCalls[handoffToHumanCalls.length - 1];
+  const handoffTopicEntryId = lastHandoff?.topicEntryId ?? null;
+  const handoffReason = lastHandoff?.reason ?? null;
   const reasoningForOperators = (
     structuredOutput?.reasoning_for_operators ?? ""
   ).trim();
@@ -434,5 +481,9 @@ export async function runAgentSession(
     sessionId,
     messages: outboundMessages,
     handoff_enabled: handoffEnabled,
+    handoffCalled,
+    handoffTopicEntryId,
+    handoffReason,
+    reasoningForOperators,
   };
 }

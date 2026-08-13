@@ -869,3 +869,81 @@ export const zzzWaDumps = pgTable("zzz_wa_dumps", {
     .notNull()
     .defaultNow(),
 });
+
+export const evalCases = pgTable(
+  "eval_cases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    agentConfigId: uuid("agent_config_id")
+      .notNull()
+      .references(() => agentConfigs.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    source: text("source").notNull().default("manual"),
+    status: text("status").notNull().default("ready"),
+    expectedReply: text("expected_reply").notNull().default(""),
+    /** reply = compare text; handoff = expect handoff_to_human tool. */
+    expectedAction: text("expected_action").notNull().default("reply"),
+    expectedTopicEntryId: uuid("expected_topic_entry_id").references(
+      () => workspaceHandoffTopicEntries.id,
+      { onDelete: "set null" },
+    ),
+    answerAnalysis: text("answer_analysis"),
+    answerCorrect: boolean("answer_correct"),
+    sourceConversationId: uuid("source_conversation_id").references(
+      () => conversations.id,
+      { onDelete: "set null" },
+    ),
+    turns: jsonb("turns").notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_eval_cases_workspace_agent_created").on(
+      t.workspaceId,
+      t.agentConfigId,
+      t.createdAt.desc(),
+    ),
+  ],
+);
+
+export const evalRuns = pgTable(
+  "eval_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    evalCaseId: uuid("eval_case_id")
+      .notNull()
+      .references(() => evalCases.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    /** passed | failed (answer) | error (runtime) */
+    status: text("status").notNull().default("failed"),
+    actualReply: text("actual_reply").notNull().default(""),
+    answerAnalysis: text("answer_analysis"),
+    /** Subject agent `reasoning_for_operators` from the dry-run (same as live chat Reasoning). */
+    reasoningForOperators: text("reasoning_for_operators"),
+    /** Whether subject called handoff_to_human during this run. */
+    handoffCalled: boolean("handoff_called").notNull().default(false),
+    handoffTopicEntryId: uuid("handoff_topic_entry_id").references(
+      () => workspaceHandoffTopicEntries.id,
+      { onDelete: "set null" },
+    ),
+    errorMessage: text("error_message"),
+    subjectSessionId: uuid("subject_session_id"),
+    ranAt: timestamp("ran_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_eval_runs_case_ran").on(t.evalCaseId, t.ranAt.desc()),
+    index("idx_eval_runs_workspace_ran").on(t.workspaceId, t.ranAt.desc()),
+  ],
+);

@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
 import { HandoffTopicGroupEntryForm } from "@/pages/dashboard/components/handoff-topic-group-entry-form";
+import {
+  AddKnowledgeToEvalButton,
+  KNOWLEDGE_ROW_ACTION_BTN,
+} from "@/pages/dashboard/evals/components/add-knowledge-to-eval-button";
 import { cn } from "@/lib/utils";
 import type { WorkspaceHandoffTopicEntryRecord } from "@/types/repositories";
 
@@ -111,11 +115,12 @@ export function HandoffTopicGroupEntryCard({
             <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-500">Unsaved</span>
           ) : null}
         </button>
+        <AddKnowledgeToEvalButton kind="handoff" entryId={entry.id} disabled={saving} />
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="shrink-0"
+          className={KNOWLEDGE_ROW_ACTION_BTN}
           disabled={saving}
           onClick={() => setRemoveDialogOpen(true)}
         >
