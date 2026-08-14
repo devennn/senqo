@@ -218,6 +218,7 @@ vi.mock("../repositories/workspace-storage.js", () => ({
 vi.mock("../repositories/response-templates.js", () => ({
   listWorkspaceResponseTemplateGroupSummaries: vi.fn().mockResolvedValue([]),
   getWorkspaceResponseTemplateGroupDetail: vi.fn(),
+  getWorkspaceResponseTemplateEntryForEval: vi.fn(),
   createWorkspaceResponseTemplateGroup: vi.fn(),
   updateWorkspaceResponseTemplateGroupName: vi.fn(),
   addWorkspaceResponseTemplateEntry: vi.fn(),
@@ -245,6 +246,7 @@ vi.mock("../repositories/handoff-topic-groups.js", () => ({
 vi.mock("../repositories/workspace-context-groups.js", () => ({
   listWorkspaceContextGroupSummaries: vi.fn().mockResolvedValue([]),
   getWorkspaceContextGroupDetail: vi.fn(),
+  getWorkspaceContextEntryForEval: vi.fn(),
   createWorkspaceContextGroup: vi.fn(),
   updateWorkspaceContextGroupName: vi.fn(),
   addWorkspaceContextEntry: vi.fn(),
@@ -267,6 +269,10 @@ vi.mock("../repositories/agent-messages.js", () => ({
 
 vi.mock("../repositories/reports.js", () => ({
   getAgentPerformanceReport: vi.fn(),
+}));
+
+vi.mock("../services/knowledge-ref-links.js", () => ({
+  resolveKnowledgeRefLinks: vi.fn(),
 }));
 
 vi.mock("../services/agent-knowledge-import.js", () => ({
@@ -358,6 +364,7 @@ import { findUserById } from "../repositories/auth-users.js";
 import { getProfileForSettings, updateProfile } from "../repositories/profiles.js";
 import { getWorkspaceRow } from "../repositories/workspaces.js";
 import { generateApiKeyMaterial } from "../lib/api-keys.js";
+import { resolveKnowledgeRefLinks } from "../services/knowledge-ref-links.js";
 
 const verifyTokenMock = vi.mocked(verifyToken);
 const validateWorkspaceMembershipMock = vi.mocked(validateWorkspaceMembership);
@@ -389,6 +396,7 @@ const validateHandoffTopicGroupIdsMock = vi.mocked(validateHandoffTopicGroupIdsF
 const getAgentPerformanceReportMock = vi.mocked(getAgentPerformanceReport);
 const scheduleHandoffNotifyMock = vi.mocked(scheduleHandoffNotify);
 const generateCustomToolDraftMock = vi.mocked(generateCustomToolDraft);
+const resolveKnowledgeRefLinksMock = vi.mocked(resolveKnowledgeRefLinks);
 const findUserByIdMock = vi.mocked(findUserById);
 const getProfileForSettingsMock = vi.mocked(getProfileForSettings);
 const updateProfileMock = vi.mocked(updateProfile);
@@ -1132,6 +1140,38 @@ describe("POST /custom-tools/generate", () => {
     expect(await res.json()).toEqual({
       error: "generate_failed",
       message: "Could not generate tool code.",
+    });
+  });
+});
+
+describe("POST /knowledge-ref-links", () => {
+  // Operators click conversation refs only when the knowledge item still exists.
+  it("returns hrefs for live knowledge refs", async () => {
+    resolveKnowledgeRefLinksMock.mockResolvedValue([
+      {
+        kind: "context",
+        id: "ctx-e1",
+        href: "/knowledge?contextGroupId=ctx-g1&contextEntryId=ctx-e1",
+      },
+    ]);
+
+    const res = await app.request("/knowledge-ref-links", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({
+        refs: [{ kind: "context", id: "ctx-e1", groupId: "ctx-g1" }],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      links: [
+        {
+          kind: "context",
+          id: "ctx-e1",
+          href: "/knowledge?contextGroupId=ctx-g1&contextEntryId=ctx-e1",
+        },
+      ],
     });
   });
 });

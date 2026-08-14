@@ -506,8 +506,9 @@ export async function validateContextGroupIdsForWorkspace(
 }
 
 export type ContextGroupForInstructions = {
+  id: string;
   name: string;
-  entries: { title: string; body_text: string }[];
+  entries: { id: string; title: string; body_text: string }[];
 };
 
 export async function listWorkspaceContextForInstructions(
@@ -536,6 +537,7 @@ export async function listWorkspaceContextForInstructions(
 
     const entries = await db
       .select({
+        id: workspaceContextEntries.id,
         groupId: workspaceContextEntries.groupId,
         title: workspaceContextEntries.title,
         body: workspaceContextEntries.body,
@@ -561,8 +563,10 @@ export async function listWorkspaceContextForInstructions(
       const rowsByGroup = (byGroup.get(gid) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
 
       result.push({
+        id: gid,
         name,
         entries: rowsByGroup.map((x) => ({
+          id: x.id,
           title: x.title,
           body_text: x.body,
         })),

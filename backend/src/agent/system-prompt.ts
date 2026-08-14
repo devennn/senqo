@@ -74,6 +74,7 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
 - When you do not hand off, set \`handoff_enabled\` to false. Do not set \`handoff_enabled\` true unless you called \`handoff_to_human\`.
 - Before final output, you MUST call \`apply_conversation_labels\` when any Conversation labels catalog definition matches this thread and the AI-sourced label set is not already correct (match each label's description/definition, not the name alone). Weigh the latest message with roughly the previous 10 messages; a single message or thread may need multiple labels in one call. Pass the full AI label set that should remain. Only skip when that set is already correct. Do not answer and skip labeling when a match is missing from AI labels.
 - In your final structured output, fill \`reasoning_for_operators\` for workspace operators only — never put this text in \`messages\`. For trivial small talk, one brief sentence. When the reply uses facts or policy, say what grounded it: recent customer messages, response templates, workspace context, loaded skills, and behavior rules. Say if handoff_to_human, apply_conversation_labels, or create_task materially drove the outcome.
+- Also fill \`sources\` with the knowledge you actually used (empty array when none). Each item is \`kind\` (\`context\`, \`template\`, \`skill\`, or \`handoff\`) plus \`label\` set to the exact group, entry, skill, or handoff topic name from Available Information or a skill you loaded. Never invent labels. Never put sources in \`messages\`.
 
 ## Available Tools
 ${toolsText}

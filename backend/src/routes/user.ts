@@ -28,6 +28,7 @@ import {
   validateAssetGroupIdsForWorkspace,
 } from "../repositories/workspace-asset-groups.js";
 import { getWorkspaceStorageUsage } from "../repositories/workspace-storage.js";
+import { resolveKnowledgeRefLinks } from "../services/knowledge-ref-links.js";
 import {
   listWorkspaceResponseTemplateGroupSummaries,
   getWorkspaceResponseTemplateGroupDetail,
@@ -783,6 +784,26 @@ app.get("/workspace-context-groups", async (c) => {
   const workspaceId = c.get("workspaceId");
   const groups = await listWorkspaceContextGroupSummaries(workspaceId);
   return c.json({ groups });
+});
+
+const knowledgeRefLinksBody = z.object({
+  refs: z
+    .array(
+      z.object({
+        kind: z.enum(["context", "template", "skill", "handoff"]),
+        id: z.string().min(1),
+        groupId: z.string().min(1).optional().nullable(),
+      }),
+    )
+    .max(20),
+});
+
+app.post("/knowledge-ref-links", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const parsed = knowledgeRefLinksBody.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "Invalid payload" }, 400);
+  const links = await resolveKnowledgeRefLinks(workspaceId, parsed.data.refs);
+  return c.json({ links });
 });
 
 app.get("/workspace-context-groups/:id", async (c) => {

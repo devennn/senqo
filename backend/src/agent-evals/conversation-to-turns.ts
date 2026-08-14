@@ -3,7 +3,7 @@ import {
   THREAD_EVENT_MANUAL_TOGGLE,
 } from "../lib/conversation-thread-events.js";
 import type { ConversationMessage } from "../types/repositories.js";
-import type { EvalTurn, EvalTurnMedia } from "../types/evals.js";
+import type { EvalKnowledgeRef, EvalTurn, EvalTurnMedia } from "../types/evals.js";
 
 function isThreadEvent(metadata: Record<string, unknown> | null): boolean {
   const event = typeof metadata?.thread_event === "string" ? metadata.thread_event : null;
@@ -22,6 +22,27 @@ function toMedia(media: ConversationMessage["media"]): EvalTurnMedia | null {
     signedUrl: media.signedUrl,
     fileSizeBytes: media.fileSizeBytes,
   };
+}
+
+function parseEvalSources(raw: unknown): EvalKnowledgeRef[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const sources: EvalKnowledgeRef[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const ref = item as Record<string, unknown>;
+    const kind = ref.kind;
+    const label = typeof ref.label === "string" ? ref.label.trim() : "";
+    if (
+      (kind === "context" ||
+        kind === "template" ||
+        kind === "skill" ||
+        kind === "handoff") &&
+      label
+    ) {
+      sources.push({ kind, label });
+    }
+  }
+  return sources.length > 0 ? sources : undefined;
 }
 
 /** Map inbox conversation messages into eval turns (skip thread markers). */
@@ -50,6 +71,8 @@ export function conversationMessagesToEvalTurns(
           ? metadata.ai_reasoning.trim()
           : "";
       if (reasoning) turn.whyReply = reasoning;
+      const sources = parseEvalSources(metadata?.ai_sources);
+      if (sources) turn.sources = sources;
     }
 
     turns.push(turn);

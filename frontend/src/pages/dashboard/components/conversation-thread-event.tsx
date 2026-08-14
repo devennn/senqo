@@ -1,4 +1,5 @@
 import { ConversationOperatorAiReasoning } from "@/pages/dashboard/components/conversation-operator-ai-reasoning";
+import type { ConversationKnowledgeRef } from "@/lib/conversation-operator-ai-reasoning";
 import {
   THREAD_EVENT_HANDOFF_TO_HUMAN,
   THREAD_EVENT_MANUAL_TOGGLE,
@@ -15,10 +16,12 @@ export function ConversationThreadEvent({
   eventType,
   summaryText,
   reasoningText,
+  sources = [],
 }: {
   eventType: ConversationThreadEventType;
   summaryText: string | null;
   reasoningText: string | null;
+  sources?: ConversationKnowledgeRef[];
 }) {
   return (
     <div className="mb-5">
@@ -34,9 +37,13 @@ export function ConversationThreadEvent({
           {summaryText}
         </p>
       ) : null}
-      {reasoningText ? (
+      {reasoningText || sources.length > 0 ? (
         <div className="mt-2">
-          <ConversationOperatorAiReasoning text={reasoningText} alignEnd={false} />
+          <ConversationOperatorAiReasoning
+            text={reasoningText}
+            sources={sources}
+            alignEnd={false}
+          />
         </div>
       ) : null}
     </div>

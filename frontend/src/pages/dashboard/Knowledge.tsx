@@ -33,6 +33,7 @@ export default function KnowledgePage() {
     if (next !== "templates") {
       p.delete("template");
       p.delete("templateGroupId");
+      p.delete("templateEntryId");
     }
     if (next !== "handoff") {
       p.delete("handoffGroupId");
@@ -41,6 +42,7 @@ export default function KnowledgePage() {
     }
     if (next !== "context") {
       p.delete("contextGroupId");
+      p.delete("contextEntryId");
       p.delete("context");
     }
     setSearchParams(p, { replace: true });

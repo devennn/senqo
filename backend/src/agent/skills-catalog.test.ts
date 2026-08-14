@@ -34,8 +34,10 @@ vi.mock("../repositories/conversation-labels.js", () => ({
   listLabelBadgesForConversations: (...args: unknown[]) => mockListLabelBadges(...args),
 }));
 
+const mockListSkills = vi.fn();
+
 vi.mock("../repositories/skills.js", () => ({
-  listActiveWorkspaceSkills: vi.fn(),
+  listActiveWorkspaceSkills: (...args: unknown[]) => mockListSkills(...args),
   findWorkspaceSkillByNameOrKey: vi.fn(),
   readWorkspaceSkillContent: vi.fn(),
 }));
@@ -53,6 +55,7 @@ beforeEach(() => {
   mockListLabelBadges.mockResolvedValue(new Map());
   mockListHandoff.mockResolvedValue([]);
   mockListCustomTools.mockResolvedValue([]);
+  mockListSkills.mockResolvedValue([]);
 });
 
 describe("formatConversationLabelsInstruction", () => {
@@ -149,6 +152,7 @@ describe("formatHandoffTopicsInstruction", () => {
     const { formatHandoffTopicsInstruction } = await import("./skills-catalog.js");
     const text = formatHandoffTopicsInstruction([
       {
+        id: "hg-1",
         name: "Billing",
         entries: [
           { id: "entry-1", topic: "Refunds", description: "Customer wants money back" },
@@ -187,6 +191,7 @@ describe("buildAgentInstructions handoff topics", () => {
     });
     mockListHandoff.mockResolvedValue([
       {
+        id: "hg-1",
         name: "Escalations",
         entries: [
           { id: "entry-legal", topic: "Legal threat", description: "Escalate immediately" },
@@ -228,5 +233,54 @@ describe("buildAgentInstructions handoff topics", () => {
     expect(prompt).toContain("### Handoff Guidance");
     expect(prompt).not.toContain("#### ");
     expect(prompt).not.toContain("topicEntryId");
+  });
+});
+
+describe("buildKnowledgeSourceCatalog", () => {
+  // Operators match model-declared refs against authored names, including group and entry labels.
+  it("collects context, template, skill, and handoff labels", async () => {
+    const { buildKnowledgeSourceCatalog } = await import("./skills-catalog.js");
+    const catalog = buildKnowledgeSourceCatalog({
+      context: [
+        {
+          id: "ctx-g1",
+          name: "Policies",
+          entries: [{ id: "ctx-e1", title: "Refund policy", body_text: "90 days" }],
+        },
+      ],
+      templates: [
+        {
+          id: "tpl-g1",
+          name: "Greetings",
+          entries: [{ id: "tpl-e1", question_text: "Hi there", answer_text: "Hello" }],
+        },
+      ],
+      handoff: [
+        {
+          id: "ho-g1",
+          name: "Escalations",
+          entries: [{ id: "entry-1", topic: "Billing", description: "" }],
+        },
+      ],
+      skills: [{ id: "s1", skillKey: "booking_flow", name: "Booking flow", description: "" }],
+    });
+    expect(catalog.items).toEqual(
+      expect.arrayContaining([
+        { kind: "context", label: "Refund policy", id: "ctx-e1", groupId: "ctx-g1" },
+        { kind: "context", label: "Policies", id: "ctx-g1", groupId: "ctx-g1" },
+        { kind: "template", label: "Hi there", id: "tpl-e1", groupId: "tpl-g1" },
+        { kind: "template", label: "Greetings", id: "tpl-g1", groupId: "tpl-g1" },
+        { kind: "skill", label: "Booking flow", id: "s1", groupId: null },
+        { kind: "skill", label: "booking_flow", id: "s1", groupId: null },
+        { kind: "handoff", label: "Billing", id: "entry-1", groupId: "ho-g1" },
+        { kind: "handoff", label: "Escalations", id: "ho-g1", groupId: "ho-g1" },
+      ]),
+    );
+    expect(catalog.handoffByEntryId["entry-1"]).toEqual({
+      kind: "handoff",
+      label: "Billing",
+      id: "entry-1",
+      groupId: "ho-g1",
+    });
   });
 });

@@ -28,6 +28,7 @@ const {
   findOrCreateConversationByWhatsappChatId,
   getWhatsappConnectionModeForInboundAi,
   createConversationMessage,
+  mergeAiReasoningOntoAgentRunMessages,
 } = await vi.importActual("../repositories/whatsapp.js") as typeof import("../repositories/whatsapp.js");
 
 function mockSelectLimitRows(rows: unknown[], options?: { orderBy?: boolean }) {
@@ -483,5 +484,37 @@ describe("createConversationMessage", () => {
     );
 
     expect(result).toEqual({ ok: false, created: false });
+  });
+});
+
+describe("mergeAiReasoningOntoAgentRunMessages", () => {
+  // Live chat stores operator reasoning and knowledge refs on the WhatsApp rows for the run.
+  it("writes ai_reasoning and ai_sources onto matching outbound metadata", async () => {
+    const mockWhereUpdate = vi.fn().mockResolvedValue(undefined);
+    mockSet.mockReturnValue({ where: mockWhereUpdate });
+    mockDb.select.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          { id: "msg-1", metadata: { agent_run_id: "run-1" } },
+        ]),
+      }),
+    });
+
+    const result = await mergeAiReasoningOntoAgentRunMessages({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      agentRunId: "run-1",
+      aiReasoning: "Used refund policy",
+      aiSources: [{ kind: "context", label: "Refund policy" }],
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(mockSet).toHaveBeenCalledWith({
+      metadata: {
+        agent_run_id: "run-1",
+        ai_reasoning: "Used refund policy",
+        ai_sources: [{ kind: "context", label: "Refund policy" }],
+      },
+    });
   });
 });

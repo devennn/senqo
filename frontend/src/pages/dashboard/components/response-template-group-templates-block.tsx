@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { WorkspaceResponseTemplateEntryRecord } from "@/types/repositories";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import {
@@ -17,6 +18,8 @@ type Props = {
 };
 
 export function ResponseTemplateGroupTemplatesBlock({ groupId, entries, reloadGroup, onWorkspaceStale }: Props) {
+  const [searchParams] = useSearchParams();
+  const focusEntryId = searchParams.get("templateEntryId");
   const [page, setPage] = useState(1);
   const pageSize = RESPONSE_TEMPLATE_UI_PAGE_SIZE;
 
@@ -28,6 +31,13 @@ export function ResponseTemplateGroupTemplatesBlock({ groupId, entries, reloadGr
     const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
     setPage((p) => Math.min(Math.max(p, 1), totalPages));
   }, [entries.length, pageSize]);
+
+  useEffect(() => {
+    if (!focusEntryId) return;
+    const idx = entries.findIndex((entry) => entry.id === focusEntryId);
+    if (idx < 0) return;
+    setPage(Math.floor(idx / pageSize) + 1);
+  }, [entries, focusEntryId, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
   const safePage = Math.min(Math.max(page, 1), totalPages);
@@ -66,6 +76,7 @@ export function ResponseTemplateGroupTemplatesBlock({ groupId, entries, reloadGr
               labelIndex={startOffset + idx + 1}
               onAfterMutation={reloadGroup}
               onWorkspaceStale={onWorkspaceStale}
+              focusOpen={entry.id === focusEntryId}
             />
           ))
         )}

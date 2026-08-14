@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -17,6 +17,7 @@ type Props = {
   labelIndex: number;
   onAfterMutation: () => Promise<void>;
   onWorkspaceStale: () => void | Promise<void>;
+  focusOpen?: boolean;
 };
 
 export function ContextGroupFactEntryCard({
@@ -25,8 +26,10 @@ export function ContextGroupFactEntryCard({
   labelIndex,
   onAfterMutation,
   onWorkspaceStale,
+  focusOpen = false,
 }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(focusOpen);
   const [title, setTitle] = useState(entry.title);
   const [bodyText, setBodyText] = useState(entry.body_text);
   const [saving, setSaving] = useState(false);
@@ -38,6 +41,11 @@ export function ContextGroupFactEntryCard({
     setBodyText(entry.body_text);
     setSaveError(null);
   }, [entry.id, entry.title, entry.body_text]);
+  useEffect(() => {
+    if (!focusOpen) return;
+    setExpanded(true);
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [focusOpen]);
 
   useEffect(() => {
     if (!saveError) return;
@@ -83,7 +91,7 @@ export function ContextGroupFactEntryCard({
   }
 
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20">
+    <div ref={rootRef} className="rounded-lg border border-border/60 bg-muted/20">
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"

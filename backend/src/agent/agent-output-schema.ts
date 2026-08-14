@@ -1,5 +1,24 @@
 import { z } from "zod";
 
+export const agentKnowledgeKindSchema = z.enum([
+  "context",
+  "template",
+  "skill",
+  "handoff",
+]);
+
+export const agentKnowledgeRefSchema = z.object({
+  kind: agentKnowledgeKindSchema.describe(
+    "Where the fact came from: workspace context, a response template, a loaded skill, or a handoff topic.",
+  ),
+  label: z
+    .string()
+    .min(1)
+    .describe(
+      "Exact group, entry, skill, or handoff topic name from Available Information.",
+    ),
+});
+
 export const agentOutboundMessageSchema = z.object({
   text: z
     .string()
@@ -24,6 +43,11 @@ export const agentOutputSchema = z.object({
     .describe(
       "Dashboard-only: why this run's reply fits the customer and what grounded it. Never customer-facing. Empty string when nothing to explain.",
     ),
+  sources: z
+    .array(agentKnowledgeRefSchema)
+    .describe(
+      "Dashboard-only knowledge refs actually used for this reply. Empty array when none. Never customer-facing. Use exact names from Available Information or loaded skills.",
+    ),
   handoff_enabled: z
     .boolean()
     .describe(
@@ -32,4 +56,5 @@ export const agentOutputSchema = z.object({
 });
 
 export type AgentOutboundMessage = z.infer<typeof agentOutboundMessageSchema>;
+export type AgentKnowledgeRef = z.infer<typeof agentKnowledgeRefSchema>;
 export type AgentStructuredOutput = z.infer<typeof agentOutputSchema>;

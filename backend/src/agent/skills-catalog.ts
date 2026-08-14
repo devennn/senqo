@@ -31,6 +31,11 @@ import {
   DEFAULT_TOOL_KEYS,
   resolveEnabledToolKeys,
 } from "./system-prompt.js";
+import {
+  emptyKnowledgeSourceCatalog,
+  type AgentKnowledgeSourceCatalog,
+  type KnowledgeCatalogItem,
+} from "./reply-sources.js";
 
 export async function listSkillSummaries(
   workspaceId: string,
@@ -165,6 +170,60 @@ export function formatHandoffTopicsInstruction(
   return chunks.filter((s) => s.trim().length > 0).join("\n\n");
 }
 
+function uniqueCatalogItems(items: KnowledgeCatalogItem[]): KnowledgeCatalogItem[] {
+  const seen = new Set<string>();
+  const out: KnowledgeCatalogItem[] = [];
+  for (const item of items) {
+    const label = item.label.trim();
+    if (!label) continue;
+    const key = `${item.kind}:${label.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...item, label });
+  }
+  return out;
+}
+
+export function buildKnowledgeSourceCatalog(input: {
+  context: ContextGroupForInstructions[];
+  templates: ResponseTemplateGroupForInstructions[];
+  handoff: HandoffTopicGroupForInstructions[];
+  skills: SkillSummary[];
+}): AgentKnowledgeSourceCatalog {
+  const items: KnowledgeCatalogItem[] = [];
+  for (const grp of input.context) {
+    for (const entry of grp.entries) {
+      items.push({ kind: "context", label: entry.title, id: entry.id, groupId: grp.id });
+    }
+    items.push({ kind: "context", label: grp.name, id: grp.id, groupId: grp.id });
+  }
+  for (const grp of input.templates) {
+    for (const entry of grp.entries) {
+      items.push({ kind: "template", label: entry.question_text, id: entry.id, groupId: grp.id });
+    }
+    items.push({ kind: "template", label: grp.name, id: grp.id, groupId: grp.id });
+  }
+  for (const skill of input.skills) {
+    items.push({ kind: "skill", label: skill.name, id: skill.id, groupId: null });
+    items.push({ kind: "skill", label: skill.skillKey, id: skill.id, groupId: null });
+  }
+  const handoffByEntryId: AgentKnowledgeSourceCatalog["handoffByEntryId"] = {};
+  for (const grp of input.handoff) {
+    for (const entry of grp.entries) {
+      const topic = entry.topic.trim();
+      if (!topic) continue;
+      const item = { kind: "handoff" as const, label: topic, id: entry.id, groupId: grp.id };
+      items.push(item);
+      handoffByEntryId[entry.id] = item;
+    }
+    items.push({ kind: "handoff", label: grp.name, id: grp.id, groupId: grp.id });
+  }
+  return {
+    items: uniqueCatalogItems(items),
+    handoffByEntryId,
+  };
+}
+
 function emptyAgentSystemPromptInput(
   dryRun: boolean,
 ): Parameters<typeof buildAgentSystemPrompt>[0] {
@@ -182,19 +241,28 @@ function emptyAgentSystemPromptInput(
   };
 }
 
-export async function buildAgentInstructions(
+export async function buildAgentInstructionsWithCatalog(
   workspaceId: string,
   agentConfigId?: string,
   dryRun = false,
   conversationId?: string,
-): Promise<string> {
+): Promise<{
+  instructions: string;
+  sourceCatalog: AgentKnowledgeSourceCatalog;
+}> {
   if (!agentConfigId) {
-    return buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun));
+    return {
+      instructions: buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun)),
+      sourceCatalog: emptyKnowledgeSourceCatalog(),
+    };
   }
 
   const activeConfig = await getAgentConfigById(workspaceId, agentConfigId);
   if (!activeConfig) {
-    return buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun));
+    return {
+      instructions: buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun)),
+      sourceCatalog: emptyKnowledgeSourceCatalog(),
+    };
   }
 
   const contextGroupIds = activeConfig.context_groups ?? [];
@@ -270,16 +338,42 @@ export async function buildAgentInstructions(
     ]),
   );
 
-  return buildAgentSystemPrompt({
-    dryRun,
-    enabledToolKeys: resolveEnabledToolKeys(activeConfig.tools),
-    customToolDescriptions,
-    workspaceContext,
-    responseTemplates,
-    handoffTopics,
-    conversationLabels,
-    assetGroups,
-    profileName: activeConfig.profile_name,
-    behavior: activeConfig.behavior,
+  const skills = await listSkillSummaries(workspaceId);
+  const sourceCatalog = buildKnowledgeSourceCatalog({
+    context: groupedContext,
+    templates: groupedTemplates,
+    handoff: handoffGrouped,
+    skills,
   });
+
+  return {
+    instructions: buildAgentSystemPrompt({
+      dryRun,
+      enabledToolKeys: resolveEnabledToolKeys(activeConfig.tools),
+      customToolDescriptions,
+      workspaceContext,
+      responseTemplates,
+      handoffTopics,
+      conversationLabels,
+      assetGroups,
+      profileName: activeConfig.profile_name,
+      behavior: activeConfig.behavior,
+    }),
+    sourceCatalog,
+  };
+}
+
+export async function buildAgentInstructions(
+  workspaceId: string,
+  agentConfigId?: string,
+  dryRun = false,
+  conversationId?: string,
+): Promise<string> {
+  const { instructions } = await buildAgentInstructionsWithCatalog(
+    workspaceId,
+    agentConfigId,
+    dryRun,
+    conversationId,
+  );
+  return instructions;
 }

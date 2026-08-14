@@ -4,7 +4,7 @@
 
 - Unified inbox — sidebar with search, filters (label, WhatsApp line, human-handling-only), and per-line routing
 - Threads are per WhatsApp line — the same contact on two connected numbers is two conversations (pre-fix merged threads are left as-is)
-- Thread view — message history with infinite scroll, AI reasoning insights, timeline-style handoff markers
+- Thread view — message history with infinite scroll, AI reasoning insights with knowledge references, timeline-style handoff markers
 - Manual replies — compose text and media; outbound sends show delivery confirmation
 - AI / Human toggle — per-conversation control over automated vs manual replies
 - Handoff WhatsApp notify — when a chat switches to human handling, chosen verified teammates get a WhatsApp alert with reason, customer phone, WhatsApp line, workspace, and a dashboard link to open the conversation
@@ -20,7 +20,7 @@
 - Agent profiles — create, rename, and archive configurable agents with custom behavior instructions
 - Multi-model — powered by OpenRouter; plug in any supported LLM
 - Inline saves — per-section save buttons when settings change; transient success feedback
-- Operator insights — dashboard-only explanation of what grounded each AI reply
+- Operator insights — dashboard-only explanation of what grounded each AI reply, plus knowledge references (context, templates, skills, handoff) that link to Knowledge when the item still exists
 - Per-connection attach — bind an agent to one or more WhatsApp lines from Agent setup; Inactive / Testing / Live modes stay per connection
 - Tasks — when an agent has multiple attached lines, pick which WhatsApp connection the task sends on
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model

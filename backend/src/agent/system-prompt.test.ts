@@ -89,6 +89,14 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("set `handoff_enabled` to false");
   });
 
+  // Operators need structured knowledge refs, not only free-text reasoning.
+  it("instructs dashboard-only sources with exact knowledge labels", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("fill `sources`");
+    expect(prompt).toContain("Never invent labels");
+    expect(prompt).toContain("Never put sources in `messages`");
+  });
+
   // Asset delivery uses messages[].assetFileName, not a send tool.
   it("mentions assetFileName on messages items", () => {
     const prompt = buildAgentSystemPrompt({

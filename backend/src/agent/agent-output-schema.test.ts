@@ -11,6 +11,7 @@ describe("agentOutputSchema", () => {
         { text: "Anytime", assetFileName: "" },
       ],
       reasoning_for_operators: "Greeting",
+      sources: [],
       handoff_enabled: false,
     });
     expect(parsed.success).toBe(true);
@@ -21,6 +22,7 @@ describe("agentOutputSchema", () => {
     const parsed = agentOutputSchema.safeParse({
       messages: [],
       reasoning_for_operators: "Billing handoff",
+      sources: [{ kind: "handoff", label: "Billing" }],
       handoff_enabled: true,
     });
     expect(parsed.success).toBe(true);
@@ -31,6 +33,7 @@ describe("agentOutputSchema", () => {
     const parsed = agentOutputSchema.safeParse({
       messages: [{ text: "A teammate will help you shortly.", assetFileName: "" }],
       reasoning_for_operators: "Courtesy after handoff",
+      sources: [],
       handoff_enabled: true,
     });
     expect(parsed.success).toBe(true);
@@ -41,6 +44,7 @@ describe("agentOutputSchema", () => {
     const withAsset = agentOutputSchema.safeParse({
       messages: [{ text: "Menu", assetFileName: "menu.pdf" }],
       reasoning_for_operators: "",
+      sources: [],
       handoff_enabled: false,
     });
     expect(withAsset.success).toBe(true);
@@ -48,6 +52,7 @@ describe("agentOutputSchema", () => {
     const textOnly = agentOutputSchema.safeParse({
       messages: [{ text: "Hi", assetFileName: "" }],
       reasoning_for_operators: "",
+      sources: [],
       handoff_enabled: false,
     });
     expect(textOnly.success).toBe(true);
@@ -58,6 +63,7 @@ describe("agentOutputSchema", () => {
     const parsed = agentOutputSchema.safeParse({
       messages: [{ text: "Hi" }],
       reasoning_for_operators: "",
+      sources: [],
       handoff_enabled: false,
     });
     expect(parsed.success).toBe(false);
@@ -66,8 +72,19 @@ describe("agentOutputSchema", () => {
   // handoff_enabled is required on every structured result.
   it("rejects missing handoff_enabled", () => {
     const parsed = agentOutputSchema.safeParse({
-      messages: [{ text: "Hi" }],
+      messages: [{ text: "Hi", assetFileName: "" }],
       reasoning_for_operators: "",
+      sources: [],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  // Azure structured output requires sources on every result.
+  it("rejects missing sources", () => {
+    const parsed = agentOutputSchema.safeParse({
+      messages: [{ text: "Hi", assetFileName: "" }],
+      reasoning_for_operators: "",
+      handoff_enabled: false,
     });
     expect(parsed.success).toBe(false);
   });
@@ -77,6 +94,7 @@ describe("agentOutputSchema", () => {
     const parsed = agentOutputSchema.safeParse({
       messages: [],
       reasoning_for_operators: "",
+      sources: [],
       handoff_enabled: "yes",
     });
     expect(parsed.success).toBe(false);
@@ -92,6 +110,7 @@ describe("agentOutputSchema", () => {
         { text: "4", assetFileName: "" },
       ],
       reasoning_for_operators: "",
+      sources: [],
       handoff_enabled: false,
     });
     expect(parsed.success).toBe(false);
@@ -102,17 +121,19 @@ describe("agentOutputSchema", () => {
     const parsed = agentOutputSchema.safeParse({
       messages: [{ text: "", assetFileName: "a.pdf" }],
       reasoning_for_operators: "",
+      sources: [],
       handoff_enabled: false,
     });
     expect(parsed.success).toBe(false);
   });
 
   // Model guidance must be present on every field via .describe.
-  it("includes describes on messages, nested fields, reasoning, and handoff_enabled", () => {
+  it("includes describes on messages, nested fields, reasoning, sources, and handoff_enabled", () => {
     expect(agentOutputSchema.shape.messages.description).toMatch(/WhatsApp bubbles/i);
     expect(agentOutputSchema.shape.reasoning_for_operators.description).toMatch(
       /Dashboard-only/i,
     );
+    expect(agentOutputSchema.shape.sources.description).toMatch(/Dashboard-only/i);
     expect(agentOutputSchema.shape.handoff_enabled.description).toMatch(/handoff_to_human/i);
     const messageShape = agentOutputSchema.shape.messages.element.shape;
     expect(messageShape.text.description).toMatch(/bubble/i);

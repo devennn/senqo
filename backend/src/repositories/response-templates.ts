@@ -506,8 +506,9 @@ export async function validateResponseTemplateGroupIdsForWorkspace(
 }
 
 export type ResponseTemplateGroupForInstructions = {
+  id: string;
   name: string;
-  entries: { question_text: string; answer_text: string }[];
+  entries: { id: string; question_text: string; answer_text: string }[];
 };
 
 /** Ordered list of attached groups + entries for prompt injection */
@@ -537,6 +538,7 @@ export async function listResponseTemplatesForInstructions(
 
     const entries = await db
       .select({
+        id: workspaceResponseTemplateEntries.id,
         groupId: workspaceResponseTemplateEntries.groupId,
         title: workspaceResponseTemplateEntries.title,
         body: workspaceResponseTemplateEntries.body,
@@ -562,8 +564,10 @@ export async function listResponseTemplatesForInstructions(
       const rowsByGroup = (byGroup.get(gid) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
 
       result.push({
+        id: gid,
         name,
         entries: rowsByGroup.map((x) => ({
+          id: x.id,
           question_text: x.title,
           answer_text: x.body,
         })),

@@ -550,6 +550,7 @@ export async function validateHandoffTopicGroupIdsForWorkspace(
 }
 
 export type HandoffTopicGroupForInstructions = {
+  id: string;
   name: string;
   entries: { id: string; topic: string; description: string }[];
 };
@@ -609,6 +610,7 @@ export async function listHandoffTopicsForInstructions(
       const rowsByGroup = (byGroup.get(gid) ?? []).sort((a, b) => a.sortOrder - b.sortOrder);
 
       result.push({
+        id: gid,
         name,
         entries: rowsByGroup.map((x) => ({
           id: x.id,

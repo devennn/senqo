@@ -222,6 +222,7 @@ vi.mock("../repositories/workspace-storage.js", () => ({
 vi.mock("../repositories/response-templates.js", () => ({
   listWorkspaceResponseTemplateGroupSummaries: vi.fn().mockResolvedValue([]),
   getWorkspaceResponseTemplateGroupDetail: vi.fn(),
+  getWorkspaceResponseTemplateEntryForEval: vi.fn(),
   createWorkspaceResponseTemplateGroup: vi.fn(),
   updateWorkspaceResponseTemplateGroupName: vi.fn(),
   addWorkspaceResponseTemplateEntry: vi.fn(),
@@ -249,6 +250,7 @@ vi.mock("../repositories/handoff-topic-groups.js", () => ({
 vi.mock("../repositories/workspace-context-groups.js", () => ({
   listWorkspaceContextGroupSummaries: vi.fn().mockResolvedValue([]),
   getWorkspaceContextGroupDetail: vi.fn(),
+  getWorkspaceContextEntryForEval: vi.fn(),
   createWorkspaceContextGroup: vi.fn(),
   updateWorkspaceContextGroupName: vi.fn(),
   addWorkspaceContextEntry: vi.fn(),
@@ -306,6 +308,10 @@ vi.mock("../repositories/evals.js", () => ({
   createEvalRun: vi.fn(),
   parseEvalTurns: vi.fn((turns: unknown) => turns),
   markEvalRunEmailSent: vi.fn(),
+}));
+
+vi.mock("../services/knowledge-ref-links.js", () => ({
+  resolveKnowledgeRefLinks: vi.fn(),
 }));
 
 vi.mock("../services/agent-knowledge-import.js", () => ({

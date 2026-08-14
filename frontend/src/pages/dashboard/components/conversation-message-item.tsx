@@ -7,6 +7,7 @@ import {
 import { getMessageClusterSenderKey } from "@/lib/conversation-message-cluster";
 import {
   getOperatorAiReasoning,
+  getOperatorAiSources,
   shouldShowOperatorAiReasoningFooter,
 } from "@/lib/conversation-operator-ai-reasoning";
 import { asConversationThreadEventType } from "@/lib/conversation-thread-events";
@@ -68,6 +69,7 @@ export function ConversationMessageItem({
         eventType={threadEventType}
         summaryText={summaryText}
         reasoningText={getOperatorAiReasoning(message)}
+        sources={getOperatorAiSources(message)}
       />
     );
   }
@@ -103,10 +105,10 @@ export function ConversationMessageItem({
   const isAudioMessage = message.media?.mimeType?.startsWith("audio/") ?? false;
   const showContent = !isAudioMessage && message.content.trim().length > 0;
   const showSenderHeader = clusterHead && senderLabel;
-  const operatorReasoningText = shouldShowOperatorAiReasoningFooter(message, nextMessage)
-    ? getOperatorAiReasoning(message)
-    : null;
-  const outerMb = operatorReasoningText ? "mb-5" : tightWithNext ? "mb-1" : "mb-5";
+  const showOperatorInsight = shouldShowOperatorAiReasoningFooter(message, nextMessage);
+  const operatorReasoningText = showOperatorInsight ? getOperatorAiReasoning(message) : null;
+  const operatorSources = showOperatorInsight ? getOperatorAiSources(message) : [];
+  const outerMb = showOperatorInsight ? "mb-5" : tightWithNext ? "mb-1" : "mb-5";
   const messageTimeLabel = formatConversationMessageTime(message.created_at);
 
   return (
@@ -206,8 +208,12 @@ export function ConversationMessageItem({
           </div>
         </div>
       </div>
-      {operatorReasoningText ? (
-        <ConversationOperatorAiReasoning text={operatorReasoningText} alignEnd={!isUser} />
+      {showOperatorInsight ? (
+        <ConversationOperatorAiReasoning
+          text={operatorReasoningText}
+          sources={operatorSources}
+          alignEnd={!isUser}
+        />
       ) : null}
     </div>
   );

@@ -1372,14 +1372,15 @@ export async function findOrCreateConversationByWhatsappChatId(
   }
 }
 
-/** Merges `ai_reasoning` into all outbound rows for one agent tool run (same `agent_run_id` in metadata). */
+/** Merges operator reasoning and knowledge refs into outbound rows for one agent run. */
 export async function mergeAiReasoningOntoAgentRunMessages(input: {
   workspaceId: string;
   conversationId: string;
   agentRunId: string;
   aiReasoning: string;
+  aiSources?: Array<{ kind: string; label: string; id?: string; groupId?: string }>;
 }): Promise<{ ok: boolean }> {
-  const { workspaceId, conversationId, agentRunId, aiReasoning } = input;
+  const { workspaceId, conversationId, agentRunId, aiReasoning, aiSources } = input;
   try {
     const rows = await db
       .select({ id: messages.id, metadata: messages.metadata })
@@ -1401,6 +1402,18 @@ export async function mergeAiReasoningOntoAgentRunMessages(input: {
     const handoffRows: Array<{ id: string; metadata: Record<string, unknown> }> = [];
     let updatedRegularRows = 0;
 
+    const sources =
+      Array.isArray(aiSources) && aiSources.length > 0 ? aiSources : null;
+
+    const withOperatorInsight = (
+      existing: Record<string, unknown>,
+    ): Record<string, unknown> => {
+      const merged: Record<string, unknown> = { ...existing };
+      if (aiReasoning) merged.ai_reasoning = aiReasoning;
+      if (sources) merged.ai_sources = sources;
+      return merged;
+    };
+
     for (const row of matched) {
       const existing: Record<string, unknown> =
         row.metadata && typeof row.metadata === "object" ? { ...row.metadata } : {};
@@ -1408,7 +1421,7 @@ export async function mergeAiReasoningOntoAgentRunMessages(input: {
         handoffRows.push({ id: row.id, metadata: existing });
         continue;
       }
-      const merged = { ...existing, ai_reasoning: aiReasoning };
+      const merged = withOperatorInsight(existing);
       await db
         .update(messages)
         .set({ metadata: merged })
@@ -1424,7 +1437,7 @@ export async function mergeAiReasoningOntoAgentRunMessages(input: {
 
     if (updatedRegularRows === 0 && handoffRows.length > 0) {
       for (const row of handoffRows) {
-        const merged = { ...row.metadata, ai_reasoning: aiReasoning };
+        const merged = withOperatorInsight(row.metadata);
         await db
           .update(messages)
           .set({ metadata: merged })

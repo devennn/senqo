@@ -16,7 +16,7 @@ import {
   toModelMessageFromRow,
 } from "../agent/messages.js";
 import { resolveSessionId } from "../agent/session.js";
-import { buildAgentInstructions } from "../agent/skills-catalog.js";
+import { buildAgentInstructionsWithCatalog } from "../agent/skills-catalog.js";
 import { getAgentTools } from "../agent/tools/index.js";
 import { normalizeStoredContentForModelMessage } from "../lib/agent-multimodal-normalize.js";
 import { BUILTIN_AGENT_TOOL_KEYS } from "../lib/builtin-agent-tool-keys.js";
@@ -34,6 +34,10 @@ import {
 } from "../repositories/agent.js";
 import { touchAgentSession } from "../repositories/agent-sessions.js";
 import { mergeAiReasoningOntoAgentRunMessages } from "../repositories/whatsapp.js";
+import {
+  resolveAgentReplySources,
+  resolveHandoffTopicLabel,
+} from "./reply-sources.js";
 import { prepareOutboundMessages, sendPreparedOutboundMessages } from "../services/agent-outbound-messages.js";
 import {
   AGENT_RUN_LOG_KIND_LLM_OUTPUT,
@@ -163,7 +167,7 @@ export async function runAgentSession(
     };
   }
 
-  const instructions = await buildAgentInstructions(
+  const { instructions, sourceCatalog } = await buildAgentInstructionsWithCatalog(
     input.workspaceId,
     input.agentConfigId,
     isDryRun,
@@ -200,6 +204,7 @@ export async function runAgentSession(
     topicEntryId: string | null;
     reason: string | null;
   }> = [];
+  const loadedSkillNames: string[] = [];
 
   const agent = new ToolLoopAgent({
     model: getChatLLM(),
@@ -210,7 +215,7 @@ export async function runAgentSession(
       schema: agentOutputSchema,
       name: "agent_run_result",
       description:
-        "Return the final agent run result. Put customer WhatsApp bubbles in messages (0–3). Set handoff_enabled when you called handoff_to_human. Include reasoning_for_operators for workspace operators (never paste into messages).",
+        "Return the final agent run result. Put customer WhatsApp bubbles in messages (0–3). Set handoff_enabled when you called handoff_to_human. Include reasoning_for_operators and sources for workspace operators (never paste into messages).",
     }),
     stopWhen: stepCountIs(20),
     prepareStep: ({ stepNumber, messages }) => {
@@ -254,6 +259,29 @@ export async function runAgentSession(
             args: call.input,
             output: matching?.output,
           });
+        }
+        if (call.toolName === "load_skills") {
+          const matching = toolResults.find(
+            (result) => result.toolCallId === call.toolCallId,
+          );
+          const output =
+            matching?.output && typeof matching.output === "object"
+              ? (matching.output as Record<string, unknown>)
+              : {};
+          const callRecord = call as unknown as {
+            input?: unknown;
+            args?: unknown;
+          };
+          const rawArgs =
+            callRecord.input && typeof callRecord.input === "object"
+              ? (callRecord.input as Record<string, unknown>)
+              : callRecord.args && typeof callRecord.args === "object"
+                ? (callRecord.args as Record<string, unknown>)
+                : {};
+          const nameRaw = output.skill_name ?? rawArgs.skill_name;
+          if (output.ok === true && typeof nameRaw === "string" && nameRaw.trim()) {
+            loadedSkillNames.push(nameRaw.trim());
+          }
         }
         if (call.toolName === "handoff_to_human") {
           const callRecord = call as unknown as {
@@ -333,7 +361,7 @@ export async function runAgentSession(
           schema: agentOutputSchema,
           name: "agent_run_result",
           description:
-            "Return the final agent run result without calling tools. Prefer empty messages, handoff_enabled false, and include reasoning_for_operators.",
+            "Return the final agent run result without calling tools. Prefer empty messages, handoff_enabled false, and include reasoning_for_operators and sources.",
         }),
         stopWhen: stepCountIs(20),
       });
@@ -378,6 +406,17 @@ export async function runAgentSession(
   const reasoningForOperators = (
     structuredOutput?.reasoning_for_operators ?? ""
   ).trim();
+  const handoffTopicLabel = resolveHandoffTopicLabel(
+    handoffTopicEntryId,
+    sourceCatalog,
+    handoffCalled,
+  );
+  const replySources = resolveAgentReplySources({
+    modelSources: structuredOutput?.sources,
+    loadedSkillNames,
+    handoffTopicLabel,
+    catalog: sourceCatalog,
+  });
 
   let outboundMessages = prepareOutboundMessages(rawMessages);
   let outboundSent = 0;
@@ -425,6 +464,7 @@ export async function runAgentSession(
           type: AGENT_RUN_LOG_KIND_LLM_OUTPUT,
           messages: structuredOutput?.messages ?? [],
           reasoning_for_operators: reasoningForOperators,
+          sources: replySources,
           handoff_enabled: handoffEnabled,
           conversation_labels: conversationLabels,
         },
@@ -463,12 +503,13 @@ export async function runAgentSession(
     }
   }
 
-  if (!isDryRun && agentRunId && reasoningForOperators) {
+  if (!isDryRun && agentRunId && (reasoningForOperators || replySources.length > 0)) {
     const merged = await mergeAiReasoningOntoAgentRunMessages({
       workspaceId: input.workspaceId,
       conversationId: sessionId,
       agentRunId,
       aiReasoning: reasoningForOperators,
+      aiSources: replySources,
     });
     if (!merged.ok) {
       console.error(
