@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export type EvalDetailTab = "conversation" | "history";
+export type EvalDetailTab = "conversation" | "history" | "schedule";
 
 type Props = {
   value: EvalDetailTab;
@@ -28,6 +28,12 @@ export function EvalDetailTabBar({ value, onChange, trailing }: Props) {
           label="Run history"
           selected={value === "history"}
           onClick={() => onChange("history")}
+        />
+        <TabButton
+          id="schedule"
+          label="Schedule"
+          selected={value === "schedule"}
+          onClick={() => onChange("schedule")}
         />
       </div>
       {trailing ? <div className="flex shrink-0 items-center gap-2">{trailing}</div> : null}

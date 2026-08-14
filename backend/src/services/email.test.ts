@@ -10,7 +10,7 @@ vi.mock("../lib/env.js", () => ({
   env: { frontendUrl: "http://localhost:5173" },
 }));
 
-const { sendRegistrationInviteEmail, sendWhatsappDisconnectEmail } = await import(
+const { sendRegistrationInviteEmail, sendWhatsappDisconnectEmail, sendEvalScheduleFailureEmail } = await import(
   "./email.js"
 );
 
@@ -137,5 +137,42 @@ describe("sendWhatsappDisconnectEmail", () => {
     });
 
     expect(result).toEqual({ ok: false });
+  });
+});
+
+describe("sendEvalScheduleFailureEmail", () => {
+  // Failed scheduled eval → subject and deep link, needed so the operator can open that eval.
+  it("sends fail mail with eval title and eval URL", async () => {
+    const result = await sendEvalScheduleFailureEmail({
+      to: "ops@example.com",
+      workspaceId: "ws-1",
+      evalCaseId: "eval-1",
+      evalTitle: "Business hours",
+      status: "failed",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(mockSendEmail).toHaveBeenCalledWith({
+      to: "ops@example.com",
+      subject: "Eval failed: Business hours",
+      html: expect.stringContaining("http://localhost:5173/ws-1/evals?evalId=eval-1"),
+    });
+  });
+
+  // Runtime error → subject uses errored, needed so fail vs error is distinct in the inbox.
+  it("sends error mail when status is error", async () => {
+    await sendEvalScheduleFailureEmail({
+      to: "ops@example.com",
+      workspaceId: "ws-1",
+      evalCaseId: "eval-1",
+      evalTitle: "Business hours",
+      status: "error",
+    });
+
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Eval errored: Business hours",
+      }),
+    );
   });
 });

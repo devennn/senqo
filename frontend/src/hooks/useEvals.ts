@@ -43,6 +43,7 @@ export function useEvals(
   remove: (id: string) => Promise<void>;
   run: (id: string) => Promise<EvalCase | null>;
   runningId: string | null;
+  setHasSchedule: (id: string, hasSchedule: boolean) => void;
 } {
   const [cases, setCases] = useState<EvalCase[]>([]);
   const [total, setTotal] = useState(0);
@@ -191,6 +192,13 @@ export function useEvals(
     [reload],
   );
 
+  const setHasSchedule = useCallback((id: string, hasSchedule: boolean) => {
+    setCases((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, hasSchedule } : item)),
+    );
+    setSelectedCase((prev) => (prev?.id === id ? { ...prev, hasSchedule } : prev));
+  }, []);
+
   return {
     cases,
     total,
@@ -208,5 +216,6 @@ export function useEvals(
     remove,
     run,
     runningId,
+    setHasSchedule,
   };
 }

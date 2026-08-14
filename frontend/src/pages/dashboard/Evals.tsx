@@ -31,6 +31,7 @@ export default function EvalsPage() {
     remove,
     run,
     runningId,
+    setHasSchedule,
   } = useEvals(agentId || null, selectedId);
 
   useEffect(() => {
@@ -138,6 +139,7 @@ export default function EvalsPage() {
                     void run(id);
                   }}
                   running={runningId === selected.id}
+                  onScheduleChange={(hasSchedule) => setHasSchedule(selected.id, hasSchedule)}
                 />
               ) : (
                 <p className="rounded-2xl border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">

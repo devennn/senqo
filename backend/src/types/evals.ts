@@ -57,6 +57,52 @@ export type EvalRunRecord = {
   ranAt: string;
 };
 
+export type EvalScheduleRepeat = "daily" | "weekly" | "monthly";
+
+export type EvalScheduleRecord = {
+  id: string;
+  workspaceId: string;
+  evalCaseId: string;
+  repeat: EvalScheduleRepeat;
+  weekdays: number[];
+  monthDay: number | null;
+  hour: number;
+  minute: number;
+  timezone: string;
+  notifyUserId: string | null;
+  enabled: boolean;
+  lastFiredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EvalScheduledRunRecord = EvalRunRecord & {
+  emailSent: boolean;
+  notifyEmail: string | null;
+};
+
+export type CreateEvalScheduleInput = {
+  workspaceId: string;
+  evalCaseId: string;
+  repeat: EvalScheduleRepeat;
+  weekdays: number[];
+  monthDay: number | null;
+  hour: number;
+  minute: number;
+  timezone: string;
+  notifyUserId: string;
+};
+
+export type UpdateEvalScheduleInput = {
+  repeat: EvalScheduleRepeat;
+  weekdays: number[];
+  monthDay: number | null;
+  hour: number;
+  minute: number;
+  timezone: string;
+  notifyUserId: string;
+};
+
 export type EvalCaseRecord = {
   id: string;
   workspaceId: string;
@@ -77,6 +123,7 @@ export type EvalCaseRecord = {
   answerCorrect: boolean | null;
   sourceConversationId: string | null;
   runs: EvalRunRecord[];
+  hasSchedule: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -126,4 +173,5 @@ export type CreateEvalRunInput = {
   handoffTopicEntryId?: string | null;
   errorMessage?: string | null;
   subjectSessionId: string | null;
+  scheduleId?: string | null;
 };

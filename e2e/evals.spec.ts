@@ -27,6 +27,28 @@ type EvalCase = {
     errorMessage?: string | null;
   }>;
   createdAt: string;
+  hasSchedule: boolean;
+};
+
+type EvalSchedule = {
+  repeat: "daily" | "weekly" | "monthly";
+  weekdays: number[];
+  monthDay: number | null;
+  hour: number;
+  minute: number;
+  timezone: string;
+  notifyUserId: string;
+  enabled: boolean;
+};
+
+type EvalScheduledRun = {
+  id: string;
+  status: "passed" | "failed" | "error";
+  actualReply: string;
+  ranAt: string;
+  errorMessage?: string | null;
+  emailSent: boolean;
+  notifyEmail: string | null;
 };
 
 function createEval(overrides: Partial<EvalCase> = {}): EvalCase {
@@ -47,6 +69,7 @@ function createEval(overrides: Partial<EvalCase> = {}): EvalCase {
     sourceConversationId: null,
     runs: [],
     createdAt: "2026-08-08T04:00:00.000Z",
+    hasSchedule: false,
     ...overrides,
   };
 }
@@ -61,7 +84,15 @@ async function seedSession(page: Page) {
   });
 }
 
-async function mockEvalsApis(page: Page, state: { current: EvalCase | null; cases: EvalCase[] }) {
+async function mockEvalsApis(
+  page: Page,
+  state: {
+    current: EvalCase | null;
+    cases: EvalCase[];
+    schedule?: EvalSchedule | null;
+    scheduledRuns?: EvalScheduledRun[];
+  },
+) {
   const authUser = { id: "e2e-user-1", email: "e2e@senqo.app" };
 
   await page.route("**/api/auth/**", async (route) => {
@@ -152,6 +183,26 @@ async function mockEvalsApis(page: Page, state: { current: EvalCase | null; case
       return;
     }
 
+    if (path.endsWith("/api/user/team") && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          members: [
+            {
+              id: "m-e2e-1",
+              userId: "e2e-user-1",
+              email: "e2e@senqo.app",
+              role: "owner",
+              joined_at: null,
+              handoffPhones: [],
+            },
+          ],
+        }),
+      });
+      return;
+    }
+
     if (path.endsWith("/api/user/evals") && method === "GET") {
       await route.fulfill({
         status: 200,
@@ -186,6 +237,98 @@ async function mockEvalsApis(page: Page, state: { current: EvalCase | null; case
         status: 201,
         contentType: "application/json",
         body: JSON.stringify({ evalCase: created }),
+      });
+      return;
+    }
+
+    if (path.includes("/api/user/evals/") && path.endsWith("/scheduled-runs") && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          runs: state.scheduledRuns ?? [],
+          total: (state.scheduledRuns ?? []).length,
+          page: 1,
+          pageSize: 5,
+        }),
+      });
+      return;
+    }
+
+    if (path.includes("/api/user/evals/") && path.endsWith("/schedule") && method === "GET") {
+      if (!state.schedule) {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "not_found" }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ schedule: state.schedule }),
+      });
+      return;
+    }
+
+    if (path.includes("/api/user/evals/") && path.endsWith("/schedule") && method === "POST") {
+      const body = route.request().postDataJSON() as EvalSchedule;
+      if (state.schedule) {
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "schedule_exists" }),
+        });
+        return;
+      }
+      state.schedule = { ...body, enabled: true };
+      const id = path.split("/").slice(-2)[0];
+      const idx = state.cases.findIndex((c) => c.id === id);
+      if (idx >= 0) state.cases[idx] = { ...state.cases[idx], hasSchedule: true };
+      if (state.current?.id === id) {
+        state.current = { ...state.current, hasSchedule: true };
+      }
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ schedule: state.schedule }),
+      });
+      return;
+    }
+
+    if (path.includes("/api/user/evals/") && path.endsWith("/schedule") && method === "PATCH") {
+      const body = route.request().postDataJSON() as { enabled: boolean };
+      if (!state.schedule) {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "not_found" }),
+        });
+        return;
+      }
+      state.schedule = { ...state.schedule, enabled: body.enabled };
+      const id = path.split("/").slice(-2)[0];
+      const idx = state.cases.findIndex((c) => c.id === id);
+      if (idx >= 0) state.cases[idx] = { ...state.cases[idx], hasSchedule: body.enabled };
+      if (state.current?.id === id) {
+        state.current = { ...state.current, hasSchedule: body.enabled };
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ schedule: state.schedule }),
+      });
+      return;
+    }
+
+    if (path.includes("/api/user/evals/") && path.endsWith("/schedule") && method === "PUT") {
+      const body = route.request().postDataJSON() as EvalSchedule;
+      state.schedule = body;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ schedule: state.schedule }),
       });
       return;
     }
@@ -287,5 +430,111 @@ test.describe("Evals", () => {
     await page.getByRole("tab", { name: "Run history" }).click();
     await expect(page.getByText(/Pass|Passed/i).first()).toBeVisible();
     await expect(page.getByText("We're open Monday to Friday, 9am–6pm SGT.")).toBeVisible();
+  });
+
+  // Create a per-eval schedule → list shows the calendar icon (happy path).
+  test("creates a schedule and shows the calendar icon on the list", async ({ page }) => {
+    const seeded = createEval();
+    const state = { current: seeded, cases: [seeded], schedule: null as EvalSchedule | null };
+    await seedSession(page);
+    await mockEvalsApis(page, state);
+
+    await page.goto(`/${WORKSPACE_ID}/evals?evalId=${EVAL_ID}`);
+    await page.getByRole("tab", { name: "Schedule" }).click();
+    await page.getByLabel("Email on fail or error").selectOption("e2e-user-1");
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+
+    await expect(page.getByLabel("Has a schedule")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  });
+
+  // Turn off stops the schedule and hides the list icon; Turn on is available.
+  test("Turn off hides the calendar icon", async ({ page }) => {
+    const seeded = createEval({ hasSchedule: true });
+    const state = {
+      current: seeded,
+      cases: [seeded],
+      schedule: {
+        repeat: "weekly" as const,
+        weekdays: [0],
+        monthDay: 1,
+        hour: 20,
+        minute: 0,
+        timezone: "UTC",
+        notifyUserId: "e2e-user-1",
+        enabled: true,
+      },
+    };
+    await seedSession(page);
+    await mockEvalsApis(page, state);
+
+    await page.goto(`/${WORKSPACE_ID}/evals?evalId=${EVAL_ID}`);
+    await page.getByRole("tab", { name: "Schedule" }).click();
+    await page.getByRole("button", { name: "Turn off" }).click();
+    await expect(page.getByRole("button", { name: "Turn on" })).toBeVisible();
+    await expect(page.getByLabel("Has a schedule")).toHaveCount(0);
+  });
+
+  // After a schedule exists, Save stays disabled until the form is dirty.
+  test("Save stays disabled until the schedule form is dirty", async ({ page }) => {
+    const seeded = createEval({ hasSchedule: true });
+    const state = {
+      current: seeded,
+      cases: [seeded],
+      schedule: {
+        repeat: "weekly" as const,
+        weekdays: [0],
+        monthDay: 1,
+        hour: 20,
+        minute: 0,
+        timezone: "UTC",
+        notifyUserId: "e2e-user-1",
+        enabled: true,
+      },
+    };
+    await seedSession(page);
+    await mockEvalsApis(page, state);
+
+    await page.goto(`/${WORKSPACE_ID}/evals?evalId=${EVAL_ID}`);
+    await page.getByRole("tab", { name: "Schedule" }).click();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    await page.getByLabel("At").fill("09:00");
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+  });
+
+  // Schedule tab history lists this eval’s scheduled result, not other evals.
+  test("Schedule tab history shows this eval’s scheduled run", async ({ page }) => {
+    const seeded = createEval({ hasSchedule: true });
+    const state = {
+      current: seeded,
+      cases: [seeded],
+      schedule: {
+        repeat: "daily" as const,
+        weekdays: [] as number[],
+        monthDay: 1,
+        hour: 9,
+        minute: 0,
+        timezone: "UTC",
+        notifyUserId: "e2e-user-1",
+        enabled: true,
+      },
+      scheduledRuns: [
+        {
+          id: "sched-run-1",
+          status: "failed" as const,
+          actualReply: "Wrong hours reply for this eval.",
+          ranAt: "2026-08-13T09:00:00.000Z",
+          emailSent: true,
+          notifyEmail: "e2e@senqo.app",
+        },
+      ],
+    };
+    await seedSession(page);
+    await mockEvalsApis(page, state);
+
+    await page.goto(`/${WORKSPACE_ID}/evals?evalId=${EVAL_ID}`);
+    await page.getByRole("tab", { name: "Schedule" }).click();
+    await expect(page.getByText("Wrong hours reply for this eval.")).toBeVisible();
+    await expect(page.getByText("Emailed e2e@senqo.app")).toBeVisible();
   });
 });

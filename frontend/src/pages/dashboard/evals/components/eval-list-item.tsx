@@ -1,3 +1,4 @@
+import { CalendarClock } from "lucide-react";
 import { EvalRunBadge } from "@/pages/dashboard/evals/components/eval-badges";
 import type { EvalCase } from "@/types/evals";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,8 @@ type Props = {
 };
 
 export function EvalListItem({ item, selected, onSelect }: Props) {
+  const hasSchedule = item.hasSchedule;
+
   return (
     <li>
       <button
@@ -24,12 +27,20 @@ export function EvalListItem({ item, selected, onSelect }: Props) {
         )}
       >
         <div className="min-w-0 flex-1">
-          <p
-            className="truncate text-sm font-semibold text-foreground"
-            title={item.title}
-          >
-            {item.title}
-          </p>
+          <div className="flex items-center gap-2">
+            <p
+              className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground"
+              title={item.title}
+            >
+              {item.title}
+            </p>
+            {hasSchedule ? (
+              <CalendarClock
+                className="size-3.5 shrink-0 text-primary"
+                aria-label="Has a schedule"
+              />
+            ) : null}
+          </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
             <EvalRunBadge status={item.runs[0]?.status} />
             <span className="text-xs text-muted-foreground">

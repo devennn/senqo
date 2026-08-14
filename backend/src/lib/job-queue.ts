@@ -5,12 +5,16 @@ import {
   executeAgentKnowledgeImportJob,
   type AgentKnowledgeImportJobPayload,
 } from "../services/agent-knowledge-import-job-run.js";
+import { executeEvalScheduleRun } from "../services/eval-schedule-run.js";
+import { tickEvalSchedules } from "../services/eval-schedule-tick.js";
 import type { TaskExecutePayload } from "../types/task-execute.js";
 import { env } from "./env.js";
 
 export const QUEUE_INBOUND_AI = "inbound-ai";
 export const QUEUE_TASK_EXECUTE = "task-execute";
 export const QUEUE_AGENT_KNOWLEDGE_IMPORT = "agent-knowledge-import";
+export const QUEUE_EVAL_SCHEDULE_TICK = "eval-schedule-tick";
+export const QUEUE_EVAL_SCHEDULE_RUN = "eval-schedule-run";
 
 export type InboundAiJobData = {
   workspaceId: string;
@@ -54,6 +58,17 @@ export async function startJobQueue(): Promise<void> {
     expireInSeconds: 3600,
     retryLimit: 1,
   });
+  await instance.createQueue(QUEUE_EVAL_SCHEDULE_TICK, {
+    expireInSeconds: 60,
+    retryLimit: 0,
+  });
+  await instance.createQueue(QUEUE_EVAL_SCHEDULE_RUN, {
+    expireInSeconds: 600,
+    retryLimit: 0,
+    policy: "singleton",
+  });
+
+  await instance.schedule(QUEUE_EVAL_SCHEDULE_TICK, "* * * * *", {});
 
   await instance.work<InboundAiJobData>(QUEUE_INBOUND_AI, async (jobs) => {
     for (const job of jobs) {
@@ -93,6 +108,42 @@ export async function startJobQueue(): Promise<void> {
       }
     }
   });
+
+  await instance.work(QUEUE_EVAL_SCHEDULE_TICK, async () => {
+    const due = await tickEvalSchedules();
+    for (const payload of due) {
+      try {
+        const jobId = await instance.send(QUEUE_EVAL_SCHEDULE_RUN, payload, {
+          singletonKey: payload.scheduleId,
+          retryLimit: 0,
+          expireInSeconds: 600,
+        });
+        if (!jobId) {
+          console.info(
+            `[JobQueue/work/eval-schedule-tick] Failed query: no job id scheduleId=${payload.scheduleId}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[JobQueue/work/eval-schedule-tick] Unexpected error: scheduleId=${payload.scheduleId} ${String(error)}`,
+        );
+      }
+    }
+  });
+
+  await instance.work<{ workspaceId: string; evalCaseId: string; scheduleId: string }>(
+    QUEUE_EVAL_SCHEDULE_RUN,
+    async (jobs) => {
+      for (const job of jobs) {
+        const result = await executeEvalScheduleRun(job.data);
+        if (!result.ok) {
+          console.error(
+            `[JobQueue/work/eval-schedule-run] Failed query: evalCaseId=${job.data.evalCaseId}`,
+          );
+        }
+      }
+    },
+  );
 
   boss = instance;
   console.info("[JobQueue/start] Success: pg-boss workers registered");

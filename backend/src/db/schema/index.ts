@@ -913,6 +913,43 @@ export const evalCases = pgTable(
   ],
 );
 
+export const evalSchedules = pgTable(
+  "eval_schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    evalCaseId: uuid("eval_case_id")
+      .notNull()
+      .references(() => evalCases.id, { onDelete: "cascade" }),
+    /** daily | weekly | monthly */
+    repeat: text("repeat").notNull(),
+    weekdays: jsonb("weekdays").notNull().default([]),
+    monthDay: integer("month_day"),
+    hour: integer("hour").notNull(),
+    minute: integer("minute").notNull(),
+    timezone: text("timezone").notNull(),
+    notifyUserId: uuid("notify_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    enabled: boolean("enabled").notNull().default(true),
+    lastFiredAt: timestamp("last_fired_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("eval_schedules_workspace_eval_case_uidx").on(
+      t.workspaceId,
+      t.evalCaseId,
+    ),
+  ],
+);
+
 export const evalRuns = pgTable(
   "eval_runs",
   {
@@ -937,6 +974,12 @@ export const evalRuns = pgTable(
     ),
     errorMessage: text("error_message"),
     subjectSessionId: uuid("subject_session_id"),
+    /** Set when a scheduled worker created this run; null for manual Run. */
+    scheduleId: uuid("schedule_id").references(() => evalSchedules.id, {
+      onDelete: "set null",
+    }),
+    emailSent: boolean("email_sent").notNull().default(false),
+    notifyEmail: text("notify_email"),
     ranAt: timestamp("ran_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -11,6 +11,7 @@ import { EvalConversationEditor } from "@/pages/dashboard/evals/components/eval-
 import { EvalConversationThread } from "@/pages/dashboard/evals/components/eval-conversation-thread";
 import { EvalExpectedDock } from "@/pages/dashboard/evals/components/eval-expected-dock";
 import { EvalRunHistory } from "@/pages/dashboard/evals/components/eval-run-history";
+import { EvalSchedulePanel } from "@/pages/dashboard/evals/components/eval-schedule-panel";
 import type { EvalCase, EvalTurn } from "@/types/evals";
 
 type Props = {
@@ -21,6 +22,7 @@ type Props = {
   onDelete: (id: string) => Promise<void>;
   onRun: (id: string) => void;
   running?: boolean;
+  onScheduleChange?: (hasSchedule: boolean) => void;
 };
 
 /** Inbox-style column: chat view by default; Edit chat opens rearrange editor. */
@@ -32,6 +34,7 @@ export function EvalDetail({
   onDelete,
   onRun,
   running = false,
+  onScheduleChange,
 }: Props) {
   const [tab, setTab] = useState<EvalDetailTab>("conversation");
   const [editing, setEditing] = useState(false);
@@ -42,7 +45,7 @@ export function EvalDetail({
   }, [evalCase.id]);
 
   const showEditChat = tab === "conversation" && !editing && !running;
-  const showMetaActions = !editing && !running;
+  const showMetaActions = tab === "conversation" && !editing && !running;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-soft">
@@ -129,10 +132,15 @@ export function EvalDetail({
             />
           ) : null}
         </>
-      ) : (
+      ) : tab === "history" ? (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           <EvalRunHistory runs={evalCase.runs} />
         </div>
+      ) : (
+        <EvalSchedulePanel
+          evalId={evalCase.id}
+          onScheduleChange={onScheduleChange}
+        />
       )}
     </div>
   );

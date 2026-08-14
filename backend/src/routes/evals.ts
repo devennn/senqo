@@ -6,7 +6,6 @@ import { parseListPageParams } from "../lib/pagination.js";
 import { getAgentConfigById, listAgentConfigs } from "../repositories/agent.js";
 import {
   createEvalCaseFromDraft,
-  createEvalRun,
   createManualEvalCase,
   deleteEvalCase,
   getEvalCaseById,
@@ -14,6 +13,16 @@ import {
   parseEvalTurns,
   updateEvalCase,
 } from "../repositories/evals.js";
+import {
+  createEvalSchedule,
+  getEvalScheduleByEvalCaseId,
+  listScheduledRunsPage,
+  setEvalScheduleEnabled,
+  updateEvalSchedule,
+} from "../repositories/eval-schedules.js";
+import { isWorkspaceTeammate } from "../repositories/workspaces.js";
+import { runAndPersistEvalCase } from "../services/eval-run.js";
+import type { EvalScheduleRecord } from "../types/evals.js";
 import {
   getConversationWithContact,
   listConversationMessagesLatestPage,
@@ -28,7 +37,6 @@ import {
   draftEvalFromHandoff,
   draftEvalFromKnowledge,
   draftEvalFromReport,
-  runEvalCase,
 } from "../agent-evals/index.js";
 
 type Variables = AuthVariables & WorkspaceVariables;
@@ -36,6 +44,7 @@ type Variables = AuthVariables & WorkspaceVariables;
 const app = new Hono<{ Variables: Variables }>();
 
 const EVALS_DEFAULT_PAGE_SIZE = 8;
+const EVAL_SCHEDULED_RUN_PAGE_SIZE = 5;
 
 const knowledgeRefSchema = z.object({
   kind: z.enum(["context", "template", "skill", "handoff"]),
@@ -127,6 +136,47 @@ const updateEvalSchema = z.object({
   answerCorrect: z.boolean().nullable().optional(),
 });
 
+const scheduleBodySchema = z
+  .object({
+    repeat: z.enum(["daily", "weekly", "monthly"]),
+    weekdays: z.array(z.number().int().min(0).max(6)).max(7),
+    monthDay: z.number().int().min(1).max(31).nullable().optional(),
+    hour: z.number().int().min(0).max(23),
+    minute: z.number().int().min(0).max(59),
+    timezone: z.string().trim().min(1).max(64),
+    notifyUserId: z.string().uuid(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.repeat === "weekly" && data.weekdays.length === 0) {
+      ctx.addIssue({ code: "custom", path: ["weekdays"], message: "weekdays_required" });
+    }
+    if (data.repeat === "monthly" && data.monthDay == null) {
+      ctx.addIssue({ code: "custom", path: ["monthDay"], message: "month_day_required" });
+    }
+    try {
+      Intl.DateTimeFormat("en-US", { timeZone: data.timezone });
+    } catch {
+      ctx.addIssue({ code: "custom", path: ["timezone"], message: "invalid_timezone" });
+    }
+  });
+
+function uniqueWeekdays(weekdays: number[]): number[] {
+  return [...new Set(weekdays)].sort((a, b) => a - b);
+}
+
+function schedulePayload(schedule: EvalScheduleRecord) {
+  return {
+    repeat: schedule.repeat,
+    weekdays: schedule.weekdays,
+    monthDay: schedule.monthDay,
+    hour: schedule.hour,
+    minute: schedule.minute,
+    timezone: schedule.timezone,
+    notifyUserId: schedule.notifyUserId,
+    enabled: schedule.enabled,
+  };
+}
+
 app.get("/evals", async (c) => {
   const workspaceId = c.get("workspaceId");
   const agentId = c.req.query("agentId")?.trim() ?? "";
@@ -162,6 +212,125 @@ app.get("/evals/:id", async (c) => {
   const evalCase = await getEvalCaseById(workspaceId, id);
   if (!evalCase) return c.json({ error: "not_found" }, 404);
   return c.json({ evalCase });
+});
+
+app.get("/evals/:id/schedule", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
+  const evalCase = await getEvalCaseById(workspaceId, id);
+  if (!evalCase) return c.json({ error: "not_found" }, 404);
+  const schedule = await getEvalScheduleByEvalCaseId(workspaceId, id);
+  if (!schedule) return c.json({ error: "not_found" }, 404);
+  return c.json({ schedule: schedulePayload(schedule) });
+});
+
+app.post("/evals/:id/schedule", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
+  const evalCase = await getEvalCaseById(workspaceId, id);
+  if (!evalCase) return c.json({ error: "not_found" }, 404);
+
+  const parsed = scheduleBodySchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const teammate = await isWorkspaceTeammate(workspaceId, parsed.data.notifyUserId);
+  if (!teammate) return c.json({ error: "notify_not_member" }, 422);
+
+  const created = await createEvalSchedule({
+    workspaceId,
+    evalCaseId: id,
+    repeat: parsed.data.repeat,
+    weekdays: uniqueWeekdays(parsed.data.weekdays),
+    monthDay: parsed.data.repeat === "monthly" ? (parsed.data.monthDay ?? 1) : null,
+    hour: parsed.data.hour,
+    minute: parsed.data.minute,
+    timezone: parsed.data.timezone,
+    notifyUserId: parsed.data.notifyUserId,
+  });
+  if (!created.ok) {
+    if (created.error === "exists") return c.json({ error: "schedule_exists" }, 409);
+    return c.json({ error: "create_failed" }, 500);
+  }
+
+  const schedule = await getEvalScheduleByEvalCaseId(workspaceId, id);
+  if (!schedule) return c.json({ error: "create_failed" }, 500);
+  return c.json({ schedule: schedulePayload(schedule) }, 201);
+});
+
+app.put("/evals/:id/schedule", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
+  const evalCase = await getEvalCaseById(workspaceId, id);
+  if (!evalCase) return c.json({ error: "not_found" }, 404);
+
+  const parsed = scheduleBodySchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const teammate = await isWorkspaceTeammate(workspaceId, parsed.data.notifyUserId);
+  if (!teammate) return c.json({ error: "notify_not_member" }, 422);
+
+  const existing = await getEvalScheduleByEvalCaseId(workspaceId, id);
+  if (!existing) return c.json({ error: "not_found" }, 404);
+
+  const updated = await updateEvalSchedule(workspaceId, id, {
+    repeat: parsed.data.repeat,
+    weekdays: uniqueWeekdays(parsed.data.weekdays),
+    monthDay: parsed.data.repeat === "monthly" ? (parsed.data.monthDay ?? 1) : null,
+    hour: parsed.data.hour,
+    minute: parsed.data.minute,
+    timezone: parsed.data.timezone,
+    notifyUserId: parsed.data.notifyUserId,
+  });
+  if (!updated.ok) return c.json({ error: "update_failed" }, 500);
+
+  const schedule = await getEvalScheduleByEvalCaseId(workspaceId, id);
+  if (!schedule) return c.json({ error: "not_found" }, 404);
+  return c.json({ schedule: schedulePayload(schedule) });
+});
+
+app.patch("/evals/:id/schedule", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
+  const evalCase = await getEvalCaseById(workspaceId, id);
+  if (!evalCase) return c.json({ error: "not_found" }, 404);
+
+  const parsed = z.object({ enabled: z.boolean() }).safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const existing = await getEvalScheduleByEvalCaseId(workspaceId, id);
+  if (!existing) return c.json({ error: "not_found" }, 404);
+
+  const updated = await setEvalScheduleEnabled(workspaceId, id, parsed.data.enabled);
+  if (!updated.ok) return c.json({ error: "update_failed" }, 500);
+
+  const schedule = await getEvalScheduleByEvalCaseId(workspaceId, id);
+  if (!schedule) return c.json({ error: "not_found" }, 404);
+  return c.json({ schedule: schedulePayload(schedule) });
+});
+
+app.get("/evals/:id/scheduled-runs", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const id = c.req.param("id");
+  const evalCase = await getEvalCaseById(workspaceId, id);
+  if (!evalCase) return c.json({ error: "not_found" }, 404);
+
+  const { page, pageSize } = parseListPageParams(
+    c.req.query("page"),
+    c.req.query("pageSize"),
+    EVAL_SCHEDULED_RUN_PAGE_SIZE,
+  );
+  const result = await listScheduledRunsPage({
+    workspaceId,
+    evalCaseId: id,
+    page,
+    pageSize,
+  });
+  return c.json({
+    runs: result.items,
+    total: result.total,
+    page,
+    pageSize,
+  });
 });
 
 app.post("/evals", async (c) => {
@@ -485,64 +654,9 @@ app.put("/evals/:id", async (c) => {
 app.post("/evals/:id/run", async (c) => {
   const workspaceId = c.get("workspaceId");
   const id = c.req.param("id");
-  const existing = await getEvalCaseById(workspaceId, id);
-  if (!existing) return c.json({ error: "not_found" }, 404);
-  if (existing.expectedAction === "reply" && !existing.expectedReply.trim()) {
-    return c.json({ error: "expected_reply_required" }, 400);
-  }
-  if (existing.expectedAction === "handoff" && !existing.expectedTopicEntryId) {
-    return c.json({ error: "expected_topic_required" }, 400);
-  }
-
-  let ran;
-  try {
-    ran = await runEvalCase({
-      workspaceId,
-      agentConfigId: existing.agentId,
-      turns: stripTrailingAssistantTurns(existing.turns),
-      expectedAction: existing.expectedAction,
-      expectedReply: existing.expectedReply,
-      expectedTopicEntryId: existing.expectedTopicEntryId,
-      expectedTopicLabel: existing.expectedTopicLabel,
-    });
-  } catch (error) {
-    ran = {
-      status: "error" as const,
-      sessionId: null,
-      actualReply: "",
-      reasoningForOperators: null,
-      handoffCalled: false,
-      handoffTopicEntryId: null,
-      answerAnalysis: null,
-      errorMessage: error instanceof Error ? error.message : "Eval run failed unexpectedly.",
-    };
-  }
-
-  const createdRun = await createEvalRun({
-    workspaceId,
-    evalCaseId: id,
-    status: ran.status,
-    actualReply: ran.actualReply,
-    answerAnalysis: ran.answerAnalysis,
-    reasoningForOperators: ran.reasoningForOperators,
-    handoffCalled: ran.handoffCalled,
-    handoffTopicEntryId: ran.handoffTopicEntryId,
-    errorMessage: ran.errorMessage,
-    subjectSessionId: ran.sessionId,
-  });
-  if (!createdRun.ok) return c.json({ error: "persist_run_failed" }, 500);
-
-  // Only answer outcomes update the analysis dock color; runtime errors do not.
-  if (ran.status === "passed" || ran.status === "failed") {
-    await updateEvalCase(workspaceId, id, {
-      answerCorrect: ran.status === "passed",
-      answerAnalysis: ran.answerAnalysis,
-    });
-  }
-
-  const evalCase = await getEvalCaseById(workspaceId, id);
-  if (!evalCase) return c.json({ error: "not_found" }, 404);
-  return c.json({ evalCase });
+  const result = await runAndPersistEvalCase({ workspaceId, evalCaseId: id });
+  if (!result.ok) return c.json({ error: result.error }, result.httpStatus);
+  return c.json({ evalCase: result.evalCase });
 });
 
 app.delete("/evals/:id", async (c) => {

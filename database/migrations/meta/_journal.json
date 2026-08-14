@@ -127,6 +127,20 @@
       "when": 1780540924816,
       "tag": "0017_eval_run_handoff",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1780540924817,
+      "tag": "0018_eval_schedules",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1780540924818,
+      "tag": "0019_eval_schedule_enabled",
+      "breakpoints": true
     }
   ]
 }

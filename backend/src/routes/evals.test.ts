@@ -34,6 +34,21 @@ vi.mock("../repositories/evals.js", () => ({
   parseEvalTurns: vi.fn((turns: unknown) => turns),
 }));
 
+vi.mock("../repositories/eval-schedules.js", () => ({
+  listEvalCaseIdsWithSchedule: vi.fn(),
+  getEvalScheduleByEvalCaseId: vi.fn(),
+  createEvalSchedule: vi.fn(),
+  updateEvalSchedule: vi.fn(),
+  listScheduledRunsPage: vi.fn(),
+  listAllEvalSchedules: vi.fn(),
+  claimEvalScheduleSlot: vi.fn(),
+  setEvalScheduleEnabled: vi.fn(),
+}));
+
+vi.mock("../repositories/workspaces.js", () => ({
+  isWorkspaceTeammate: vi.fn(),
+}));
+
 vi.mock("../repositories/conversations.js", () => ({
   getConversationWithContact: vi.fn(),
   listConversationMessagesLatestPage: vi.fn(),
@@ -79,6 +94,13 @@ import {
   getEvalCaseById,
   listEvalCasesPage,
 } from "../repositories/evals.js";
+import {
+  createEvalSchedule,
+  getEvalScheduleByEvalCaseId,
+  listScheduledRunsPage,
+  setEvalScheduleEnabled,
+} from "../repositories/eval-schedules.js";
+import { isWorkspaceTeammate } from "../repositories/workspaces.js";
 import { draftEvalFromHandoff, draftEvalFromKnowledge } from "../agent-evals/index.js";
 import { getWorkspaceResponseTemplateEntryForEval } from "../repositories/response-templates.js";
 import { getWorkspaceContextEntryForEval } from "../repositories/workspace-context-groups.js";
@@ -90,6 +112,11 @@ const createManualEvalCaseMock = vi.mocked(createManualEvalCase);
 const createEvalCaseFromDraftMock = vi.mocked(createEvalCaseFromDraft);
 const getEvalCaseByIdMock = vi.mocked(getEvalCaseById);
 const listEvalCasesPageMock = vi.mocked(listEvalCasesPage);
+const createEvalScheduleMock = vi.mocked(createEvalSchedule);
+const getEvalScheduleByEvalCaseIdMock = vi.mocked(getEvalScheduleByEvalCaseId);
+const listScheduledRunsPageMock = vi.mocked(listScheduledRunsPage);
+const setEvalScheduleEnabledMock = vi.mocked(setEvalScheduleEnabled);
+const isWorkspaceTeammateMock = vi.mocked(isWorkspaceTeammate);
 const getTemplateEntryMock = vi.mocked(getWorkspaceResponseTemplateEntryForEval);
 const getContextEntryMock = vi.mocked(getWorkspaceContextEntryForEval);
 const getHandoffEntryMock = vi.mocked(getWorkspaceHandoffTopicEntryForEval);
@@ -479,5 +506,180 @@ describe("evals routes", () => {
         expectedReply: "",
       }),
     );
+  });
+});
+
+const NOTIFY_USER_ID = "11111111-1111-4111-8111-111111111111";
+
+const SCHEDULE_BODY = {
+  repeat: "weekly" as const,
+  weekdays: [0],
+  monthDay: 1,
+  hour: 20,
+  minute: 0,
+  timezone: "Asia/Kuala_Lumpur",
+  notifyUserId: NOTIFY_USER_ID,
+};
+
+function evalCaseStub() {
+  return {
+    id: EVAL_ID,
+    workspaceId: "ws-1",
+    agentId: AGENT_ID,
+    agentName: "Support",
+    title: "Hours",
+    source: "manual" as const,
+    status: "ready" as const,
+    turns: [{ role: "user" as const, content: "Hours?" }],
+    expectedReply: "9-6",
+    expectedAction: "reply" as const,
+    expectedTopicEntryId: null,
+    expectedTopicLabel: null,
+    expectedTopicDescription: null,
+    answerAnalysis: null,
+    answerCorrect: null,
+    sourceConversationId: null,
+    runs: [],
+    hasSchedule: false,
+    createdAt: "2026-08-13T00:00:00.000Z",
+    updatedAt: "2026-08-13T00:00:00.000Z",
+  };
+}
+
+describe("eval schedule routes", () => {
+  // Create schedule for a member → 201, needed so the Schedule tab can persist cadence.
+  it("POST /evals/:id/schedule → creates when the eval exists and notify user is a member", async () => {
+    getEvalCaseByIdMock.mockResolvedValue(evalCaseStub());
+    isWorkspaceTeammateMock.mockResolvedValue(true);
+    createEvalScheduleMock.mockResolvedValue({ ok: true, id: "sched-1" });
+    getEvalScheduleByEvalCaseIdMock.mockResolvedValue({
+      id: "sched-1",
+      workspaceId: "ws-1",
+      evalCaseId: EVAL_ID,
+      ...SCHEDULE_BODY,
+      monthDay: null,
+      enabled: true,
+      lastFiredAt: null,
+      createdAt: "2026-08-13T00:00:00.000Z",
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    });
+
+    const res = await appWithAuth().request(`/evals/${EVAL_ID}/schedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(SCHEDULE_BODY),
+    });
+
+    expect(res.status).toBe(201);
+    const payload = await res.json();
+    expect(payload.schedule.notifyUserId).toBe(NOTIFY_USER_ID);
+    expect(payload.schedule.repeat).toBe("weekly");
+  });
+
+  // Second create for the same eval → 409, needed so one schedule per eval is enforced.
+  it("POST /evals/:id/schedule → 409 when a schedule already exists", async () => {
+    getEvalCaseByIdMock.mockResolvedValue(evalCaseStub());
+    isWorkspaceTeammateMock.mockResolvedValue(true);
+    createEvalScheduleMock.mockResolvedValue({ ok: false, error: "exists" });
+
+    const res = await appWithAuth().request(`/evals/${EVAL_ID}/schedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(SCHEDULE_BODY),
+    });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "schedule_exists" });
+  });
+
+  // Notify user is not owner/member → 422, needed so mail cannot target outsiders.
+  it("POST /evals/:id/schedule → 422 when notify user is not a workspace member", async () => {
+    getEvalCaseByIdMock.mockResolvedValue(evalCaseStub());
+    isWorkspaceTeammateMock.mockResolvedValue(false);
+
+    const res = await appWithAuth().request(`/evals/${EVAL_ID}/schedule`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(SCHEDULE_BODY),
+    });
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: "notify_not_member" });
+  });
+
+  // Paginated scheduled runs for that eval → 200 with the run payload.
+  it("GET /evals/:id/scheduled-runs → returns this eval’s scheduled runs", async () => {
+    getEvalCaseByIdMock.mockResolvedValue({ ...evalCaseStub(), hasSchedule: true });
+    listScheduledRunsPageMock.mockResolvedValue({
+      items: [
+        {
+          id: "run-1",
+          status: "failed",
+          actualReply: "Wrong hours.",
+          answerAnalysis: null,
+          reasoningForOperators: null,
+          handoffCalled: false,
+          handoffTopicEntryId: null,
+          handoffTopicLabel: null,
+          errorMessage: null,
+          subjectSessionId: null,
+          ranAt: "2026-08-13T09:00:00.000Z",
+          emailSent: true,
+          notifyEmail: "ops@example.com",
+        },
+      ],
+      total: 1,
+    });
+
+    const res = await appWithAuth().request(`/evals/${EVAL_ID}/scheduled-runs?page=1`);
+    expect(res.status).toBe(200);
+    const payload = await res.json();
+    expect(payload.total).toBe(1);
+    expect(payload.runs[0].actualReply).toBe("Wrong hours.");
+    expect(payload.pageSize).toBe(5);
+  });
+
+  // PATCH enabled false → 200, needed so Turn off stops future runs without deleting the cadence.
+  it("PATCH /evals/:id/schedule → sets enabled to false", async () => {
+    getEvalCaseByIdMock.mockResolvedValue({ ...evalCaseStub(), hasSchedule: true });
+    getEvalScheduleByEvalCaseIdMock
+      .mockResolvedValueOnce({
+        id: "sched-1",
+        workspaceId: "ws-1",
+        evalCaseId: EVAL_ID,
+        ...SCHEDULE_BODY,
+        monthDay: null,
+        enabled: true,
+        lastFiredAt: null,
+        createdAt: "2026-08-13T00:00:00.000Z",
+        updatedAt: "2026-08-13T00:00:00.000Z",
+      })
+      .mockResolvedValueOnce({
+        id: "sched-1",
+        workspaceId: "ws-1",
+        evalCaseId: EVAL_ID,
+        ...SCHEDULE_BODY,
+        monthDay: null,
+        enabled: false,
+        lastFiredAt: null,
+        createdAt: "2026-08-13T00:00:00.000Z",
+        updatedAt: "2026-08-13T00:00:00.000Z",
+      });
+    setEvalScheduleEnabledMock.mockResolvedValue({ ok: true });
+
+    const res = await appWithAuth().request(`/evals/${EVAL_ID}/schedule`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: false }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      schedule: {
+        ...SCHEDULE_BODY,
+        monthDay: null,
+        enabled: false,
+      },
+    });
   });
 });

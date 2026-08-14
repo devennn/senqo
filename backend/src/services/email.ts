@@ -81,3 +81,36 @@ export async function sendWhatsappDisconnectEmail(
     return { ok: false };
   }
 }
+
+type EvalScheduleFailureEmailInput = {
+  to: string;
+  workspaceId: string;
+  evalCaseId: string;
+  evalTitle: string;
+  status: "failed" | "error";
+};
+
+export async function sendEvalScheduleFailureEmail(
+  input: EvalScheduleFailureEmailInput,
+): Promise<{ ok: boolean }> {
+  const outcome = input.status === "error" ? "errored" : "failed";
+  const title = input.evalTitle.trim() || "Untitled eval";
+  const evalUrl = `${env.frontendUrl.replace(/\/$/, "")}/${encodeURIComponent(input.workspaceId)}/evals?evalId=${encodeURIComponent(input.evalCaseId)}`;
+
+  try {
+    await sendEmail({
+      to: input.to,
+      subject: `Eval ${outcome}: ${title}`,
+      html: `<p>Scheduled eval <strong>${escapeHtml(title)}</strong> ${outcome}.</p><p><a href="${escapeHtml(evalUrl)}">Open eval</a></p>`,
+    });
+    console.info(
+      `[${scope}/sendEvalScheduleFailureEmail] Success: to=${input.to} evalCaseId=${input.evalCaseId}`,
+    );
+    return { ok: true };
+  } catch (error) {
+    console.error(
+      `[${scope}/sendEvalScheduleFailureEmail] Unexpected error: ${String(error)}`,
+    );
+    return { ok: false };
+  }
+}

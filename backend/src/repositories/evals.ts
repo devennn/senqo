@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { agentConfigs, evalCases, evalRuns, workspaceHandoffTopicEntries } from "../db/schema/index.js";
 import { listPageOffset } from "../lib/pagination.js";
+import { listEvalCaseIdsWithSchedule } from "./eval-schedules.js";
 import type {
   CreateEvalCaseFromDraftInput,
   CreateEvalRunInput,
@@ -159,6 +160,7 @@ function toCaseRecord(
     agentName: string | null;
   },
   runs: EvalRunRecord[],
+  hasSchedule: boolean,
 ): EvalCaseRecord {
   return {
     id: row.id,
@@ -178,6 +180,7 @@ function toCaseRecord(
     answerCorrect: row.answerCorrect,
     sourceConversationId: row.sourceConversationId,
     runs,
+    hasSchedule,
     createdAt: asIso(row.createdAt),
     updatedAt: asIso(row.updatedAt),
   };
@@ -286,8 +289,12 @@ export async function listEvalCasesPage(input: {
       rows.map((row) => row.id),
     );
 
+    const scheduledIds = await listEvalCaseIdsWithSchedule(
+      workspaceId,
+      rows.map((row) => row.id),
+    );
     const items = rows.map((row) =>
-      toCaseRecord(row, runsByCase.get(row.id) ?? []),
+      toCaseRecord(row, runsByCase.get(row.id) ?? [], scheduledIds.has(row.id)),
     );
     console.info(
       `[${scope}/listEvalCasesPage] Success: userId=${workspaceId} agentId=${agentConfigId} total=${countRow?.count ?? 0}`,
@@ -348,8 +355,9 @@ export async function getEvalCaseById(
     }
 
     const runsByCase = await listRunsForCases(workspaceId, [row.id]);
+    const scheduledIds = await listEvalCaseIdsWithSchedule(workspaceId, [row.id]);
     console.info(`[${scope}/getEvalCaseById] Success: userId=${workspaceId} id=${evalCaseId}`);
-    return toCaseRecord(row, runsByCase.get(row.id) ?? []);
+    return toCaseRecord(row, runsByCase.get(row.id) ?? [], scheduledIds.has(row.id));
   } catch (error) {
     console.error(`[${scope}/getEvalCaseById] Unexpected error: ${String(error)}`);
     return null;
@@ -533,6 +541,7 @@ export async function createEvalRun(
         handoffTopicEntryId: input.handoffTopicEntryId ?? null,
         errorMessage: input.errorMessage ?? null,
         subjectSessionId: input.subjectSessionId,
+        scheduleId: input.scheduleId ?? null,
       })
       .returning({ id: evalRuns.id });
 
@@ -548,6 +557,34 @@ export async function createEvalRun(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[${scope}/createEvalRun] Failed query: ${message}`);
+    return { ok: false };
+  }
+}
+
+export async function markEvalRunEmailSent(
+  workspaceId: string,
+  runId: string,
+  notifyEmail: string,
+): Promise<{ ok: boolean }> {
+  try {
+    const updated = await db
+      .update(evalRuns)
+      .set({ emailSent: true, notifyEmail })
+      .where(and(eq(evalRuns.workspaceId, workspaceId), eq(evalRuns.id, runId)))
+      .returning({ id: evalRuns.id });
+    if (!updated[0]) {
+      console.info(
+        `[${scope}/markEvalRunEmailSent] Failed query: not found userId=${workspaceId} id=${runId}`,
+      );
+      return { ok: false };
+    }
+    console.info(
+      `[${scope}/markEvalRunEmailSent] Success: userId=${workspaceId} id=${runId}`,
+    );
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[${scope}/markEvalRunEmailSent] Unexpected error: ${message}`);
     return { ok: false };
   }
 }

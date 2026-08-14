@@ -73,12 +73,39 @@ export type EvalCase = {
   sourceConversationId: string | null;
   /** Newest first. */
   runs: EvalRun[];
+  hasSchedule: boolean;
   createdAt: string;
 };
 
 export type EvalAgentOption = {
   id: string;
   name: string;
+};
+
+export type EvalScheduleRepeat = "daily" | "weekly" | "monthly";
+
+/** 0 = Sunday … 6 = Saturday (JS `Date#getDay`). */
+export type EvalScheduleWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type EvalSchedule = {
+  repeat: EvalScheduleRepeat;
+  weekdays: EvalScheduleWeekday[];
+  /** 1–31 when repeat is monthly. */
+  monthDay: number;
+  /** Local wall-clock `HH:mm`. */
+  time: string;
+  timezone: string;
+  notifyUserId: string;
+};
+
+export type EvalScheduleMember = {
+  userId: string;
+  email: string;
+};
+
+export type EvalScheduledRun = EvalRun & {
+  emailSent: boolean;
+  notifyEmail: string | null;
 };
 
 export type CreateManualEvalInput = {

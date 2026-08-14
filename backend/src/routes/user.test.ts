@@ -304,6 +304,40 @@ vi.mock("../repositories/team.js", () => ({
   listMembers: vi.fn(),
 }));
 
+vi.mock("../agent-evals/index.js", () => ({
+  draftEvalFromReport: vi.fn(),
+  draftEvalFromKnowledge: vi.fn(),
+  draftEvalFromHandoff: vi.fn(),
+  runEvalCase: vi.fn(),
+}));
+
+vi.mock("../services/eval-run.js", () => ({
+  runAndPersistEvalCase: vi.fn(),
+}));
+
+vi.mock("../repositories/eval-schedules.js", () => ({
+  listEvalCaseIdsWithSchedule: vi.fn(),
+  getEvalScheduleByEvalCaseId: vi.fn(),
+  createEvalSchedule: vi.fn(),
+  updateEvalSchedule: vi.fn(),
+  listScheduledRunsPage: vi.fn(),
+  listAllEvalSchedules: vi.fn(),
+  claimEvalScheduleSlot: vi.fn(),
+  setEvalScheduleEnabled: vi.fn(),
+}));
+
+vi.mock("../repositories/evals.js", () => ({
+  listEvalCasesPage: vi.fn(),
+  getEvalCaseById: vi.fn(),
+  createManualEvalCase: vi.fn(),
+  createEvalCaseFromDraft: vi.fn(),
+  updateEvalCase: vi.fn(),
+  deleteEvalCase: vi.fn(),
+  createEvalRun: vi.fn(),
+  parseEvalTurns: vi.fn((turns: unknown) => turns),
+  markEvalRunEmailSent: vi.fn(),
+}));
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";
