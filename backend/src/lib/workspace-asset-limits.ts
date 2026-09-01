@@ -2,13 +2,8 @@ export type WorkspaceAssetKind = "image" | "video" | "audio" | "file";
 
 const MB = 1024 * 1024;
 
-/** Per-file caps by kind (WhatsApp delivery and storage). */
-export const WORKSPACE_ASSET_MAX_BYTES_BY_KIND: Record<WorkspaceAssetKind, number> = {
-  image: 10 * MB,
-  video: 16 * MB,
-  audio: 12 * MB,
-  file: 20 * MB,
-};
+/** Per-file cap for every asset kind. */
+export const WORKSPACE_ASSET_MAX_BYTES = 20 * MB;
 
 const ALLOWED_MIME_EXACT = new Set([
   "application/pdf",
@@ -31,10 +26,6 @@ export function classifyWorkspaceAssetKind(mimeType: string): WorkspaceAssetKind
   if (normalized.startsWith("video/")) return "video";
   if (normalized.startsWith("audio/")) return "audio";
   return "file";
-}
-
-export function maxBytesForWorkspaceAssetKind(kind: WorkspaceAssetKind): number {
-  return WORKSPACE_ASSET_MAX_BYTES_BY_KIND[kind];
 }
 
 export function isAllowedWorkspaceAssetMimeType(mimeType: string): boolean {
@@ -79,35 +70,21 @@ export function validateWorkspaceAssetUpload(
   }
 
   const kind = classifyWorkspaceAssetKind(mimeType);
-  const maxBytes = maxBytesForWorkspaceAssetKind(kind);
 
   if (input.byteLength <= 0) {
     return { ok: false, message: "File is empty." };
   }
 
-  if (input.byteLength > maxBytes) {
-    const kindLabel =
-      kind === "image"
-        ? "Images"
-        : kind === "video"
-          ? "Videos"
-          : kind === "audio"
-            ? "Audio"
-            : "Files";
+  if (input.byteLength > WORKSPACE_ASSET_MAX_BYTES) {
     return {
       ok: false,
-      message: `${kindLabel} must be ${formatMegabytes(maxBytes)} MB or smaller.`,
+      message: `File must be ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES)} MB or smaller.`,
     };
   }
 
-  return { ok: true, kind, maxBytes };
+  return { ok: true, kind, maxBytes: WORKSPACE_ASSET_MAX_BYTES };
 }
 
 export function workspaceAssetLimitsSummaryForUi(): string {
-  return [
-    `Images up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.image)} MB`,
-    `videos up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.video)} MB`,
-    `audio up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.audio)} MB`,
-    `other files up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.file)} MB`,
-  ].join("; ");
+  return `Up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES)} MB per file`;
 }

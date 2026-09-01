@@ -194,16 +194,17 @@ export async function updateWorkspaceContextEntry(payload: {
     }
 
     const [entryRow] = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ id: workspaceContextEntries.id })
       .from(workspaceContextEntries)
       .where(
         and(
           eq(workspaceContextEntries.groupId, payload.groupId),
           eq(workspaceContextEntries.id, payload.entryId),
         ),
-      );
+      )
+      .limit(1);
 
-    if ((entryRow?.count ?? 0) !== 1) {
+    if (!entryRow) {
       console.error(`[${scope}/updateWorkspaceContextEntry] Failed query: entry not found`);
       return { ok: false, message: "Entry not found." };
     }

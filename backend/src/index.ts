@@ -17,6 +17,7 @@ import healthRoute from "./routes/health.js";
 import authRoute from "./routes/auth.js";
 import adminRoute from "./routes/admin.js";
 import { env } from "./lib/env.js";
+import { isHttpPostTooLarge } from "./lib/http-post-max-bytes.js";
 import { startJobQueue, stopJobQueue } from "./lib/job-queue.js";
 import { bootstrapAdminIfNeeded } from "./lib/bootstrap-admin.js";
 
@@ -92,8 +93,7 @@ app.use(
 );
 
 app.post("*", async (c, next) => {
-  const contentLength = c.req.header("content-length");
-  if (contentLength && parseInt(contentLength, 10) > 10 * 1024 * 1024) {
+  if (isHttpPostTooLarge(c.req.header("content-length"))) {
     return c.json({ error: "payload_too_large" }, 413);
   }
   await next();

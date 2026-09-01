@@ -205,19 +205,18 @@ export async function updateWorkspaceHandoffTopicEntry(payload: {
       return { ok: false, message: "Group not found." };
     }
 
-    const countResult = await db
-      .select({ count: sql<number>`count(*)` })
+    const [entryRow] = await db
+      .select({ id: workspaceHandoffTopicEntries.id })
       .from(workspaceHandoffTopicEntries)
       .where(
         and(
           eq(workspaceHandoffTopicEntries.groupId, payload.groupId),
           eq(workspaceHandoffTopicEntries.id, payload.entryId),
         ),
-      );
+      )
+      .limit(1);
 
-    const ownsEntry = countResult[0]?.count ?? 0;
-
-    if (ownsEntry !== 1) {
+    if (!entryRow) {
       console.error(`[${scope}/updateWorkspaceHandoffTopicEntry] Failed query: entry not found`);
       return { ok: false, message: "Topic not found." };
     }

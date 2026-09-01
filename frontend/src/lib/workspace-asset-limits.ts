@@ -1,14 +1,8 @@
 /** Keep in sync with backend `workspace-asset-limits.ts`. */
-export type WorkspaceAssetKind = "image" | "video" | "audio" | "file";
 
 const MB = 1024 * 1024;
 
-export const WORKSPACE_ASSET_MAX_BYTES_BY_KIND: Record<WorkspaceAssetKind, number> = {
-  image: 10 * MB,
-  video: 16 * MB,
-  audio: 12 * MB,
-  file: 20 * MB,
-};
+export const WORKSPACE_ASSET_MAX_BYTES = 20 * MB;
 
 const ALLOWED_MIME_EXACT = new Set([
   "application/pdf",
@@ -25,14 +19,6 @@ const ALLOWED_MIME_EXACT = new Set([
 
 const ALLOWED_MIME_PREFIXES = ["image/", "video/", "audio/"];
 
-export function classifyWorkspaceAssetKind(mimeType: string): WorkspaceAssetKind {
-  const normalized = mimeType.trim().toLowerCase();
-  if (normalized.startsWith("image/")) return "image";
-  if (normalized.startsWith("video/")) return "video";
-  if (normalized.startsWith("audio/")) return "audio";
-  return "file";
-}
-
 function isAllowedWorkspaceAssetMimeType(mimeType: string): boolean {
   const normalized = mimeType.trim().toLowerCase();
   if (!normalized || normalized === "application/octet-stream") return true;
@@ -46,8 +32,6 @@ function formatMegabytes(bytes: number): string {
 }
 
 export function validateWorkspaceAssetFile(file: File): { ok: true } | { ok: false; message: string } {
-  const kind = classifyWorkspaceAssetKind(file.type || "application/octet-stream");
-  const maxBytes = WORKSPACE_ASSET_MAX_BYTES_BY_KIND[kind];
   if (!isAllowedWorkspaceAssetMimeType(file.type)) {
     return {
       ok: false,
@@ -57,22 +41,15 @@ export function validateWorkspaceAssetFile(file: File): { ok: true } | { ok: fal
   if (file.size <= 0) {
     return { ok: false, message: "File is empty." };
   }
-  if (file.size > maxBytes) {
-    const kindLabel =
-      kind === "image" ? "Images" : kind === "video" ? "Videos" : kind === "audio" ? "Audio" : "Files";
+  if (file.size > WORKSPACE_ASSET_MAX_BYTES) {
     return {
       ok: false,
-      message: `${kindLabel} must be ${formatMegabytes(maxBytes)} MB or smaller.`,
+      message: `File must be ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES)} MB or smaller.`,
     };
   }
   return { ok: true };
 }
 
 export function workspaceAssetLimitsSummaryForUi(): string {
-  return [
-    `Images up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.image)} MB`,
-    `videos up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.video)} MB`,
-    `audio up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.audio)} MB`,
-    `other files up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES_BY_KIND.file)} MB`,
-  ].join("; ");
+  return `Up to ${formatMegabytes(WORKSPACE_ASSET_MAX_BYTES)} MB per file`;
 }

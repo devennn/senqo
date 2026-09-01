@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { validateAgentKnowledgeImportPreviewInput } from "../lib/agent-knowledge-import.js";
+import {
+  validateAgentKnowledgeImportFileMeta,
+  validateAgentKnowledgeImportPreviewInput,
+} from "../lib/agent-knowledge-import.js";
 
 describe("validateAgentKnowledgeImportPreviewInput", () => {
   // Rejects empty uploads so the route never calls extraction or the LLM.
@@ -30,5 +33,15 @@ describe("validateAgentKnowledgeImportPreviewInput", () => {
       expect(result.targets).toEqual(["context", "skills"]);
       expect(result.files[0]?.name).toBe("prices.csv");
     }
+  });
+
+  // A file over the 20 MB per-file cap is rejected before preview work starts.
+  it("returns exceeds 20 MB when a file is over the per-file cap", () => {
+    const result = validateAgentKnowledgeImportFileMeta({
+      name: "big.pdf",
+      size: 20 * 1024 * 1024 + 1,
+      mimeType: "application/pdf",
+    });
+    expect(result).toEqual({ ok: false, message: "big.pdf: exceeds 20 MB limit." });
   });
 });

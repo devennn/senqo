@@ -4,7 +4,7 @@ import {
 } from "../types/agent-knowledge-import.js";
 
 export const AGENT_KNOWLEDGE_IMPORT_MAX_FILES = 5;
-export const AGENT_KNOWLEDGE_IMPORT_MAX_FILE_BYTES = 15 * 1024 * 1024;
+export const AGENT_KNOWLEDGE_IMPORT_MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 const ALLOWED_EXTENSIONS = new Set(["pdf", "csv", "md"]);
 
@@ -22,7 +22,7 @@ export function validateAgentKnowledgeImportFileMeta(
     return { ok: false, message: `${file.name}: unsupported file type.` };
   }
   if (file.size > AGENT_KNOWLEDGE_IMPORT_MAX_FILE_BYTES) {
-    return { ok: false, message: `${file.name}: exceeds 15 MB limit.` };
+    return { ok: false, message: `${file.name}: exceeds 20 MB limit.` };
   }
   return { ok: true };
 }

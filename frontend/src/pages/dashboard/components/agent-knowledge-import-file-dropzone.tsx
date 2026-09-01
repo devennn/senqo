@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   AGENT_KNOWLEDGE_IMPORT_ACCEPT,
   AGENT_KNOWLEDGE_IMPORT_FILE_TYPES_LABEL,
+  AGENT_KNOWLEDGE_IMPORT_MAX_FILE_BYTES,
   AGENT_KNOWLEDGE_IMPORT_MAX_FILES,
 } from "@/lib/agent-knowledge-import";
 import type { AgentKnowledgeImportFile } from "@/types/agent-knowledge-import";
@@ -149,7 +150,8 @@ export function AgentKnowledgeImportFileDropzone({
           <div>
             <p className="text-sm font-medium text-foreground">Drop company docs here</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {AGENT_KNOWLEDGE_IMPORT_FILE_TYPES_LABEL} — up to {AGENT_KNOWLEDGE_IMPORT_MAX_FILES} files
+              {AGENT_KNOWLEDGE_IMPORT_FILE_TYPES_LABEL} — up to {AGENT_KNOWLEDGE_IMPORT_MAX_FILES} files,{" "}
+              {AGENT_KNOWLEDGE_IMPORT_MAX_FILE_BYTES / (1024 * 1024)} MB each
             </p>
           </div>
           <Button type="button" size="sm" variant="outline" disabled={disabled}>

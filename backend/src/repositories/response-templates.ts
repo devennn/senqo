@@ -194,16 +194,17 @@ export async function updateWorkspaceResponseTemplateEntry(payload: {
     }
 
     const [entryRow] = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ id: workspaceResponseTemplateEntries.id })
       .from(workspaceResponseTemplateEntries)
       .where(
         and(
           eq(workspaceResponseTemplateEntries.groupId, payload.groupId),
           eq(workspaceResponseTemplateEntries.id, payload.entryId),
         ),
-      );
+      )
+      .limit(1);
 
-    if ((entryRow?.count ?? 0) !== 1) {
+    if (!entryRow) {
       console.error(`[${scope}/updateWorkspaceResponseTemplateEntry] Failed query: entry not found`);
       return { ok: false, message: "Template not found." };
     }

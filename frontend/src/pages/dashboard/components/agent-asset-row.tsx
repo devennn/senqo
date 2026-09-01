@@ -5,6 +5,7 @@ import {
   ASSET_ABOUT_DESCRIPTION_PLACEHOLDER,
   AssetAboutDescriptionLabel,
 } from "@/pages/dashboard/components/agent-asset-about-description";
+import { AgentAssetThumb } from "@/pages/dashboard/components/agent-asset-thumb";
 import type { AgentAssetRecord } from "@/types/repositories";
 
 type Props = {
@@ -41,22 +42,14 @@ export function AgentAssetRow({ asset, onSaveDescription, onDelete }: Props) {
     }
   }
 
-  const isImage = asset.mime_type.startsWith("image/");
-
   return (
     <li className="rounded-lg border border-border bg-card p-4 shadow-soft">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        {isImage && asset.preview_url ? (
-          <img
-            src={asset.preview_url}
-            alt=""
-            className="size-20 shrink-0 rounded-md border border-border object-cover"
-          />
-        ) : (
-          <div className="flex size-20 shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted text-xs text-muted-foreground">
-            {asset.mime_type.split("/")[0] ?? "file"}
-          </div>
-        )}
+        <AgentAssetThumb
+          mimeType={asset.mime_type}
+          previewUrl={asset.preview_url}
+          fileName={asset.file_name}
+        />
         <div className="min-w-0 flex-1 space-y-2">
           <p className="truncate font-medium text-foreground">{asset.file_name}</p>
           <p className="text-xs text-muted-foreground">{asset.mime_type}</p>
