@@ -141,6 +141,13 @@
       "when": 1780540924818,
       "tag": "0019_eval_schedule_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1780540924819,
+      "tag": "0020_dashboard_list_indexes",
+      "breakpoints": true
     }
   ]
 }

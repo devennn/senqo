@@ -5,6 +5,7 @@ import { buildConversationsQuery } from "@/lib/build-conversations-query";
 import { mergeConversationMessagesOnRefresh } from "@/lib/conversation-message-cursor";
 import { useRealtime, type RealtimeEvent } from "@/hooks/useRealtime";
 import {
+  CONVERSATIONS_PAGE_SIZE,
   CONVERSATION_THREAD_MESSAGES_PAGE_SIZE,
   type ConversationHeaderData,
   type ConversationLabelRecord,
@@ -12,6 +13,7 @@ import {
   type ConversationSummary,
   type ConversationThreadDetailResponse,
   type ConversationThreadMessagesPage,
+  type ConversationsListResponse,
 } from "@/types/repositories";
 
 // Safety-net poll interval — covers dropped SSE connections and edge cases.
@@ -32,6 +34,9 @@ export function useDashboardThread(
   const [loadingConversationDetail, setLoadingConversationDetail] = useState(false);
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
   const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(false);
+  const [hasMoreConversations, setHasMoreConversations] = useState(false);
+  const [totalConversations, setTotalConversations] = useState(0);
+  const [loadingOlderConversations, setLoadingOlderConversations] = useState(false);
   const [activeConversation, setActiveConversation] = useState<ConversationHeaderData | null>(null);
   const { workspaceId } = useWorkspace();
   // IDs of conversations that just arrived via realtime — used for the brief
@@ -45,8 +50,6 @@ export function useDashboardThread(
   const scrollRestoreRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(null);
   const userNearBottomRef = useRef(true);
   const oldestHistoryFullyLoadedRef = useRef(false);
-
-  const conversationsQs = buildConversationsQuery(searchQuery, labelId, humanOnly, connectionId);
 
   messagesRef.current = messages;
   hasMoreOlderMessagesRef.current = hasMoreOlderMessages;
@@ -62,10 +65,31 @@ export function useDashboardThread(
   const conversationsRef = useRef<ConversationSummary[]>([]);
   conversationsRef.current = conversations;
 
+  // Server-side rail pagination: how many conversations have been fetched so
+  // far for the current filters; refreshes re-fetch limit = max(page, loaded)
+  // so the list never truncates mid-session while the user has scrolled.
+  const loadedConversationsCountRef = useRef(0);
+  const hasMoreConversationsRef = useRef(false);
+  const loadingOlderConversationsRef = useRef(false);
+  hasMoreConversationsRef.current = hasMoreConversations;
+  loadingOlderConversationsRef.current = loadingOlderConversations;
+
   const reloadConversations = useCallback(() => {
+    const limit = Math.max(CONVERSATIONS_PAGE_SIZE, loadedConversationsCountRef.current);
     return api
-      .get<{ conversations: ConversationSummary[] }>(`/api/user/conversations${conversationsQs}`)
+      .get<ConversationsListResponse>(
+        `/api/user/conversations${buildConversationsQuery(
+          searchQuery,
+          labelId,
+          humanOnly,
+          connectionId,
+          { limit, offset: 0 },
+        )}`,
+      )
       .then((res) => {
+        loadedConversationsCountRef.current = res.conversations.length;
+        setHasMoreConversations(res.hasMore);
+        setTotalConversations(res.total);
         const next = res.conversations;
         // Detect IDs that weren't in the previous list — mark them for highlight.
         const prevIds = new Set(conversationsRef.current.map((c) => c.id));
@@ -87,12 +111,42 @@ export function useDashboardThread(
         }
         setConversations(next);
       });
-  }, [conversationsQs]);
+  }, [connectionId, humanOnly, labelId, searchQuery]);
 
   useEffect(() => {
+    // Filters changed: reset rail paging to the first page.
+    loadedConversationsCountRef.current = CONVERSATIONS_PAGE_SIZE;
     setLoadingConversations(true);
     reloadConversations().finally(() => setLoadingConversations(false));
   }, [reloadConversations]);
+
+  const loadOlderConversations = useCallback(async () => {
+    if (loadingOlderConversationsRef.current || !hasMoreConversationsRef.current) return;
+    loadingOlderConversationsRef.current = true;
+    setLoadingOlderConversations(true);
+    try {
+      const res = await api.get<ConversationsListResponse>(
+        `/api/user/conversations${buildConversationsQuery(
+          searchQuery,
+          labelId,
+          humanOnly,
+          connectionId,
+          { limit: CONVERSATIONS_PAGE_SIZE, offset: loadedConversationsCountRef.current },
+        )}`,
+      );
+      // Ordering can shift between pages (a chat updates → moves to the top);
+      // drop any rows already loaded so the rail stays duplicate-free.
+      const prevIds = new Set(conversationsRef.current.map((c) => c.id));
+      const fresh = res.conversations.filter((c) => !prevIds.has(c.id));
+      loadedConversationsCountRef.current += res.conversations.length;
+      setHasMoreConversations(res.hasMore);
+      setTotalConversations(res.total);
+      setConversations((prev) => [...prev, ...fresh]);
+    } finally {
+      loadingOlderConversationsRef.current = false;
+      setLoadingOlderConversations(false);
+    }
+  }, [connectionId, humanOnly, labelId, searchQuery]);
 
   useEffect(() => {
     if (!conversationId) {
@@ -203,10 +257,7 @@ export function useDashboardThread(
   loadOlderMessagesRef.current = loadOlderMessages;
 
   const refreshThreadAndList = useCallback(async () => {
-    const qs = buildConversationsQuery(searchQuery, labelId, humanOnly, connectionId);
-    const listPromise = api
-      .get<{ conversations: ConversationSummary[] }>(`/api/user/conversations${qs}`)
-      .then((res) => setConversations(res.conversations));
+    const listPromise = reloadConversations();
     const catalogPromise = api
       .get<{ labels: ConversationLabelRecord[] }>("/api/user/conversation-labels")
       .then((res) => setLabelCatalog(res.labels));
@@ -242,7 +293,7 @@ export function useDashboardThread(
       );
     }
     await Promise.all(tasks);
-  }, [connectionId, conversationId, humanOnly, labelId, searchQuery]);
+  }, [connectionId, conversationId, humanOnly, labelId, searchQuery, reloadConversations]);
 
   // Stable ref so the SSE handler can read the current conversationId without
   // re-subscribing every time it changes.
@@ -312,6 +363,10 @@ export function useDashboardThread(
     loadingOlderMessages,
     hasMoreOlderMessages,
     loadOlderMessages,
+    hasMoreConversations,
+    totalConversations,
+    loadingOlderConversations,
+    loadOlderConversations,
     activeConversation,
     setActiveConversation,
     setConversations,

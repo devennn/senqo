@@ -325,6 +325,14 @@ export type ConversationSummary = {
   } | null;
 };
 
+export type ListConversationsResult = {
+  conversations: ConversationSummary[];
+  /** True when more conversations exist beyond the current page. */
+  hasMore: boolean;
+  /** Total matching conversations for the current filters (for the rail badge). */
+  total: number;
+};
+
 export type ConversationMessageMedia = {
   path?: string;
   /** Object storage namespace; defaults to whatsapp-media when signing previews. */

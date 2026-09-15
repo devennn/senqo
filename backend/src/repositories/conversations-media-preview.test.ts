@@ -8,10 +8,10 @@ vi.mock("../lib/storage.js", () => ({
   storageDownload: vi.fn(),
 }));
 
-const mockFindAgentAssetStorageByFileName = vi.fn();
+const mockFindAgentAssetStorageByFileNames = vi.fn();
 vi.mock("../repositories/workspace-asset-groups.js", () => ({
-  findAgentAssetStorageByFileName: (...args: unknown[]) =>
-    mockFindAgentAssetStorageByFileName(...args),
+  findAgentAssetStorageByFileNames: (...args: unknown[]) =>
+    mockFindAgentAssetStorageByFileNames(...args),
 }));
 
 vi.mock("../repositories/conversation-labels.js", () => ({
@@ -41,7 +41,7 @@ const { listConversationMessagesLatestPage } = await import("./conversations.js"
 beforeEach(() => {
   vi.clearAllMocks();
   mockStorageCreateSignedUrl.mockResolvedValue("https://signed.example/img.png");
-  mockFindAgentAssetStorageByFileName.mockResolvedValue(null);
+  mockFindAgentAssetStorageByFileNames.mockResolvedValue(new Map());
 });
 
 describe("listConversationMessagesLatestPage media preview", () => {
@@ -78,12 +78,11 @@ describe("listConversationMessagesLatestPage media preview", () => {
     expect(result.messages[0]?.media?.signedUrl).toBe("https://signed.example/img.png");
   });
 
-  // Legacy agent media without path → lookup by fileName then sign, needed so already-sent AI images still preview.
-  it("resolves missing path from agent asset fileName for agent_tool_send_whatsapp", async () => {
-    mockFindAgentAssetStorageByFileName.mockResolvedValue({
-      storagePath: "ws/g/a/legacy.png",
-      mimeType: "image/png",
-    });
+  // Legacy agent media without path → one batched lookup by fileName then sign, needed so already-sent AI images still preview.
+  it("resolves missing path from batched agent asset fileName lookup for agent_tool_send_whatsapp", async () => {
+    mockFindAgentAssetStorageByFileNames.mockResolvedValue(
+      new Map([["legacy.png", { storagePath: "ws/g/a/legacy.png", mimeType: "image/png" }]]),
+    );
     mockLimit.mockResolvedValue([
       {
         id: "m2",
@@ -105,7 +104,7 @@ describe("listConversationMessagesLatestPage media preview", () => {
     ]);
 
     const result = await listConversationMessagesLatestPage("ws-1", "conv-1", 20);
-    expect(mockFindAgentAssetStorageByFileName).toHaveBeenCalledWith("ws-1", "legacy.png");
+    expect(mockFindAgentAssetStorageByFileNames).toHaveBeenCalledWith("ws-1", ["legacy.png"]);
     expect(mockStorageCreateSignedUrl).toHaveBeenCalledWith(
       "agent-assets",
       "ws/g/a/legacy.png",

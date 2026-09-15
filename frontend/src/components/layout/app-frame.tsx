@@ -32,6 +32,10 @@ export function AppFrame({
   conversationLabelCatalog,
   loadingConversations,
   newConversationIds,
+  totalConversations,
+  hasMoreConversations,
+  loadingOlderConversations,
+  onLoadMoreConversations,
   mobilePanel: mobilePanelProp,
 }: {
   conversations: ConversationSummary[];
@@ -47,6 +51,14 @@ export function AppFrame({
   conversationLabelCatalog?: ConversationLabelRecord[];
   loadingConversations?: boolean;
   newConversationIds?: Set<string>;
+  /** Rail pagination: total for the current filters. */
+  totalConversations?: number;
+  /** Rail pagination: true when more pages exist. */
+  hasMoreConversations?: boolean;
+  /** Rail pagination: true while the next page loads. */
+  loadingOlderConversations?: boolean;
+  /** Rail pagination: loads the next page on scroll. */
+  onLoadMoreConversations?: () => void;
   mobilePanel?: "side" | "main" | "both";
 }) {
   const omitConversationRail = hideConversationRail === true;
@@ -71,6 +83,10 @@ export function AppFrame({
         labelCatalog={conversationLabelCatalog ?? []}
         loading={loadingConversations}
         newConversationIds={newConversationIds}
+        total={totalConversations}
+        hasMore={hasMoreConversations}
+        loadingMore={loadingOlderConversations}
+        onLoadMore={onLoadMoreConversations}
       />
     </Suspense>
   );

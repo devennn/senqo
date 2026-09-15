@@ -142,9 +142,9 @@ export const conversations = pgTable(
       t.workspaceId,
       t.updatedAt.desc(),
     ),
-    index("idx_conversations_workspace_unarchived_updated").on(
+    index("idx_conversations_workspace_contact").on(
       t.workspaceId,
-      t.updatedAt.desc(),
+      t.contactId,
     ),
   ],
 );
@@ -174,6 +174,10 @@ export const messages = pgTable(
     index("idx_messages_conversation_created").on(
       t.conversationId,
       t.createdAt.asc(),
+    ),
+    index("idx_messages_workspace_created").on(
+      t.workspaceId,
+      t.createdAt.desc(),
     ),
     uniqueIndex("idx_messages_workspace_wa_message_id_unique")
       .on(t.workspaceId, t.waMessageId)

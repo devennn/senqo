@@ -472,33 +472,45 @@ export async function getAgentAssetByFileNameForAgent(
   }
 }
 
-/** Resolves storage path for inbox preview when older messages omitted media.path. */
-export async function findAgentAssetStorageByFileName(
+/** Batched variant of findAgentAssetStorageByFileName for message-page hydration. */
+export async function findAgentAssetStorageByFileNames(
   workspaceId: string,
-  fileName: string,
-): Promise<{ storagePath: string; mimeType: string } | null> {
-  const normalized = fileName.trim();
-  if (!normalized) return null;
+  fileNames: string[],
+): Promise<Map<string, { storagePath: string; mimeType: string }>> {
+  const map = new Map<string, { storagePath: string; mimeType: string }>();
+  const normalized = [...new Set(fileNames.map((n) => n.trim()).filter(Boolean))];
+  if (normalized.length === 0) return map;
   try {
-    const [data] = await db
+    const rows = await db
       .select({
+        fileName: agentAssets.fileName,
         storagePath: agentAssets.storagePath,
         mimeType: agentAssets.mimeType,
       })
       .from(agentAssets)
       .where(
-        and(eq(agentAssets.workspaceId, workspaceId), ilike(agentAssets.fileName, normalized)),
-      )
-      .limit(1);
-    if (!data?.storagePath) {
-      console.error(`[${scope}/findAgentAssetStorageByFileName] Failed query: asset not found`);
-      return null;
+        and(
+          eq(agentAssets.workspaceId, workspaceId),
+          inArray(
+            sql`lower(${agentAssets.fileName})`,
+            normalized.map((n) => n.toLowerCase()),
+          ),
+        ),
+      );
+    for (const row of rows) {
+      if (!row.storagePath) continue;
+      const key = row.fileName.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { storagePath: row.storagePath, mimeType: row.mimeType });
+      }
     }
-    console.info(`[${scope}/findAgentAssetStorageByFileName] Success: workspaceId=${workspaceId}`);
-    return { storagePath: data.storagePath, mimeType: data.mimeType };
+    console.info(
+      `[${scope}/findAgentAssetStorageByFileNames] Success: workspaceId=${workspaceId} requested=${normalized.length} resolved=${map.size}`
+    );
+    return map;
   } catch (error) {
-    console.error(`[${scope}/findAgentAssetStorageByFileName] Unexpected error: ${String(error)}`);
-    return null;
+    console.error(`[${scope}/findAgentAssetStorageByFileNames] Unexpected error: ${String(error)}`);
+    return map;
   }
 }
 

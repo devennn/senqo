@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { CheckCheck, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,7 +21,9 @@ function isTestContactLabel(label: ConversationLabelBadge): boolean {
   return name === "test" || name === "test contact";
 }
 
-export function ConversationListRow({
+// Memoized: the rail re-renders on every poll/SSE tick; rows only need to
+// re-render when their own conversation data, link, or highlight changes.
+export const ConversationListRow = memo(function ConversationListRow({
   conversation: c,
   to,
   isActive,
@@ -116,4 +119,4 @@ export function ConversationListRow({
       </div>
     </Link>
   );
-}
+});

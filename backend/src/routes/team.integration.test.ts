@@ -269,6 +269,7 @@ vi.mock("../repositories/leads.js", () => ({
 
 vi.mock("../repositories/agent-messages.js", () => ({
   listAgentMessages: vi.fn(),
+  listAgentMessagesPage: vi.fn(),
 }));
 
 vi.mock("../repositories/team.js", () => ({

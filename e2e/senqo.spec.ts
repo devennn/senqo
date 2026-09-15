@@ -104,7 +104,7 @@ function mockUserApi(page: import("@playwright/test").Page) {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ conversations: [] }),
+        body: JSON.stringify({ conversations: [], hasMore: false, total: 0 }),
       });
       return;
     }

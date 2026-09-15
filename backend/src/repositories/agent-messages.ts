@@ -1,4 +1,4 @@
-import { eq, asc, and, sql } from "drizzle-orm";
+import { eq, asc, and, desc, lt, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   agentMessages,
@@ -9,6 +9,36 @@ import type {
 } from "../types/repositories.js";
 
 const scope = "AgentMessagesRepository";
+
+const DEFAULT_AGENT_MESSAGES_PAGE_SIZE = 100;
+const MAX_AGENT_MESSAGES_PAGE_SIZE = 200;
+
+export type ListAgentMessagesPageResult = {
+  messages: AgentMessageRecord[];
+  hasMoreOlderMessages: boolean;
+};
+
+function clampAgentMessagesPageSize(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested) || requested < 1) {
+    return DEFAULT_AGENT_MESSAGES_PAGE_SIZE;
+  }
+  return Math.min(Math.floor(requested), MAX_AGENT_MESSAGES_PAGE_SIZE);
+}
+
+function toAgentMessageRecord(row: typeof agentMessages.$inferSelect): AgentMessageRecord {
+  return {
+    id: row.id,
+    workspace_id: row.workspaceId,
+    agent_session_id: row.agentSessionId,
+    role: row.role as AgentMessageRecord["role"],
+    content: row.content,
+    provider_options: (row.providerOptions as Record<string, unknown> | null) ?? null,
+    created_at:
+      row.createdAt instanceof Date
+        ? row.createdAt.toISOString()
+        : String(row.createdAt),
+  };
+}
 
 function resolveAgentWaMessageId(item: InsertAgentMessageInput): string | null {
   const fromInput =
@@ -38,21 +68,63 @@ export async function listAgentMessages(
     console.info(
       `[${scope}/listAgentMessages] Success: workspaceId=${workspaceId} sessionId=${sessionId}`
     );
-    return rows.map((row) => ({
-      id: row.id,
-      workspace_id: row.workspaceId,
-      agent_session_id: row.agentSessionId,
-      role: row.role as AgentMessageRecord["role"],
-      content: row.content,
-      provider_options: (row.providerOptions as Record<string, unknown> | null) ?? null,
-      created_at:
-        row.createdAt instanceof Date
-          ? row.createdAt.toISOString()
-          : String(row.createdAt),
-    }));
+    return rows.map(toAgentMessageRecord);
   } catch (error) {
     console.error(`[${scope}/listAgentMessages] Unexpected error: ${String(error)}`);
     return [];
+  }
+}
+
+/**
+ * Paged agent transcript for the owner logs dialog. Returns the newest page
+ * (ascending) plus a flag for loading older pages via the before* cursor.
+ */
+export async function listAgentMessagesPage(
+  workspaceId: string,
+  sessionId: string,
+  options?: { limit?: number; beforeCreatedAt?: string; beforeId?: string }
+): Promise<ListAgentMessagesPageResult> {
+  const capped = clampAgentMessagesPageSize(options?.limit);
+  const fetchSize = capped + 1;
+  const beforeCreatedAt = options?.beforeCreatedAt?.trim() ?? "";
+  const beforeId = options?.beforeId?.trim() ?? "";
+  const beforeDate =
+    beforeCreatedAt.length > 0 && beforeId.length > 0 ? new Date(beforeCreatedAt) : null;
+  const cursor =
+    beforeDate && !Number.isNaN(beforeDate.getTime())
+      ? or(
+          lt(agentMessages.createdAt, beforeDate),
+          and(
+            eq(agentMessages.createdAt, beforeDate),
+            lt(agentMessages.id, beforeId),
+          ),
+        )
+      : undefined;
+
+  try {
+    const rawRows = await db
+      .select()
+      .from(agentMessages)
+      .where(
+        and(
+          eq(agentMessages.workspaceId, workspaceId),
+          eq(agentMessages.agentSessionId, sessionId),
+          cursor,
+        ),
+      )
+      .orderBy(desc(agentMessages.createdAt), desc(agentMessages.id))
+      .limit(fetchSize);
+
+    const hasMoreOlderMessages = rawRows.length > capped;
+    const pageRows = hasMoreOlderMessages ? rawRows.slice(0, capped) : rawRows;
+    const messages = [...pageRows].reverse().map(toAgentMessageRecord);
+    console.info(
+      `[${scope}/listAgentMessagesPage] Success: workspaceId=${workspaceId} sessionId=${sessionId} count=${messages.length}`
+    );
+    return { messages, hasMoreOlderMessages };
+  } catch (error) {
+    console.error(`[${scope}/listAgentMessagesPage] Unexpected error: ${String(error)}`);
+    return { messages: [], hasMoreOlderMessages: false };
   }
 }
 

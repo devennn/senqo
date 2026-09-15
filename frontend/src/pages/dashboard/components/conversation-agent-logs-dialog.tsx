@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollText } from "lucide-react";
+import { ChevronUp, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -115,8 +115,10 @@ export function ConversationAgentLogsDialog({
   const { workspaceId } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<AgentMessageRecord[]>([]);
+  const [hasMoreOlderMessages, setHasMoreOlderMessages] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -124,19 +126,22 @@ export function ConversationAgentLogsDialog({
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setHasMoreOlderMessages(false);
 
     void api
       .get<ConversationAgentMessagesResponse>(
-        `/api/user/conversations/${conversationId}/agent-messages`,
+        `/api/user/conversations/${conversationId}/agent-messages?limit=100`,
         { workspaceId },
       )
       .then((data) => {
         if (cancelled) return;
         setMessages(data.messages);
+        setHasMoreOlderMessages(data.hasMoreOlderMessages);
       })
       .catch(() => {
         if (cancelled) return;
         setMessages([]);
+        setHasMoreOlderMessages(false);
         setError("Could not load agent logs.");
       })
       .finally(() => {
@@ -147,6 +152,28 @@ export function ConversationAgentLogsDialog({
       cancelled = true;
     };
   }, [conversationId, open, workspaceId]);
+
+  function loadOlderMessages() {
+    const oldest = messages[0];
+    if (!oldest || loadingOlder || !hasMoreOlderMessages) return;
+    const params = new URLSearchParams({
+      limit: "100",
+      beforeCreatedAt: oldest.created_at,
+      beforeId: oldest.id,
+    });
+    setLoadingOlder(true);
+    void api
+      .get<ConversationAgentMessagesResponse>(
+        `/api/user/conversations/${conversationId}/agent-messages?${params.toString()}`,
+        { workspaceId },
+      )
+      .then((data) => {
+        setMessages((prev) => [...data.messages, ...prev]);
+        setHasMoreOlderMessages(data.hasMoreOlderMessages);
+      })
+      .catch(() => setError("Could not load agent logs."))
+      .finally(() => setLoadingOlder(false));
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -179,6 +206,19 @@ export function ConversationAgentLogsDialog({
             <p className="text-sm text-muted-foreground">No agent messages yet.</p>
           ) : (
             <div className="grid min-w-0 gap-3">
+              {hasMoreOlderMessages ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mx-auto h-7 gap-1.5 px-2 text-xs"
+                  disabled={loadingOlder}
+                  onClick={loadOlderMessages}
+                >
+                  <ChevronUp className="size-3.5" />
+                  {loadingOlder ? "Loading…" : "Load earlier"}
+                </Button>
+              ) : null}
               {[...messages].reverse().map((message) => (
                 <AgentLogRow key={message.id} message={message} />
               ))}

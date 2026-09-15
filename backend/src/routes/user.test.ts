@@ -265,6 +265,7 @@ vi.mock("../repositories/leads.js", () => ({
 
 vi.mock("../repositories/agent-messages.js", () => ({
   listAgentMessages: vi.fn(),
+  listAgentMessagesPage: vi.fn(),
 }));
 
 vi.mock("../repositories/reports.js", () => ({
@@ -347,10 +348,11 @@ vi.mock("../repositories/evals.js", () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";
-import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser } from "../repositories/workspaces.js";
+import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser, isWorkspaceOwner } from "../repositories/workspaces.js";
 import { listConversationLabels, createConversationLabel, deleteConversationLabel } from "../repositories/conversation-labels.js";
 import { listContactsPage } from "../repositories/contacts.js";
 import { listConversations, getConversationWithContact, updateConversationHandlingMode } from "../repositories/conversations.js";
+import { listAgentMessagesPage } from "../repositories/agent-messages.js";
 import { listTasksPage, listSchedulableAgents } from "../repositories/tasks.js";
 import { listConnections, listRecentConnectionEvents, createConversationMessage } from "../repositories/whatsapp.js";
 import { listWorkspaceSecrets, createWorkspaceSecret, deleteWorkspaceSecret } from "../repositories/workspace-secrets.js";
@@ -375,6 +377,8 @@ const createConversationLabelMock = vi.mocked(createConversationLabel);
 const deleteConversationLabelMock = vi.mocked(deleteConversationLabel);
 const listContactsPageMock = vi.mocked(listContactsPage);
 const listConversationsMock = vi.mocked(listConversations);
+const listAgentMessagesPageMock = vi.mocked(listAgentMessagesPage);
+const isWorkspaceOwnerMock = vi.mocked(isWorkspaceOwner);
 const getConversationWithContactMock = vi.mocked(getConversationWithContact);
 const updateConversationHandlingModeMock = vi.mocked(updateConversationHandlingMode);
 const createConversationMessageMock = vi.mocked(createConversationMessage);
@@ -595,23 +599,39 @@ describe("GET /contacts", () => {
 // ── Conversations ─────────────────────────────────────────────────────────────
 
 describe("GET /conversations", () => {
-  // Returns conversations array. Verifies the basic list endpoint response shape.
-  it("returns conversations array", async () => {
-    listConversationsMock.mockResolvedValue([
-      { id: "conv-1", contact: { first_name: "Alice" }, lastMessage: null },
-    ]);
+  // Returns paginated conversations envelope. Verifies the response shape expected by the frontend rail.
+  it("returns conversations with hasMore and total", async () => {
+    listConversationsMock.mockResolvedValue({
+      conversations: [{ id: "conv-1", contact: { first_name: "Alice" }, lastMessage: null }],
+      hasMore: true,
+      total: 30,
+    });
 
     const res = await app.request("/conversations", { headers: AUTH });
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.conversations).toHaveLength(1);
+    expect(body.hasMore).toBe(true);
+    expect(body.total).toBe(30);
+  });
+
+  // limit/offset query params are forwarded to the repository for rail paging.
+  it("forwards limit and offset params to repository", async () => {
+    listConversationsMock.mockResolvedValue({ conversations: [], hasMore: false, total: 0 });
+
+    await app.request("/conversations?limit=50&offset=25", { headers: AUTH });
+
+    expect(listConversationsMock).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({ limit: 50, offset: 25 }),
+    );
   });
 
   // labelId query param is passed through to the repository filter.
   // Verifies conversation filtering by label works end-to-end at the route level.
   it("passes labelId filter to repository", async () => {
-    listConversationsMock.mockResolvedValue([]);
+    listConversationsMock.mockResolvedValue({ conversations: [], hasMore: false, total: 0 });
 
     await app.request("/conversations?labelId=lbl-1", { headers: AUTH });
 
@@ -623,7 +643,7 @@ describe("GET /conversations", () => {
 
   // humanOnly=1 param enables the human-handling-only filter.
   it("passes humanOnly filter when param is '1'", async () => {
-    listConversationsMock.mockResolvedValue([]);
+    listConversationsMock.mockResolvedValue({ conversations: [], hasMore: false, total: 0 });
 
     await app.request("/conversations?humanOnly=1", { headers: AUTH });
 
@@ -631,6 +651,55 @@ describe("GET /conversations", () => {
       "ws-1",
       expect.objectContaining({ humanHandlingOnly: true }),
     );
+  });
+});
+
+describe("GET /conversations/:id/agent-messages", () => {
+  // Owner requests the transcript → paged envelope returned, needed so the logs dialog renders newest page + Load earlier.
+  it("returns paged agent messages for owner", async () => {
+    getConversationWithContactMock.mockResolvedValue({ id: "conv-1" } as never);
+    isWorkspaceOwnerMock.mockResolvedValue(true);
+    listAgentMessagesPageMock.mockResolvedValue({
+      messages: [{ id: "am-1", role: "assistant" } as never],
+      hasMoreOlderMessages: true,
+    });
+
+    const res = await app.request("/conversations/conv-1/agent-messages?limit=100", { headers: AUTH });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.messages).toHaveLength(1);
+    expect(body.hasMoreOlderMessages).toBe(true);
+    expect(listAgentMessagesPageMock).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      expect.objectContaining({ limit: 100 }),
+    );
+  });
+
+  // Non-owner requests the transcript → 403 and the repository is never touched, needed to keep agent logs owner-only.
+  it("returns 403 for non-owner without calling repository", async () => {
+    getConversationWithContactMock.mockResolvedValue({ id: "conv-1" } as never);
+    isWorkspaceOwnerMock.mockResolvedValue(false);
+
+    const res = await app.request("/conversations/conv-1/agent-messages", { headers: AUTH });
+
+    expect(res.status).toBe(403);
+    expect(listAgentMessagesPageMock).not.toHaveBeenCalled();
+  });
+
+  // Malformed pagination cursor → 400 before hitting the repository, needed to reject garbage cursors early.
+  it("returns 400 for invalid beforeId cursor", async () => {
+    getConversationWithContactMock.mockResolvedValue({ id: "conv-1" } as never);
+    isWorkspaceOwnerMock.mockResolvedValue(true);
+
+    const res = await app.request(
+      "/conversations/conv-1/agent-messages?beforeCreatedAt=2026-01-01T00:00:00Z&beforeId=not-a-uuid",
+      { headers: AUTH },
+    );
+
+    expect(res.status).toBe(400);
+    expect(listAgentMessagesPageMock).not.toHaveBeenCalled();
   });
 });
 

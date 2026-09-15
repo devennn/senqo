@@ -176,7 +176,7 @@ import {
   startHandoffPhoneVerification,
 } from "../services/handoff-phone-verify.js";
 import { scheduleHandoffNotify } from "../services/handoff-notify.js";
-import { listAgentMessages } from "../repositories/agent-messages.js";
+import { listAgentMessages, listAgentMessagesPage } from "../repositories/agent-messages.js";
 import { getAgentPerformanceReport } from "../repositories/reports.js";
 import {
   scheduleAgentTask,
@@ -1811,6 +1811,13 @@ app.delete("/conversation-labels/:id", async (c) => {
 const conversationMessageCursorUuidRe =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function parseOptionalIntQuery(raw: string | undefined): number | undefined {
+  const trimmed = raw?.trim() ?? "";
+  if (trimmed.length === 0) return undefined;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function isValidConversationMessageCursor(
   beforeCreatedAt: string,
   beforeId: string,
@@ -1840,8 +1847,10 @@ app.get("/conversations", async (c) => {
     labelId: labelId.length > 0 ? labelId : undefined,
     humanHandlingOnly: humanHandlingOnly ? true : undefined,
     whatsappConnectionId,
+    limit: parseOptionalIntQuery(c.req.query("limit")),
+    offset: parseOptionalIntQuery(c.req.query("offset")),
   });
-  return c.json({ conversations });
+  return c.json(conversations);
 });
 
 app.get("/conversations/:id/messages", async (c) => {
@@ -1880,8 +1889,19 @@ app.get("/conversations/:id/agent-messages", async (c) => {
   const owner = await isWorkspaceOwner(workspaceId, userId);
   if (!owner) return c.json({ error: "forbidden" }, 403);
 
-  const messages = await listAgentMessages(workspaceId, conversationId);
-  return c.json({ messages });
+  const beforeCreatedAt = c.req.query("beforeCreatedAt")?.trim() ?? "";
+  const beforeId = c.req.query("beforeId")?.trim() ?? "";
+  const useCursor = beforeCreatedAt.length > 0 || beforeId.length > 0;
+  if (useCursor && !isValidConversationMessageCursor(beforeCreatedAt, beforeId)) {
+    return c.json({ error: "invalid_cursor" }, 400);
+  }
+
+  const page = await listAgentMessagesPage(workspaceId, conversationId, {
+    limit: parseOptionalIntQuery(c.req.query("limit")),
+    beforeCreatedAt: useCursor ? beforeCreatedAt : undefined,
+    beforeId: useCursor ? beforeId : undefined,
+  });
+  return c.json(page);
 });
 
 app.get("/conversations/:id", async (c) => {

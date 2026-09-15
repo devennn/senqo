@@ -1,4 +1,4 @@
-import { eq, and, or, lt, gt, gte, lte, ilike, isNull, isNotNull, inArray, desc, asc } from "drizzle-orm";
+import { eq, and, or, lt, gt, gte, lte, ilike, isNull, isNotNull, inArray, desc, asc, sql } from "drizzle-orm";
 import { storageCreateSignedUrl, storageDownload } from "../lib/storage.js";
 import { db } from "../db/index.js";
 import {
@@ -11,7 +11,7 @@ import {
   listConversationIdsByLabel,
   listLabelBadgesForConversations,
 } from "../repositories/conversation-labels.js";
-import { findAgentAssetStorageByFileName } from "../repositories/workspace-asset-groups.js";
+import { findAgentAssetStorageByFileNames } from "../repositories/workspace-asset-groups.js";
 import {
   getWhatsappConnectionRowById,
   isWhatsappConnectionRowSendable,
@@ -31,6 +31,7 @@ import type {
   ConversationMessageMedia,
   ConversationRow,
   ConversationSummary,
+  ListConversationsResult,
 } from "../types/repositories.js";
 
 export type ListConversationsOptions = {
@@ -40,12 +41,30 @@ export type ListConversationsOptions = {
   humanHandlingOnly?: boolean;
   /** When set to a UUID, only conversations tied to this WhatsApp connection row. */
   whatsappConnectionId?: string;
+  /** Rail page size (default 25, clamped to 250). */
+  limit?: number;
+  /** Offset for paging deeper into the rail (infinite scroll). */
+  offset?: number;
 };
 
 const scope = "ConversationsRepository";
 
 const DEFAULT_MESSAGES_PAGE_SIZE = 50;
 const MAX_MESSAGES_PAGE_SIZE = 100;
+const DEFAULT_CONVERSATIONS_PAGE_SIZE = 25;
+const MAX_CONVERSATIONS_PAGE_SIZE = 250;
+
+function clampConversationsPageSize(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested) || requested < 1) {
+    return DEFAULT_CONVERSATIONS_PAGE_SIZE;
+  }
+  return Math.min(Math.floor(requested), MAX_CONVERSATIONS_PAGE_SIZE);
+}
+
+function normalizeConversationsOffset(requested: number | undefined): number {
+  if (requested === undefined || !Number.isFinite(requested) || requested < 1) return 0;
+  return Math.floor(requested);
+}
 
 type MessageSelectRow = {
   id: string;
@@ -163,32 +182,6 @@ type LatestMessagePreviewRow = {
   whatsapp_sender_chat_id: string | null;
 };
 
-function firstTokenForConversationListPreview(raw: string): string {
-  const t = raw.replace(/\s+/g, " ").trim();
-  if (!t) return "";
-  return t.split(" ")[0] ?? t;
-}
-
-function toLatestMessagePreviewRow(raw: {
-  conversationId: string;
-  content: string;
-  createdAt: Date | string;
-  role: string;
-  outgoingSenderType: string | null;
-  whatsappSenderName: string | null;
-  whatsappSenderChatId: string | null;
-}): LatestMessagePreviewRow & { conversationId: string } {
-  return {
-    conversationId: raw.conversationId,
-    content: raw.content,
-    created_at: raw.createdAt instanceof Date ? raw.createdAt.toISOString() : String(raw.createdAt),
-    role: raw.role,
-    outgoing_sender_type: (raw.outgoingSenderType as LatestMessagePreviewRow["outgoing_sender_type"]) ?? null,
-    whatsapp_sender_name: raw.whatsappSenderName ?? null,
-    whatsapp_sender_chat_id: raw.whatsappSenderChatId ?? null,
-  };
-}
-
 async function listLatestMessagePreviews(
   workspaceId: string,
   conversationIds: string[]
@@ -196,8 +189,10 @@ async function listLatestMessagePreviews(
   const map = new Map<string, LatestMessagePreviewRow>();
   if (conversationIds.length === 0) return map;
   try {
+    // One row per conversation (its latest message) computed in SQL instead of
+    // pulling every message row of every conversation into Node.
     const rows = await db
-      .select({
+      .selectDistinctOn([messages.conversationId], {
         conversationId: messages.conversationId,
         content: messages.content,
         createdAt: messages.createdAt,
@@ -213,21 +208,18 @@ async function listLatestMessagePreviews(
           inArray(messages.conversationId, conversationIds),
         ),
       )
-      .orderBy(desc(messages.createdAt));
+      .orderBy(asc(messages.conversationId), desc(messages.createdAt), desc(messages.id));
 
     for (const row of rows) {
-      const preview = toLatestMessagePreviewRow(row);
-      const cid = preview.conversationId;
-      if (!map.has(cid)) {
-        map.set(cid, {
-          content: preview.content,
-          created_at: preview.created_at,
-          role: preview.role,
-          outgoing_sender_type: preview.outgoing_sender_type,
-          whatsapp_sender_name: preview.whatsapp_sender_name,
-          whatsapp_sender_chat_id: preview.whatsapp_sender_chat_id,
-        });
-      }
+      map.set(row.conversationId, {
+        content: row.content,
+        created_at:
+          row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+        role: row.role,
+        outgoing_sender_type: (row.outgoingSenderType as LatestMessagePreviewRow["outgoing_sender_type"]) ?? null,
+        whatsapp_sender_name: row.whatsappSenderName ?? null,
+        whatsapp_sender_chat_id: row.whatsappSenderChatId ?? null,
+      });
     }
     console.info(`[${scope}/listLatestMessagePreviews] Success: userId=${workspaceId}`);
     return map;
@@ -442,11 +434,13 @@ function toConversationRow(r: {
 export async function listConversations(
   workspaceId: string,
   options?: ListConversationsOptions | string
-): Promise<ConversationSummary[]> {
+): Promise<ListConversationsResult> {
   const normalizedOptions: ListConversationsOptions =
     typeof options === "string"
       ? { searchQuery: options }
       : (options ?? {});
+  const limit = clampConversationsPageSize(normalizedOptions.limit);
+  const offset = normalizeConversationsOffset(normalizedOptions.offset);
 
   try {
     const conditions: ReturnType<typeof eq>[] = [
@@ -471,7 +465,7 @@ export async function listConversations(
       const labelIds = await listConversationIdsByLabel(workspaceId, labelIdFilter);
       if (labelIds.size === 0) {
         console.info(`[${scope}/listConversations] Success: userId=${workspaceId} label=empty`);
-        return [];
+        return { conversations: [], hasMore: false, total: 0 };
       }
       idFilter = labelIds;
     }
@@ -481,12 +475,12 @@ export async function listConversations(
       const searchIds = await listConversationIdsBySearch(workspaceId, normalizedSearch);
       if (searchIds.size === 0) {
         console.info(`[${scope}/listConversations] Success: userId=${workspaceId} search=empty`);
-        return [];
+        return { conversations: [], hasMore: false, total: 0 };
       }
       idFilter = idFilter ? intersectSets(idFilter, searchIds) : searchIds;
       if (idFilter.size === 0) {
         console.info(`[${scope}/listConversations] Success: userId=${workspaceId} intersect=empty`);
-        return [];
+        return { conversations: [], hasMore: false, total: 0 };
       }
     }
 
@@ -494,30 +488,41 @@ export async function listConversations(
       conditions.push(inArray(conversations.id, Array.from(idFilter)));
     }
 
-    const rawRows = await db
-      .select({
-        id: conversations.id,
-        title: conversations.title,
-        status: conversations.status,
-        handlingMode: conversations.handlingMode,
-        whatsappChatId: conversations.whatsappChatId,
-        whatsappConnectionId: conversations.whatsappConnectionId,
-        updatedAt: conversations.updatedAt,
-        contactId: conversations.contactId,
-        contactFirstName: contacts.firstName,
-        contactLastName: contacts.lastName,
-        contactPhone: contacts.phone,
-        contactMetadata: contacts.metadata,
-        wcDisplayName: whatsappConnections.displayName,
-        wcPhoneNumber: whatsappConnections.phoneNumber,
-      })
-      .from(conversations)
-      .leftJoin(contacts, eq(conversations.contactId, contacts.id))
-      .leftJoin(whatsappConnections, eq(conversations.whatsappConnectionId, whatsappConnections.id))
-      .where(and(...conditions))
-      .orderBy(desc(conversations.updatedAt));
+    const fetchSize = limit + 1;
+    const [rawRows, countRows] = await Promise.all([
+      db
+        .select({
+          id: conversations.id,
+          title: conversations.title,
+          status: conversations.status,
+          handlingMode: conversations.handlingMode,
+          whatsappChatId: conversations.whatsappChatId,
+          whatsappConnectionId: conversations.whatsappConnectionId,
+          updatedAt: conversations.updatedAt,
+          contactId: conversations.contactId,
+          contactFirstName: contacts.firstName,
+          contactLastName: contacts.lastName,
+          contactPhone: contacts.phone,
+          contactMetadata: contacts.metadata,
+          wcDisplayName: whatsappConnections.displayName,
+          wcPhoneNumber: whatsappConnections.phoneNumber,
+        })
+        .from(conversations)
+        .leftJoin(contacts, eq(conversations.contactId, contacts.id))
+        .leftJoin(whatsappConnections, eq(conversations.whatsappConnectionId, whatsappConnections.id))
+        .where(and(...conditions))
+        .orderBy(desc(conversations.updatedAt))
+        .limit(fetchSize)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(conversations)
+        .where(and(...conditions)),
+    ]);
 
-    const rows = rawRows.map(toConversationRow);
+    const hasMore = rawRows.length > limit;
+    const rows = rawRows.slice(0, limit).map(toConversationRow);
+    const total = Number(countRows[0]?.count ?? 0);
     const ids = rows.map((r) => r.id);
     const latestMap = await listLatestMessagePreviews(workspaceId, ids);
     const labelsMap = await listLabelBadgesForConversations(workspaceId, ids);
@@ -570,11 +575,13 @@ export async function listConversations(
           : null,
       };
     });
-    console.info(`[${scope}/listConversations] Success: userId=${workspaceId}`);
-    return result;
+    console.info(
+      `[${scope}/listConversations] Success: userId=${workspaceId} count=${result.length} total=${total} hasMore=${hasMore}`
+    );
+    return { conversations: result, hasMore, total };
   } catch (error) {
     console.error(`[${scope}/listConversations] Unexpected error: ${String(error)}`);
-    return [];
+    return { conversations: [], hasMore: false, total: 0 };
   }
 }
 
@@ -600,79 +607,100 @@ function toMessageSelectRow(raw: {
   };
 }
 
+type ParsedMessageMediaRow = {
+  row: MessageSelectRow;
+  metadata: Record<string, unknown> | null;
+  media: ConversationMessageMedia | null;
+};
+
+function parseMessageMediaRow(row: MessageSelectRow): ParsedMessageMediaRow {
+  const metadata =
+    row.metadata && typeof row.metadata === "object"
+      ? (row.metadata as Record<string, unknown>)
+      : null;
+  const rawMedia =
+    metadata && typeof metadata.media === "object" && metadata.media !== null
+      ? (metadata.media as Record<string, unknown>)
+      : null;
+
+  const media: ConversationMessageMedia | null = rawMedia
+    ? {
+        path: typeof rawMedia.path === "string" ? rawMedia.path : undefined,
+        storageBucket:
+          typeof rawMedia.storageBucket === "string" ? rawMedia.storageBucket : undefined,
+        fileName: typeof rawMedia.fileName === "string" ? rawMedia.fileName : undefined,
+        mimeType: typeof rawMedia.mimeType === "string" ? rawMedia.mimeType : undefined,
+        caption: typeof rawMedia.caption === "string" ? rawMedia.caption : undefined,
+        sourceUrl: typeof rawMedia.sourceUrl === "string" ? rawMedia.sourceUrl : undefined,
+        thumbnailDataUrl:
+          typeof rawMedia.thumbnailDataUrl === "string"
+            ? rawMedia.thumbnailDataUrl
+            : undefined,
+        fileSizeBytes:
+          typeof rawMedia.fileSizeBytes === "number"
+            ? rawMedia.fileSizeBytes
+            : typeof rawMedia.fileSizeBytes === "string"
+              ? Number(rawMedia.fileSizeBytes) || undefined
+              : undefined,
+      }
+    : null;
+
+  return { row, metadata, media };
+}
+
 async function hydrateConversationMessageRows(
   workspaceId: string,
   rows: MessageSelectRow[],
 ): Promise<ConversationMessage[]> {
-  const result: ConversationMessage[] = [];
+  const parsed = rows.map(parseMessageMediaRow);
 
-  for (const row of rows) {
-    const metadata =
-      row.metadata && typeof row.metadata === "object"
-        ? (row.metadata as Record<string, unknown>)
-        : null;
-    const rawMedia =
-      metadata && typeof metadata.media === "object" && metadata.media !== null
-        ? (metadata.media as Record<string, unknown>)
-        : null;
-
-    const media: ConversationMessageMedia | null = rawMedia
-      ? {
-          path: typeof rawMedia.path === "string" ? rawMedia.path : undefined,
-          storageBucket:
-            typeof rawMedia.storageBucket === "string" ? rawMedia.storageBucket : undefined,
-          fileName: typeof rawMedia.fileName === "string" ? rawMedia.fileName : undefined,
-          mimeType: typeof rawMedia.mimeType === "string" ? rawMedia.mimeType : undefined,
-          caption: typeof rawMedia.caption === "string" ? rawMedia.caption : undefined,
-          sourceUrl: typeof rawMedia.sourceUrl === "string" ? rawMedia.sourceUrl : undefined,
-          thumbnailDataUrl:
-            typeof rawMedia.thumbnailDataUrl === "string"
-              ? rawMedia.thumbnailDataUrl
-              : undefined,
-          fileSizeBytes:
-            typeof rawMedia.fileSizeBytes === "number"
-              ? rawMedia.fileSizeBytes
-              : typeof rawMedia.fileSizeBytes === "string"
-                ? Number(rawMedia.fileSizeBytes) || undefined
-                : undefined,
-        }
-      : null;
-
-    if (media && !media.path?.trim() && media.fileName?.trim()) {
-      const source = typeof metadata?.source === "string" ? metadata.source : "";
-      if (source === "agent_tool_send_whatsapp") {
-        const asset = await findAgentAssetStorageByFileName(workspaceId, media.fileName);
-        if (asset) {
-          media.path = asset.storagePath;
-          media.storageBucket = "agent-assets";
-          if (!media.mimeType) media.mimeType = asset.mimeType;
-        }
-      }
+  // Batch the agent-asset lookups (one query) instead of one query per media row.
+  const assetFileNames = new Set<string>();
+  for (const entry of parsed) {
+    const media = entry.media;
+    if (!media || media.path?.trim() || !media.fileName?.trim()) continue;
+    const source = typeof entry.metadata?.source === "string" ? entry.metadata.source : "";
+    if (source !== "agent_tool_send_whatsapp") continue;
+    assetFileNames.add(media.fileName);
+  }
+  if (assetFileNames.size > 0) {
+    const assetMap = await findAgentAssetStorageByFileNames(workspaceId, [...assetFileNames]);
+    for (const entry of parsed) {
+      const media = entry.media;
+      if (!media || media.path?.trim() || !media.fileName?.trim()) continue;
+      const asset = assetMap.get(media.fileName.toLowerCase());
+      if (!asset) continue;
+      media.path = asset.storagePath;
+      media.storageBucket = "agent-assets";
+      if (!media.mimeType) media.mimeType = asset.mimeType;
     }
+  }
 
-    if (media?.path) {
+  // Sign media URLs in parallel instead of sequentially per row.
+  await Promise.all(
+    parsed.map(async (entry) => {
+      const media = entry.media;
+      if (!media?.path) return;
       const resolvedBucket =
         media.storageBucket?.trim() === "agent-assets" ? "agent-assets" : "whatsapp-media";
       const signedUrl = await storageCreateSignedUrl(resolvedBucket, media.path, 60 * 60);
       if (signedUrl) {
         media.signedUrl = signedUrl;
       }
-    }
+    }),
+  );
 
-    result.push({
-      id: row.id,
-      role: row.role,
-      content: row.content,
-      created_at: row.created_at,
-      metadata,
-      outgoing_sender_type: row.outgoing_sender_type,
-      whatsapp_sender_chat_id: row.whatsapp_sender_chat_id,
-      whatsapp_sender_name: row.whatsapp_sender_name,
-      media,
-    });
-  }
-
-  return result;
+  return parsed.map((entry) => ({
+    id: entry.row.id,
+    role: entry.row.role,
+    content: entry.row.content,
+    created_at: entry.row.created_at,
+    metadata: entry.metadata,
+    outgoing_sender_type: entry.row.outgoing_sender_type,
+    whatsapp_sender_chat_id: entry.row.whatsapp_sender_chat_id,
+    whatsapp_sender_name: entry.row.whatsapp_sender_name,
+    media: entry.media,
+  }));
 }
 
 function clampMessagesPageSize(requested: number): number {

@@ -215,6 +215,8 @@ export type AgentMessageRecord = {
 /** GET /api/user/conversations/:id/agent-messages — owner-only agent transcript. */
 export type ConversationAgentMessagesResponse = {
   messages: AgentMessageRecord[];
+  /** True when older agent messages exist beyond the current page. */
+  hasMoreOlderMessages: boolean;
 };
 
 export type InsertAgentMessageInput = {
@@ -377,6 +379,17 @@ export type ConversationMessage = {
 
 /** Default page size for dashboard thread message API (must match backend cap semantics). */
 export const CONVERSATION_THREAD_MESSAGES_PAGE_SIZE = 50;
+
+/** Default rail page size for GET /api/user/conversations (must match backend cap semantics). */
+export const CONVERSATIONS_PAGE_SIZE = 25;
+
+export type ConversationsListResponse = {
+  conversations: ConversationSummary[];
+  /** True when more conversations exist beyond the current page. */
+  hasMore: boolean;
+  /** Total matching conversations for the current filters (rail count badge). */
+  total: number;
+};
 
 export type ConversationThreadMessagesPage = {
   messages: ConversationMessage[];

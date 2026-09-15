@@ -2,7 +2,7 @@
 
 ## Inbox & conversations
 
-- Unified inbox — sidebar with search, filters (label, WhatsApp line, human-handling-only), and per-line routing
+- Unified inbox — sidebar with search, filters (label, WhatsApp line, human-handling-only), and per-line routing; chats load in pages of 25 and older chats stream in as you scroll
 - Threads are per WhatsApp line — the same contact on two connected numbers is two conversations (pre-fix merged threads are left as-is)
 - Thread view — message history with infinite scroll, AI reasoning insights with knowledge references, timeline-style handoff markers
 - Manual replies — compose text and media; outbound sends show delivery confirmation

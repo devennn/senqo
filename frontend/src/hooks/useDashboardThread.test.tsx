@@ -50,6 +50,8 @@ describe("useDashboardThread", () => {
               updated_at: "2025-01-01T00:00:00Z",
             },
           ],
+          hasMore: false,
+          total: 1,
         });
       }
       return Promise.resolve({});
@@ -62,6 +64,28 @@ describe("useDashboardThread", () => {
     expect(mockGet).toHaveBeenCalledWith("/api/user/conversation-labels");
     expect(mockGet).toHaveBeenCalledWith(
       expect.stringContaining("/api/user/conversations"),
+    );
+  });
+
+  // The initial list request asks the server for the first rail page (limit=25&offset=0).
+  // Ensures the rail loads a bounded page instead of the entire workspace archive.
+  it("requests the first page with limit and offset on mount", async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith("/api/user/conversation-labels")) {
+        return Promise.resolve({ labels: [] });
+      }
+      if (url.startsWith("/api/user/conversations")) {
+        return Promise.resolve({ conversations: [], hasMore: false, total: 0 });
+      }
+      return Promise.resolve({});
+    });
+
+    renderDashboardThreadHook();
+
+    await act(() => Promise.resolve());
+
+    expect(mockGet).toHaveBeenCalledWith(
+      expect.stringContaining("limit=25&offset=0"),
     );
   });
 
@@ -81,7 +105,7 @@ describe("useDashboardThread", () => {
         return Promise.resolve({ labels: [] });
       }
       if (url.startsWith("/api/user/conversations")) {
-        return Promise.resolve({ conversations: [] });
+        return Promise.resolve({ conversations: [], hasMore: false, total: 0 });
       }
       return Promise.resolve({});
     });
@@ -93,10 +117,51 @@ describe("useDashboardThread", () => {
     expect(result.current.loadingConversations).toBe(false);
   });
 
+  // When the first page reports hasMore, loadOlderConversations appends the next
+  // offset page without refetching page one, needed for the infinite-scroll rail.
+  it("appends the next page on loadOlderConversations when hasMore is true", async () => {
+    let call = 0;
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith("/api/user/conversation-labels")) {
+        return Promise.resolve({ labels: [] });
+      }
+      if (url.includes("offset=0")) {
+        call += 1;
+        return Promise.resolve({
+          conversations: [{ id: `conv-${call}`, updated_at: "2025-01-01T00:00:00Z" }],
+          hasMore: true,
+          total: 2,
+        });
+      }
+      if (url.includes("offset=1")) {
+        return Promise.resolve({
+          conversations: [{ id: "conv-2", updated_at: "2025-01-01T00:00:00Z" }],
+          hasMore: false,
+          total: 2,
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    const { result } = renderDashboardThreadHook();
+
+    await act(() => Promise.resolve());
+    expect(result.current.hasMoreConversations).toBe(true);
+
+    await act(() => result.current.loadOlderConversations());
+
+    expect(result.current.conversations.map((c: { id: string }) => c.id)).toEqual([
+      "conv-1",
+      "conv-2",
+    ]);
+    expect(result.current.hasMoreConversations).toBe(false);
+    expect(result.current.totalConversations).toBe(2);
+  });
+
   // Verifies that the hook subscribes to SSE realtime updates for the current workspace.
   // Critical for live conversation updates without manual page refreshes.
   it("subscribes to realtime updates for the active workspace", () => {
-    mockGet.mockResolvedValue({ labels: [], conversations: [] });
+    mockGet.mockResolvedValue({ labels: [], conversations: [], hasMore: false, total: 0 });
 
     renderDashboardThreadHook();
 

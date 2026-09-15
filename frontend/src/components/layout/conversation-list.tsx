@@ -1,26 +1,39 @@
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useState, useTransition } from "react";
-import { Search } from "lucide-react";
+import { useRef, useTransition } from "react";
 import { parseHumanOnlySearchParam } from "@/lib/build-conversations-query";
 import { ConversationListFiltersPanel } from "@/components/layout/conversation-list-filters-panel";
-import { cn } from "@/lib/utils";
 import { ConversationListEmptyState } from "@/components/layout/conversation-list-empty-state";
 import { ConversationListRow } from "@/components/layout/conversation-list-row";
+import { ConversationListLoadMoreRow } from "@/components/layout/conversation-list-load-more";
+import { ConversationListSearchBox } from "@/components/layout/conversation-list-search-box";
 import { useWhatsappConnectionsForInboxFilters } from "@/hooks/useWhatsappConnectionsForInboxFilters";
 import type { ConversationLabelRecord, ConversationSummary } from "@/types/repositories";
 
-const SEARCH_DEBOUNCE_MS = 700;
+/** Distance from the rail bottom that triggers loading the next page. */
+const LOAD_MORE_SCROLL_THRESHOLD_PX = 240;
 
 export function ConversationList({
   conversations,
   labelCatalog,
   loading,
   newConversationIds,
+  total,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: {
   conversations: ConversationSummary[];
   labelCatalog: ConversationLabelRecord[];
   loading?: boolean;
   newConversationIds?: Set<string>;
+  /** Total conversations for the current filters (from the server). */
+  total?: number;
+  /** True when more pages exist on the server. */
+  hasMore?: boolean;
+  /** True while the next page is in flight. */
+  loadingMore?: boolean;
+  /** Loads the next rail page when the user scrolls near the bottom. */
+  onLoadMore?: () => void;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,29 +43,11 @@ export function ConversationList({
   const currentLabelId = searchParams.get("labelId") ?? "";
   const humanOnlyFilter = parseHumanOnlySearchParam(searchParams.get("humanOnly"));
   const currentConnectionId = searchParams.get("connectionId") ?? "";
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const { connections: whatsappConnections } = useWhatsappConnectionsForInboxFilters();
-  const [search, setSearch] = useState(currentQuery);
+  const railScrollRef = useRef<HTMLDivElement>(null);
   const paramId = searchParams.get("conversationId");
   const activeId = paramId ?? conversations[0]?.id ?? null;
-
-  useEffect(() => {
-    setSearch(currentQuery);
-  }, [currentQuery]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
-      const next = search.trim();
-      if (next === currentQuery) return;
-      if (next) params.set("q", next);
-      else params.delete("q");
-      params.delete("conversationId");
-      const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-      startTransition(() => navigate(nextUrl, { replace: true }));
-    }, SEARCH_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [currentQuery, pathname, navigate, search, searchParams, startTransition]);
 
   function buildRowLink(conversationId: string): string {
     const params = new URLSearchParams(searchParams.toString());
@@ -88,12 +83,20 @@ export function ConversationList({
     startTransition(() => navigate(qs ? `${pathname}?${qs}` : pathname, { replace: true }));
   }
 
+  function handleRailScroll() {
+    const el = railScrollRef.current;
+    if (!el || !hasMore || loadingMore) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < LOAD_MORE_SCROLL_THRESHOLD_PX) {
+      onLoadMore?.();
+    }
+  }
+
   return (
     <section className="flex h-full w-full shrink-0 flex-col rounded-2xl border border-border/70 bg-card/95 shadow-soft backdrop-blur md:w-[26rem]">
       <div className="flex h-16 items-center justify-between border-b border-border/60 px-4">
         <h2 className="text-lg font-bold tracking-tight">Chats</h2>
         <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">
-          {conversations.length}
+          {total ?? conversations.length}
         </span>
       </div>
 
@@ -108,25 +111,13 @@ export function ConversationList({
         onConnectionFilter={setConnectionFilter}
       />
 
-      <div className="shrink-0 border-b border-border/40 bg-muted/20 px-3 py-2">
-        <label
-          className={cn(
-            "flex items-center gap-2.5 rounded-lg bg-muted/60 px-3 py-2 text-sm text-muted-foreground",
-            isPending && "opacity-70"
-          )}
-        >
-          <Search className="size-4 shrink-0" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, phone, message"
-            className="w-full bg-transparent outline-none placeholder:text-muted-foreground/80"
-            aria-label="Search conversations"
-          />
-        </label>
-      </div>
+      <ConversationListSearchBox currentQuery={currentQuery} />
 
-      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+      <div
+        ref={railScrollRef}
+        onScroll={handleRailScroll}
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2"
+      >
         {loading ? (
           <div className="m-2 rounded-2xl border border-border bg-muted/30 px-4 py-10 text-center">
             <p className="text-sm font-semibold text-foreground">Loading conversations</p>
@@ -142,6 +133,7 @@ export function ConversationList({
             isNew={newConversationIds?.has(c.id) ?? false}
           />
         ))}
+        {!loading ? <ConversationListLoadMoreRow loading={loadingMore} /> : null}
         {!loading && conversations.length === 0 ? (
           <ConversationListEmptyState
             humanOnlyFilter={humanOnlyFilter}

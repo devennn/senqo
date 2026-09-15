@@ -51,6 +51,10 @@ export default function DashboardPage() {
     loadingOlderMessages,
     hasMoreOlderMessages,
     loadOlderMessages,
+    hasMoreConversations,
+    totalConversations,
+    loadingOlderConversations,
+    loadOlderConversations,
     activeConversation,
     setActiveConversation,
     setConversations,
@@ -208,9 +212,14 @@ export default function DashboardPage() {
     }
   }
 
-  const showLoading = loadingConversations || loadingConversationDetail;
+  // Two distinct load phases: the chat list boot, then the selected thread.
+  // Showing a second "Loading conversations" screen while the thread fetches
+  // reads as a glitch — the thread phase gets its own accurate label.
+  const showBootLoading = loadingConversations;
+  const loadingThread = !showBootLoading && !!conversationId && loadingConversationDetail;
   const showThread = !!conversationId && !!activeConversation;
-  const mobilePanel = showLoading || showThread ? "main" : "side";
+  const mobilePanel =
+    showBootLoading || loadingThread || showThread ? "main" : "side";
 
   function buildBackToChatsPath(): string {
     const params = new URLSearchParams(searchParams.toString());
@@ -228,11 +237,17 @@ export default function DashboardPage() {
       conversationLabelCatalog={labelCatalog}
       loadingConversations={loadingConversations}
       newConversationIds={newConversationIds}
+      totalConversations={totalConversations}
+      hasMoreConversations={hasMoreConversations}
+      loadingOlderConversations={loadingOlderConversations}
+      onLoadMoreConversations={loadOlderConversations as () => void}
       mobilePanel={mobilePanel}
       mainPanel={
-        showLoading ? (
+        showBootLoading ? (
           <PageLoader label="Loading conversations" />
-        ) :         showThread ? (
+        ) : loadingThread ? (
+          <PageLoader label="Loading chat" />
+        ) : showThread ? (
           <DashboardThreadPanel
             activeConversation={activeConversation}
             labelCatalog={labelCatalog}
