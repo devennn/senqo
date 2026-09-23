@@ -192,6 +192,7 @@ import {
   toCronSchedule,
 } from "../services/task-schedule.js";
 import {
+  ensureHumanHandlingForManualReply,
   sendManualConversationMedia,
   sendManualConversationMessage,
 } from "../services/conversation-manual.js";
@@ -2062,7 +2063,12 @@ app.post("/conversations/:id/messages", async (c) => {
       mediaKind: parsed.data.mediaKind,
     });
     if (!result.ok) return c.json({ error: result.error }, 422);
-    return c.json(result);
+    const handlingMode = await ensureHumanHandlingForManualReply({
+      workspaceId,
+      conversationId,
+      previousHandlingMode: existing.handlingMode,
+    });
+    return c.json({ ...result, handlingMode });
   }
 
   const parsed = sendConversationMessageSchema.safeParse(await c.req.json());
@@ -2073,7 +2079,12 @@ app.post("/conversations/:id/messages", async (c) => {
     message: parsed.data.message,
   });
   if (!result.ok) return c.json({ error: result.error }, 422);
-  return c.json(result);
+  const handlingMode = await ensureHumanHandlingForManualReply({
+    workspaceId,
+    conversationId,
+    previousHandlingMode: existing.handlingMode,
+  });
+  return c.json({ ...result, handlingMode });
 });
 
 const patchConversationHandlingModeSchema = z.object({

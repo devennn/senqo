@@ -67,6 +67,7 @@ vi.mock("../services/task-schedule.js", () => ({
 vi.mock("../services/conversation-manual.js", () => ({
   sendManualConversationMedia: vi.fn(),
   sendManualConversationMessage: vi.fn(),
+  ensureHumanHandlingForManualReply: vi.fn(),
 }));
 
 vi.mock("../services/whatsapp-client.js", () => ({
@@ -372,6 +373,10 @@ import {
   listConversationReportsForWorkspace,
 } from "../repositories/conversation-reports.js";
 import { scheduleHandoffNotify } from "../services/handoff-notify.js";
+import {
+  ensureHumanHandlingForManualReply,
+  sendManualConversationMessage,
+} from "../services/conversation-manual.js";
 import { generateCustomToolDraft } from "../services/custom-tool-generate.js";
 import { findUserById } from "../repositories/auth-users.js";
 import { getProfileForSettings, updateProfile } from "../repositories/profiles.js";
@@ -415,6 +420,8 @@ const listConversationReportsForConversationMock = vi.mocked(
 );
 const listConversationReportsForWorkspaceMock = vi.mocked(listConversationReportsForWorkspace);
 const scheduleHandoffNotifyMock = vi.mocked(scheduleHandoffNotify);
+const sendManualConversationMessageMock = vi.mocked(sendManualConversationMessage);
+const ensureHumanHandlingForManualReplyMock = vi.mocked(ensureHumanHandlingForManualReply);
 const generateCustomToolDraftMock = vi.mocked(generateCustomToolDraft);
 const resolveKnowledgeRefLinksMock = vi.mocked(resolveKnowledgeRefLinks);
 const findUserByIdMock = vi.mocked(findUserById);
@@ -1391,6 +1398,62 @@ describe("PATCH /conversations/:id/handling-mode", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, handlingMode: "human" });
+  });
+});
+
+describe("POST /conversations/:id/messages", () => {
+  // Manual reply while the conversation is in AI mode must return the switched
+  // handling mode so the UI can flip the composer to the human form immediately.
+  it("returns the switched handling mode from the manual-reply helper on success", async () => {
+    getConversationWithContactMock.mockResolvedValue({
+      id: "conv-1",
+      handlingMode: "ai",
+    } as never);
+    sendManualConversationMessageMock.mockResolvedValue({
+      ok: true,
+      idMessage: "wa-msg-1",
+    });
+    ensureHumanHandlingForManualReplyMock.mockResolvedValue("human");
+
+    const res = await app.request("/conversations/conv-1/messages", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ message: "Hello from the app" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: true,
+      idMessage: "wa-msg-1",
+      handlingMode: "human",
+    });
+    expect(ensureHumanHandlingForManualReplyMock).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      previousHandlingMode: "ai",
+    });
+  });
+
+  // A failed WhatsApp send must leave handling mode untouched — no toggle and
+  // no "You replied from the app" info event for a message that never went out.
+  it("does not switch handling mode when the send fails", async () => {
+    getConversationWithContactMock.mockResolvedValue({
+      id: "conv-1",
+      handlingMode: "ai",
+    } as never);
+    sendManualConversationMessageMock.mockResolvedValue({
+      ok: false,
+      error: "Failed to send WhatsApp message.",
+    });
+
+    const res = await app.request("/conversations/conv-1/messages", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ message: "Hello" }),
+    });
+
+    expect(res.status).toBe(422);
+    expect(ensureHumanHandlingForManualReplyMock).not.toHaveBeenCalled();
   });
 });
 

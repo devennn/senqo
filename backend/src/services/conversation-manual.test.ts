@@ -4,6 +4,7 @@ const mockSendTextMessage = vi.fn();
 const mockPersistHumanOutboundText = vi.fn();
 const mockCreateConversationMessage = vi.fn();
 const mockGetManualWhatsappSendTarget = vi.fn();
+const mockUpdateConversationHandlingMode = vi.fn();
 
 vi.mock("../services/whatsapp-client.js", () => ({
   sendTextMessageCompat: mockSendTextMessage,
@@ -20,9 +21,12 @@ vi.mock("../repositories/whatsapp.js", () => ({
   getManualWhatsappSendTarget: mockGetManualWhatsappSendTarget,
 }));
 
-const { sendManualConversationMessage } = await import(
-  "../services/conversation-manual.js"
-);
+vi.mock("../repositories/conversations.js", () => ({
+  updateConversationHandlingMode: mockUpdateConversationHandlingMode,
+}));
+
+const { sendManualConversationMessage, ensureHumanHandlingForManualReply } =
+  await import("../services/conversation-manual.js");
 
 const mockTarget = {
   chatId: "test-chat-id",
@@ -144,5 +148,91 @@ describe("sendManualConversationMessage", () => {
       "human",
       { waMessageId: "wa-msg-2" },
     );
+  });
+});
+
+describe("ensureHumanHandlingForManualReply", () => {
+  // Conversation already handled by a human → nothing to switch, needed to avoid redundant writes and duplicate thread events on every manual reply.
+  it("returns human without any writes when already in human mode", async () => {
+    const result = await ensureHumanHandlingForManualReply({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      previousHandlingMode: "human",
+    });
+
+    expect(result).toBe("human");
+    expect(mockUpdateConversationHandlingMode).not.toHaveBeenCalled();
+    expect(mockCreateConversationMessage).not.toHaveBeenCalled();
+  });
+
+  // Conversation in AI mode → switches to human and posts the short "You replied from the app" thread event explaining the toggle, needed so users understand why AI stopped.
+  it("switches to human and posts the info thread event when previously in AI mode", async () => {
+    mockUpdateConversationHandlingMode.mockResolvedValue({ ok: true });
+    mockCreateConversationMessage.mockResolvedValue({ ok: true, created: true });
+
+    const result = await ensureHumanHandlingForManualReply({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      previousHandlingMode: "ai",
+    });
+
+    expect(result).toBe("human");
+    expect(mockUpdateConversationHandlingMode).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "human",
+    );
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "You replied from the app",
+      {
+        thread_event: "manual_toggle_human",
+        manual_toggle_reason: "You replied from the app",
+      },
+      null,
+    );
+  });
+
+  // Handling mode update fails → keeps the previous mode and skips the event, needed so the thread never claims a toggle that did not happen.
+  it("returns the previous mode without an event when the mode update fails", async () => {
+    mockUpdateConversationHandlingMode.mockResolvedValue({ ok: false });
+
+    const result = await ensureHumanHandlingForManualReply({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      previousHandlingMode: "ai",
+    });
+
+    expect(result).toBe("ai");
+    expect(mockCreateConversationMessage).not.toHaveBeenCalled();
+  });
+
+  // Mode switched but info event save fails → still returns human, needed because the mode switch already succeeded and must not be rolled back by a cosmetic failure.
+  it("still returns human when the info event save fails", async () => {
+    mockUpdateConversationHandlingMode.mockResolvedValue({ ok: true });
+    mockCreateConversationMessage.mockResolvedValue({ ok: false, created: false });
+
+    const result = await ensureHumanHandlingForManualReply({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      previousHandlingMode: "ai",
+    });
+
+    expect(result).toBe("human");
+  });
+
+  // Unexpected throw from the repository → keeps the previous mode, needed so a repo crash never breaks the manual send flow.
+  it("returns the previous mode when the update throws", async () => {
+    mockUpdateConversationHandlingMode.mockRejectedValue(new Error("db down"));
+
+    const result = await ensureHumanHandlingForManualReply({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      previousHandlingMode: "ai",
+    });
+
+    expect(result).toBe("ai");
   });
 });

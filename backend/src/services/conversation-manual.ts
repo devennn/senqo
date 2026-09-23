@@ -11,9 +11,71 @@ import {
   getManualWhatsappSendTarget,
   recordFailedOutboundMessage,
 } from "../repositories/whatsapp.js";
-import type { ManualConversationMediaInput } from "../types/repositories.js";
+import { updateConversationHandlingMode } from "../repositories/conversations.js";
+import { THREAD_EVENT_MANUAL_TOGGLE } from "../lib/conversation-thread-events.js";
+import type {
+  ConversationHandlingMode,
+  ManualConversationMediaInput,
+} from "../types/repositories.js";
 
 const scope = "ConversationManualService";
+
+const MANUAL_REPLY_HANDOFF_INFO_TEXT = "You replied from the app";
+
+// A manual reply from the app means a human is taking over: switch the
+// conversation from AI to human handling and leave a short thread event
+// explaining the switch. No WhatsApp handoff alert — the human is already
+// here, replying.
+export async function ensureHumanHandlingForManualReply(input: {
+  workspaceId: string;
+  conversationId: string;
+  previousHandlingMode: ConversationHandlingMode;
+}): Promise<ConversationHandlingMode> {
+  if (input.previousHandlingMode === "human") {
+    return "human";
+  }
+
+  try {
+    const updated = await updateConversationHandlingMode(
+      input.workspaceId,
+      input.conversationId,
+      "human",
+    );
+    if (!updated.ok) {
+      console.error(
+        `[${scope}/ensureHumanHandlingForManualReply] Failed query: unable to switch handling mode conversationId=${input.conversationId}`
+      );
+      return input.previousHandlingMode;
+    }
+
+    const eventSaved = await createConversationMessage(
+      input.workspaceId,
+      input.conversationId,
+      "assistant",
+      MANUAL_REPLY_HANDOFF_INFO_TEXT,
+      {
+        thread_event: THREAD_EVENT_MANUAL_TOGGLE,
+        manual_toggle_reason: MANUAL_REPLY_HANDOFF_INFO_TEXT,
+      },
+      null,
+    );
+    if (!eventSaved.ok) {
+      console.error(
+        `[${scope}/ensureHumanHandlingForManualReply] Failed query: unable to save manual reply info event conversationId=${input.conversationId}`
+      );
+    }
+
+    console.info(
+      `[${scope}/ensureHumanHandlingForManualReply] Success: userId=${input.workspaceId} conversationId=${input.conversationId}`
+    );
+    return "human";
+  } catch (error) {
+    console.error(
+      `[${scope}/ensureHumanHandlingForManualReply] Unexpected error: ${String(error)}`
+    );
+    return input.previousHandlingMode;
+  }
+}
 
 export async function sendManualConversationMessage(input: {
   workspaceId: string;

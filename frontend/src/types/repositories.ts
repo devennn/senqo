@@ -460,6 +460,7 @@ export type SendConversationMessageResponse = {
   ok: true;
   idMessage: string;
   urlFile?: string;
+  handlingMode?: ConversationHandlingMode;
 };
 
 export type ConversationAttachmentKind = "file" | "image" | "audio";

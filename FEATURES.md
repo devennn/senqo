@@ -5,11 +5,11 @@
 - Unified inbox — sidebar with search, filters (label, WhatsApp line, human-handling-only), and per-line routing; chats load in pages of 25 and older chats stream in as you scroll
 - Threads are per WhatsApp line — the same contact on two connected numbers is two conversations (pre-fix merged threads are left as-is)
 - Thread view — message history with infinite scroll, AI reasoning insights with knowledge references, timeline-style handoff markers
-- Manual replies — compose text and media; outbound sends show delivery confirmation
+- Manual replies — compose text and media; outbound sends show delivery confirmation; replying manually from the app on an AI-handled chat automatically switches it to Human handling and logs a "You replied from the app" marker in the thread
 - AI / Human toggle — per-conversation control over automated vs manual replies
 - Handoff WhatsApp notify — when a chat switches to human handling, chosen verified teammates get a WhatsApp alert with reason, customer phone, WhatsApp line, workspace, and a dashboard link to open the conversation
 - Conversation labels — apply workspace labels; filter inbox by label
-- Report as wrong — flag a conversation from the chats rail (flag icon on the row) or the thread header "Report" button with a required reason; report history shows inside the dialog; reports land in Reports → Reported conversations
+- Report as wrong — flag a conversation from the thread header "Report" button with a required reason; report history shows inside the dialog; reports land in Reports → Reported conversations
 - Delete conversation — permanently remove thread, messages, and AI history (CRM contact preserved)
 
 ## Reports

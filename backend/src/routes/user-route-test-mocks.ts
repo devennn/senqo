@@ -57,6 +57,7 @@ vi.mock("../services/task-schedule.js", () => ({
 vi.mock("../services/conversation-manual.js", () => ({
   sendManualConversationMedia: vi.fn(),
   sendManualConversationMessage: vi.fn(),
+  ensureHumanHandlingForManualReply: vi.fn(),
 }));
 
 vi.mock("../services/whatsapp-client.js", () => ({

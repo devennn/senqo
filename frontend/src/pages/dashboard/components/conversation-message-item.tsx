@@ -61,9 +61,13 @@ export function ConversationMessageItem({
   const threadEventType = asConversationThreadEventType(metadata?.thread_event);
   if (threadEventType) {
     const summaryText =
-      threadEventType === "handoff_to_human" && typeof metadata?.handoff_tool_reason === "string"
+      threadEventType === "handoff_to_human" &&
+      typeof metadata?.handoff_tool_reason === "string"
         ? metadata.handoff_tool_reason.trim() || null
-        : null;
+        : threadEventType === "manual_toggle_human" &&
+            typeof metadata?.manual_toggle_reason === "string"
+          ? metadata.manual_toggle_reason.trim() || null
+          : null;
     return (
       <ConversationThreadEvent
         eventType={threadEventType}

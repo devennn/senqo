@@ -79,15 +79,8 @@ export default function DashboardPage() {
     searchParams,
   ]);
 
-  async function handleHandlingModeChange(mode: ConversationHandlingMode) {
-    if (
-      !conversationId ||
-      !activeConversation ||
-      activeConversation.handlingMode === mode
-    )
-      return;
-    const previousMode = activeConversation.handlingMode;
-    setHandlingModeSaving(true);
+  function applyHandlingModeState(mode: ConversationHandlingMode) {
+    if (!conversationId) return;
     setActiveConversation((current) =>
       current?.id === conversationId
         ? { ...current, handlingMode: mode }
@@ -100,6 +93,18 @@ export default function DashboardPage() {
           : conversation,
       ),
     );
+  }
+
+  async function handleHandlingModeChange(mode: ConversationHandlingMode) {
+    if (
+      !conversationId ||
+      !activeConversation ||
+      activeConversation.handlingMode === mode
+    )
+      return;
+    const previousMode = activeConversation.handlingMode;
+    setHandlingModeSaving(true);
+    applyHandlingModeState(mode);
     try {
       await api.patch(
         `/api/user/conversations/${conversationId}/handling-mode`,
@@ -107,18 +112,7 @@ export default function DashboardPage() {
       );
       await refreshThreadAndList();
     } catch (error) {
-      setActiveConversation((current) =>
-        current?.id === conversationId
-          ? { ...current, handlingMode: previousMode }
-          : current,
-      );
-      setConversations((current) =>
-        current.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, handlingMode: previousMode }
-            : conversation,
-        ),
-      );
+      applyHandlingModeState(previousMode);
       toast.error(
         error instanceof Error
           ? error.message
@@ -145,7 +139,7 @@ export default function DashboardPage() {
     const optimistic = buildOptimisticHumanOutgoingMessage(message);
     setMessages((prev) => [...prev, optimistic]);
     try {
-      await api.post<SendConversationMessageResponse>(
+      const res = await api.post<SendConversationMessageResponse>(
         `/api/user/conversations/${conversationId}/messages`,
         { message },
       );
@@ -154,6 +148,9 @@ export default function DashboardPage() {
           m.id === optimistic.id ? { ...m, clientSendState: undefined } : m,
         ),
       );
+      if (res.handlingMode && res.handlingMode !== activeConversation?.handlingMode) {
+        applyHandlingModeState(res.handlingMode);
+      }
       await refreshThreadAndList();
     } catch (error) {
       setMessages((prev) =>
@@ -189,7 +186,7 @@ export default function DashboardPage() {
       if (kind !== "audio" && caption?.trim()) {
         formData.set("caption", caption.trim());
       }
-      await api.postForm<SendConversationMessageResponse>(
+      const res = await api.postForm<SendConversationMessageResponse>(
         `/api/user/conversations/${conversationId}/messages`,
         formData,
       );
@@ -198,6 +195,9 @@ export default function DashboardPage() {
           m.id === optimistic.id ? { ...m, clientSendState: undefined } : m,
         ),
       );
+      if (res.handlingMode && res.handlingMode !== activeConversation?.handlingMode) {
+        applyHandlingModeState(res.handlingMode);
+      }
       await refreshThreadAndList();
     } catch (error) {
       setMessages((prev) =>
