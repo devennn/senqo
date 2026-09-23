@@ -29,11 +29,16 @@ const report = {
     },
   ],
   summary: {
+    totalConversations: 12,
     conversationsHandled: 10,
+    totalMessages: 40,
     aiReplies: 20,
     handoffs: 2,
     inHumanMode: 1,
+    technicalErrors: 1,
+    reportedErrors: 2,
   },
+  agentOptions: [{ id: "agent-1", name: "Front desk" }],
 };
 
 beforeEach(() => {
@@ -87,5 +92,25 @@ describe("useAgentReports", () => {
         "/api/user/reports/agents?from=2026-07-25&to=2026-07-31",
       ),
     );
+  });
+
+  // A selected agent is forwarded as agentId; no param when unscoped.
+  it("forwards the agentId filter when provided", async () => {
+    const { result, rerender } = renderHook(
+      ({ agentId }) => useAgentReports({ from: "2026-07-02", to: "2026-07-31" }, agentId),
+      { initialProps: { agentId: undefined as string | undefined } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockGet).toHaveBeenCalledWith("/api/user/reports/agents?from=2026-07-02&to=2026-07-31");
+
+    await act(async () => {
+      rerender({ agentId: "agent-1" });
+    });
+    await waitFor(() =>
+      expect(mockGet).toHaveBeenCalledWith(
+        "/api/user/reports/agents?from=2026-07-02&to=2026-07-31&agentId=agent-1",
+      ),
+    );
+    expect(result.current.agentOptions).toEqual([{ id: "agent-1", name: "Front desk" }]);
   });
 });

@@ -12,6 +12,7 @@ if (databaseUrl.includes("@postgres:")) {
 const { db } = await import("../db/index.js");
 const {
   agentConfigs,
+  conversationReports,
   conversations,
   messages,
   users,
@@ -30,6 +31,7 @@ const agentId = randomUUID();
 const idleAgentId = randomUUID();
 const connectionId = randomUUID();
 const conversationId = randomUUID();
+const unlinkedConversationId = randomUUID();
 const groupId = randomUUID();
 const entryId = randomUUID();
 
@@ -95,14 +97,23 @@ describe.skipIf(!hasDb)("getAgentPerformanceReport (real DB)", () => {
       mode: "live",
       status: "open",
     });
-    await db.insert(conversations).values({
-      id: conversationId,
-      workspaceId,
-      title: "Customer chat",
-      whatsappConnectionId: connectionId,
-      whatsappChatId: `chat-${conversationId.slice(0, 8)}`,
-      handlingMode: "human",
-    });
+    await db.insert(conversations).values([
+      {
+        id: conversationId,
+        workspaceId,
+        title: "Customer chat",
+        whatsappConnectionId: connectionId,
+        whatsappChatId: `chat-${conversationId.slice(0, 8)}`,
+        handlingMode: "human",
+      },
+      {
+        id: unlinkedConversationId,
+        workspaceId,
+        title: "No connection chat",
+        whatsappChatId: `chat-${unlinkedConversationId.slice(0, 8)}`,
+        handlingMode: "ai",
+      },
+    ]);
 
     const inRange = new Date("2026-07-15T12:00:00.000Z");
     const outOfRange = new Date("2026-06-01T12:00:00.000Z");
@@ -125,6 +136,30 @@ describe.skipIf(!hasDb)("getAgentPerformanceReport (real DB)", () => {
         outgoingSenderType: "ai_agent",
         createdAt: inRange,
         metadata: { source: "agent_tool_send_whatsapp" },
+      },
+      {
+        workspaceId,
+        conversationId,
+        role: "assistant",
+        content: "Failed reply",
+        outgoingSenderType: "ai_agent",
+        status: "failed",
+        createdAt: inRange,
+        metadata: { source: "send_failure", send_error: "wa send timeout" },
+      },
+      {
+        workspaceId,
+        conversationId,
+        role: "user",
+        content: "Hello from customer",
+        createdAt: inRange,
+      },
+      {
+        workspaceId,
+        conversationId: unlinkedConversationId,
+        role: "user",
+        content: "Message without a connection",
+        createdAt: inRange,
       },
       {
         workspaceId,
@@ -161,14 +196,46 @@ describe.skipIf(!hasDb)("getAgentPerformanceReport (real DB)", () => {
         },
       },
     ]);
+
+    await db.insert(conversationReports).values([
+      {
+        workspaceId,
+        conversationId,
+        reportedByUserId: userId,
+        reason: "Wrong refund policy quoted",
+        createdAt: inRange,
+      },
+      {
+        workspaceId,
+        conversationId,
+        reportedByUserId: userId,
+        reason: "AI looped the same answer",
+        createdAt: inRange,
+      },
+      {
+        workspaceId,
+        conversationId: unlinkedConversationId,
+        reportedByUserId: userId,
+        reason: "Report on a conversation without a connection",
+        createdAt: inRange,
+      },
+      {
+        workspaceId,
+        conversationId,
+        reportedByUserId: userId,
+        reason: "Old report outside the range",
+        createdAt: outOfRange,
+      },
+    ]);
   });
 
   afterAll(async () => {
     await cleanup();
   });
 
-  // Seeded AI replies + handoffs in range map onto the bound agent; idle agent stays zeroed.
-  it("aggregates agent metrics and topic volume from seeded rows", async () => {
+  // Seeded AI replies + handoffs + volume + errors in range map onto the bound
+  // agent; failed sends count as technical errors, not AI replies or messages.
+  it("aggregates agent metrics, volume, and errors from seeded rows", async () => {
     const result = await getAgentPerformanceReport(workspaceId, "2026-07-01", "2026-07-31");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -191,11 +258,18 @@ describe.skipIf(!hasDb)("getAgentPerformanceReport (real DB)", () => {
       handoffs: 0,
       inHumanMode: 0,
     });
+    // Two conversations with messages in range (connection + no-connection),
+    // six non-failed messages (incl. the two handoff thread-event markers),
+    // one failed send, three in-range reports.
     expect(result.report.summary).toEqual({
+      totalConversations: 2,
       conversationsHandled: 1,
+      totalMessages: 6,
       aiReplies: 2,
       handoffs: 2,
       inHumanMode: 1,
+      technicalErrors: 1,
+      reportedErrors: 3,
     });
     expect(result.report.topics).toEqual([
       {
@@ -215,6 +289,26 @@ describe.skipIf(!hasDb)("getAgentPerformanceReport (real DB)", () => {
     ]);
   });
 
+  // Agent filter scopes every metric to the agent's connection: the
+  // connection-less conversation and its report disappear from the numbers.
+  it("scopes volume and error metrics when an agentId filter is applied", async () => {
+    const result = await getAgentPerformanceReport(workspaceId, "2026-07-01", "2026-07-31", agentId);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.report.agents.map((a) => a.id)).toEqual([agentId]);
+    expect(result.report.summary).toEqual({
+      totalConversations: 1,
+      conversationsHandled: 1,
+      totalMessages: 5,
+      aiReplies: 2,
+      handoffs: 2,
+      inHumanMode: 1,
+      technicalErrors: 1,
+      reportedErrors: 2,
+    });
+  });
+
   // Out-of-range window must ignore July activity — verifies date bounds on live SQL.
   it("returns zeros for a date range with no activity", async () => {
     const result = await getAgentPerformanceReport(workspaceId, "2026-01-01", "2026-01-31");
@@ -225,5 +319,15 @@ describe.skipIf(!hasDb)("getAgentPerformanceReport (real DB)", () => {
     expect(bot?.handoffs).toBe(0);
     expect(bot?.conversationsHandled).toBe(0);
     expect(result.report.topics).toEqual([]);
+    expect(result.report.summary).toEqual({
+      totalConversations: 0,
+      conversationsHandled: 0,
+      totalMessages: 0,
+      aiReplies: 0,
+      handoffs: 0,
+      inHumanMode: 1,
+      technicalErrors: 0,
+      reportedErrors: 0,
+    });
   });
 });

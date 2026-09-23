@@ -19,10 +19,10 @@ describe("reports-format helpers", () => {
     expect(handoffRatePercent(0, 5)).toBe(0);
   });
 
-  // Default range is inclusive 30 calendar days ending today.
-  it("defaultReportsDateRange → spans 30 days ending on now", () => {
+  // Default range is inclusive 7 calendar days ending today.
+  it("defaultReportsDateRange → spans 7 days ending on now", () => {
     const range = defaultReportsDateRange(new Date("2026-07-31T12:00:00Z"));
-    expect(range).toEqual({ from: "2026-07-02", to: "2026-07-31" });
+    expect(range).toEqual({ from: "2026-07-25", to: "2026-07-31" });
   });
 
   // Topic share uses total handoffs as denominator — verifies share column math.

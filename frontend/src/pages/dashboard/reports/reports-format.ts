@@ -7,10 +7,19 @@ export const REPORTS_AGENTS_PAGE_SIZE = 7;
 /** UI page size for the handoff topics table. */
 export const REPORTS_TOPICS_PAGE_SIZE = 7;
 
-/** Default report window: today and the previous 29 days (30 calendar days). */
+/** UI page size for the reported conversations table. */
+export const REPORTS_REPORTED_PAGE_SIZE = 7;
+
+/** Check whether an ISO timestamp falls inside an inclusive yyyy-MM-dd range. */
+export function isWithinReportsDateRange(isoDate: string, range: ReportsDateRange): boolean {
+  const day = isoDate.slice(0, 10);
+  return day >= range.from && day <= range.to;
+}
+
+/** Default report window: today and the previous 6 days (7 calendar days). */
 export function defaultReportsDateRange(now = new Date()): ReportsDateRange {
   return {
-    from: format(subDays(now, 29), "yyyy-MM-dd"),
+    from: format(subDays(now, 6), "yyyy-MM-dd"),
     to: format(now, "yyyy-MM-dd"),
   };
 }

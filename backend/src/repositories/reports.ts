@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm"
 import { db } from "../db/index.js";
 import {
   agentConfigs,
+  conversationReports,
   conversations,
   messages,
   whatsappConnections,
@@ -29,7 +30,7 @@ export function reportDateBounds(
   };
 }
 
-function emptySummary(): AgentPerformanceSummary {
+function emptyAgentSummary() {
   return {
     conversationsHandled: 0,
     aiReplies: 0,
@@ -38,7 +39,9 @@ function emptySummary(): AgentPerformanceSummary {
   };
 }
 
-function summarizeAgents(agents: AgentPerformanceRow[]): AgentPerformanceSummary {
+function summarizeAgents(
+  agents: AgentPerformanceRow[],
+): ReturnType<typeof emptyAgentSummary> {
   return agents.reduce(
     (acc, row) => ({
       conversationsHandled: acc.conversationsHandled + row.conversationsHandled,
@@ -46,7 +49,7 @@ function summarizeAgents(agents: AgentPerformanceRow[]): AgentPerformanceSummary
       handoffs: acc.handoffs + row.handoffs,
       inHumanMode: acc.inHumanMode + row.inHumanMode,
     }),
-    emptySummary(),
+    emptyAgentSummary(),
   );
 }
 
@@ -54,17 +57,25 @@ export async function getAgentPerformanceReport(
   workspaceId: string,
   fromYmd: string,
   toYmd: string,
+  agentId?: string | null,
 ): Promise<{ ok: true; report: AgentPerformanceReport } | { ok: false; message: string }> {
   try {
     const { fromDate, toDate } = reportDateBounds(fromYmd, toYmd);
 
-    const agentRows = await db
+    const agentRowsAll = await db
       .select({
         id: agentConfigs.id,
         profileName: agentConfigs.profileName,
       })
       .from(agentConfigs)
       .where(and(eq(agentConfigs.workspaceId, workspaceId), isNull(agentConfigs.archivedAt)));
+    const agentOptions = agentRowsAll
+      .map((row) => ({ id: row.id, name: row.profileName }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    // The agents table narrows to the selected agent; the dropdown keeps all.
+    const agentRows = agentId
+      ? agentRowsAll.filter((row) => row.id === agentId)
+      : agentRowsAll;
 
     const aiAgg = await db
       .select({
@@ -82,9 +93,12 @@ export async function getAgentPerformanceReport(
         and(
           eq(messages.workspaceId, workspaceId),
           eq(messages.outgoingSenderType, "ai_agent"),
+          // Failed sends are technical errors, not successful AI replies.
+          isNull(messages.status),
           gte(messages.createdAt, fromDate),
           lte(messages.createdAt, toDate),
           isNotNull(whatsappConnections.agentConfigId),
+          agentId ? eq(whatsappConnections.agentConfigId, agentId) : undefined,
         ),
       )
       .groupBy(whatsappConnections.agentConfigId);
@@ -107,6 +121,7 @@ export async function getAgentPerformanceReport(
           gte(messages.createdAt, fromDate),
           lte(messages.createdAt, toDate),
           isNotNull(whatsappConnections.agentConfigId),
+          agentId ? eq(whatsappConnections.agentConfigId, agentId) : undefined,
         ),
       )
       .groupBy(whatsappConnections.agentConfigId);
@@ -127,9 +142,108 @@ export async function getAgentPerformanceReport(
           eq(conversations.handlingMode, "human"),
           isNull(conversations.archivedAt),
           isNotNull(whatsappConnections.agentConfigId),
+          agentId ? eq(whatsappConnections.agentConfigId, agentId) : undefined,
         ),
       )
       .groupBy(whatsappConnections.agentConfigId);
+
+    // Volume metrics: conversations/messages touched in the range. Failed
+    // sends are excluded (they are counted as technical errors instead).
+    // Workspace-wide when no agent filter; agent-scoped via the connection
+    // chain otherwise.
+    const volumeAgg = agentId
+      ? await db
+          .select({
+            totalConversations: sql<number>`count(distinct ${messages.conversationId})::int`,
+            totalMessages: sql<number>`count(*)::int`,
+          })
+          .from(messages)
+          .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+          .innerJoin(
+            whatsappConnections,
+            eq(conversations.whatsappConnectionId, whatsappConnections.id),
+          )
+          .where(
+            and(
+              eq(messages.workspaceId, workspaceId),
+              isNull(messages.status),
+              gte(messages.createdAt, fromDate),
+              lte(messages.createdAt, toDate),
+              eq(whatsappConnections.agentConfigId, agentId),
+            ),
+          )
+      : await db
+          .select({
+            totalConversations: sql<number>`count(distinct ${messages.conversationId})::int`,
+            totalMessages: sql<number>`count(*)::int`,
+          })
+          .from(messages)
+          .where(
+            and(
+              eq(messages.workspaceId, workspaceId),
+              isNull(messages.status),
+              gte(messages.createdAt, fromDate),
+              lte(messages.createdAt, toDate),
+            ),
+          );
+
+    const technicalErrorsAgg = agentId
+      ? await db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(messages)
+          .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+          .innerJoin(
+            whatsappConnections,
+            eq(conversations.whatsappConnectionId, whatsappConnections.id),
+          )
+          .where(
+            and(
+              eq(messages.workspaceId, workspaceId),
+              eq(messages.status, "failed"),
+              gte(messages.createdAt, fromDate),
+              lte(messages.createdAt, toDate),
+              eq(whatsappConnections.agentConfigId, agentId),
+            ),
+          )
+      : await db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(messages)
+          .where(
+            and(
+              eq(messages.workspaceId, workspaceId),
+              eq(messages.status, "failed"),
+              gte(messages.createdAt, fromDate),
+              lte(messages.createdAt, toDate),
+            ),
+          );
+
+    const reportedErrorsAgg = agentId
+      ? await db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(conversationReports)
+          .innerJoin(conversations, eq(conversationReports.conversationId, conversations.id))
+          .innerJoin(
+            whatsappConnections,
+            eq(conversations.whatsappConnectionId, whatsappConnections.id),
+          )
+          .where(
+            and(
+              eq(conversationReports.workspaceId, workspaceId),
+              gte(conversationReports.createdAt, fromDate),
+              lte(conversationReports.createdAt, toDate),
+              eq(whatsappConnections.agentConfigId, agentId),
+            ),
+          )
+      : await db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(conversationReports)
+          .where(
+            and(
+              eq(conversationReports.workspaceId, workspaceId),
+              gte(conversationReports.createdAt, fromDate),
+              lte(conversationReports.createdAt, toDate),
+            ),
+          );
 
     const aiByAgent = new Map(
       aiAgg
@@ -167,21 +281,43 @@ export async function getAgentPerformanceReport(
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    const topicAgg = await db
-      .select({
-        entryId: sql<string | null>`${messages.metadata}->>'handoff_topic_entry_id'`,
-        handoffs: sql<number>`count(*)::int`,
-      })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.workspaceId, workspaceId),
-          sql`${messages.metadata}->>'thread_event' = ${THREAD_EVENT_HANDOFF_TO_HUMAN}`,
-          gte(messages.createdAt, fromDate),
-          lte(messages.createdAt, toDate),
-        ),
-      )
-      .groupBy(sql`${messages.metadata}->>'handoff_topic_entry_id'`);
+    const topicAgg = agentId
+      ? await db
+          .select({
+            entryId: sql<string | null>`${messages.metadata}->>'handoff_topic_entry_id'`,
+            handoffs: sql<number>`count(*)::int`,
+          })
+          .from(messages)
+          .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+          .innerJoin(
+            whatsappConnections,
+            eq(conversations.whatsappConnectionId, whatsappConnections.id),
+          )
+          .where(
+            and(
+              eq(messages.workspaceId, workspaceId),
+              sql`${messages.metadata}->>'thread_event' = ${THREAD_EVENT_HANDOFF_TO_HUMAN}`,
+              gte(messages.createdAt, fromDate),
+              lte(messages.createdAt, toDate),
+              eq(whatsappConnections.agentConfigId, agentId),
+            ),
+          )
+          .groupBy(sql`${messages.metadata}->>'handoff_topic_entry_id'`)
+      : await db
+          .select({
+            entryId: sql<string | null>`${messages.metadata}->>'handoff_topic_entry_id'`,
+            handoffs: sql<number>`count(*)::int`,
+          })
+          .from(messages)
+          .where(
+            and(
+              eq(messages.workspaceId, workspaceId),
+              sql`${messages.metadata}->>'thread_event' = ${THREAD_EVENT_HANDOFF_TO_HUMAN}`,
+              gte(messages.createdAt, fromDate),
+              lte(messages.createdAt, toDate),
+            ),
+          )
+          .groupBy(sql`${messages.metadata}->>'handoff_topic_entry_id'`);
 
     const entryIds = topicAgg
       .map((r) => r.entryId)
@@ -250,11 +386,17 @@ export async function getAgentPerformanceReport(
     }
     topics.sort((a, b) => b.handoffs - a.handoffs || a.topicName.localeCompare(b.topicName));
 
-    const summary = summarizeAgents(agents);
+    const summary: AgentPerformanceSummary = {
+      ...summarizeAgents(agents),
+      totalConversations: Number(volumeAgg[0]?.totalConversations) || 0,
+      totalMessages: Number(volumeAgg[0]?.totalMessages) || 0,
+      technicalErrors: Number(technicalErrorsAgg[0]?.total) || 0,
+      reportedErrors: Number(reportedErrorsAgg[0]?.total) || 0,
+    };
     console.info(
-      `[${scope}/getAgentPerformanceReport] Success: workspaceId=${workspaceId} agents=${agents.length}`,
+      `[${scope}/getAgentPerformanceReport] Success: workspaceId=${workspaceId} agents=${agents.length} agentId=${agentId ?? "all"} totalConversations=${summary.totalConversations} totalMessages=${summary.totalMessages} technicalErrors=${summary.technicalErrors} reportedErrors=${summary.reportedErrors}`,
     );
-    return { ok: true, report: { agents, topics, summary } };
+    return { ok: true, report: { agents, topics, summary, agentOptions } };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[${scope}/getAgentPerformanceReport] Unexpected error: ${message}`);

@@ -9,6 +9,7 @@ import {
 import {
   createConversationMessage,
   getManualWhatsappSendTarget,
+  recordFailedOutboundMessage,
 } from "../repositories/whatsapp.js";
 import type { ManualConversationMediaInput } from "../types/repositories.js";
 
@@ -75,6 +76,15 @@ export async function sendManualConversationMessage(input: {
     return { ok: true, idMessage: sent.messageId };
   } catch (error) {
     console.error(`[${scope}/sendManualConversationMessage] Unexpected error: ${String(error)}`);
+    // Anything thrown inside this try is a WhatsApp send failure — persist it
+    // as a technical error so it is countable in Reports.
+    await recordFailedOutboundMessage({
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      content: message,
+      outgoingSenderType: "human",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     return { ok: false, error: "Failed to send WhatsApp message." };
   }
 }
@@ -161,6 +171,15 @@ export async function sendManualConversationMedia(
     return { ok: true, idMessage: sent.messageId, urlFile: "" };
   } catch (error) {
     console.error(`[${scope}/sendManualConversationMedia] Unexpected error: ${String(error)}`);
+    // Anything thrown inside this try is a WhatsApp send failure — persist it
+    // as a technical error (media failure, no message row is created on success path).
+    await recordFailedOutboundMessage({
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      content: contentForMediaMessage(input),
+      outgoingSenderType: "human",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     return { ok: false, error: "Failed to send WhatsApp attachment." };
   }
 }

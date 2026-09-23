@@ -7,7 +7,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { useWorkspace } from "@/context/workspace";
+import { REPORTS_DEFINITIONS, hintLabel } from "@/pages/dashboard/reports/reports-definitions";
 import { formatTopicShare } from "@/pages/dashboard/reports/reports-format";
 import type { HandoffTopicPerformanceRow } from "@/types/reports";
 
@@ -89,8 +91,22 @@ export function ReportsHandoffTopicsTable({ topics, totalHandoffs }: Props) {
             <TableRow>
               <TableHead>Topic</TableHead>
               <TableHead className="w-28 max-w-[7rem]">Group</TableHead>
-              <TableHead className="text-right">Handoffs</TableHead>
-              <TableHead className="text-right">Share</TableHead>
+              <TableHead className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <span>Handoffs</span>
+                  <InlineHelpHint label={hintLabel("Handoffs")} className="size-6">
+                    <p>{REPORTS_DEFINITIONS.handoffs}</p>
+                  </InlineHelpHint>
+                </div>
+              </TableHead>
+              <TableHead className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <span>Share</span>
+                  <InlineHelpHint label={hintLabel("Share")} className="size-6">
+                    <p>{REPORTS_DEFINITIONS.topicShare}</p>
+                  </InlineHelpHint>
+                </div>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

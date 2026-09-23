@@ -206,6 +206,8 @@ async function listLatestMessagePreviews(
         and(
           eq(messages.workspaceId, workspaceId),
           inArray(messages.conversationId, conversationIds),
+          // Failed sends are technical errors, not visible chat content.
+          isNull(messages.status),
         ),
       )
       .orderBy(asc(messages.conversationId), desc(messages.createdAt), desc(messages.id));
@@ -737,6 +739,8 @@ export async function listConversationMessagesLatestPage(
         and(
           eq(messages.workspaceId, workspaceId),
           eq(messages.conversationId, conversationId),
+          // Failed sends are technical errors, not visible chat content.
+          isNull(messages.status),
         ),
       )
       .orderBy(desc(messages.createdAt), desc(messages.id))
@@ -784,6 +788,8 @@ export async function listConversationMessagesOlderPage(
         and(
           eq(messages.workspaceId, workspaceId),
           eq(messages.conversationId, conversationId),
+          // Failed sends are technical errors, not visible chat content.
+          isNull(messages.status),
           or(
             lt(messages.createdAt, beforeDate),
             and(
@@ -828,6 +834,8 @@ export async function listConversationMessagesBareForAi(
         and(
           eq(messages.workspaceId, workspaceId),
           eq(messages.conversationId, conversationId),
+          // Failed sends are technical errors, not AI conversation context.
+          isNull(messages.status),
         ),
       )
       .orderBy(asc(messages.createdAt));

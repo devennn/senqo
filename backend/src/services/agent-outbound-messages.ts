@@ -1,3 +1,4 @@
+import { recordFailedOutboundMessage } from "../repositories/whatsapp.js";
 import { sendAgentWhatsappMessage } from "./agent-whatsapp.js";
 
 const scope = "AgentOutboundMessages";
@@ -87,6 +88,13 @@ export async function sendPreparedOutboundMessages(input: {
       console.error(
         `[${scope}/sendPreparedOutboundMessages] Failed query: send failed after=${sent} error=${result.error ?? "unknown"}`,
       );
+      await recordFailedOutboundMessage({
+        workspaceId: input.workspaceId,
+        conversationId: input.conversationId,
+        content: message.text,
+        outgoingSenderType: "ai_agent",
+        errorMessage: result.error ?? null,
+      });
       break;
     }
     sent += 1;

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ConversationLabelBadges } from "@/pages/dashboard/components/conversation-label-badges";
 import { ConversationDeleteDialog } from "@/pages/dashboard/components/conversation-delete-dialog";
 import { ConversationAgentLogsDialog } from "@/pages/dashboard/components/conversation-agent-logs-dialog";
+import { ConversationReportDialog } from "@/pages/dashboard/components/conversation-report-dialog";
 import { ConversationUserLabelsDialog } from "@/pages/dashboard/components/conversation-user-labels-dialog";
 import { AddConversationToEvalDialog } from "@/pages/dashboard/evals/components/add-conversation-to-eval-dialog";
 import type { ConversationHeaderData, ConversationLabelRecord } from "@/types/repositories";
@@ -103,6 +104,10 @@ export function ConversationContactHeader({
             </Button>
           ) : null}
           <AddConversationToEvalDialog
+            conversationId={conversation.id}
+            conversationTitle={displayName}
+          />
+          <ConversationReportDialog
             conversationId={conversation.id}
             conversationTitle={displayName}
           />

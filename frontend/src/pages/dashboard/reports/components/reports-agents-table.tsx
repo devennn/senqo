@@ -6,12 +6,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { InlineHelpHint } from "@/components/ui/inline-help-hint";
+import { REPORTS_DEFINITIONS, hintLabel } from "@/pages/dashboard/reports/reports-definitions";
 import { formatHandoffRate } from "@/pages/dashboard/reports/reports-format";
 import type { AgentPerformanceRow } from "@/types/reports";
 
 type Props = {
   agents: AgentPerformanceRow[];
 };
+
+function HintedHead({ label, definition }: { label: string; definition: string }) {
+  return (
+    <TableHead className="text-right">
+      <div className="flex items-center justify-end gap-1">
+        <span>{label}</span>
+        <InlineHelpHint label={hintLabel(label)} className="size-6">
+          <p>{definition}</p>
+        </InlineHelpHint>
+      </div>
+    </TableHead>
+  );
+}
 
 export function ReportsAgentsTable({ agents }: Props) {
   return (
@@ -65,11 +80,14 @@ export function ReportsAgentsTable({ agents }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>Agent</TableHead>
-              <TableHead className="text-right">Conversations</TableHead>
-              <TableHead className="text-right">AI replies</TableHead>
-              <TableHead className="text-right">Handoffs</TableHead>
-              <TableHead className="text-right">Handoff rate</TableHead>
-              <TableHead className="text-right">In human mode</TableHead>
+              <HintedHead
+                label="Conversations"
+                definition={REPORTS_DEFINITIONS.conversationsHandled}
+              />
+              <HintedHead label="AI replies" definition={REPORTS_DEFINITIONS.aiReplies} />
+              <HintedHead label="Handoffs" definition={REPORTS_DEFINITIONS.handoffs} />
+              <HintedHead label="Handoff rate" definition={REPORTS_DEFINITIONS.handoffRate} />
+              <HintedHead label="In human mode" definition={REPORTS_DEFINITIONS.inHumanMode} />
             </TableRow>
           </TableHeader>
           <TableBody>

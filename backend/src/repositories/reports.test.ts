@@ -34,6 +34,9 @@ describe("getAgentPerformanceReport", () => {
       .mockReturnValueOnce(chainSelect([])) // ai agg
       .mockReturnValueOnce(chainSelect([])) // handoff agg
       .mockReturnValueOnce(chainSelect([])) // human agg
+      .mockReturnValueOnce(chainSelect([])) // volume agg
+      .mockReturnValueOnce(chainSelect([])) // technical errors agg
+      .mockReturnValueOnce(chainSelect([])) // reported errors agg
       .mockReturnValueOnce(chainSelect([])); // topic agg
 
     const { getAgentPerformanceReport } = await import("./reports.js");
@@ -44,14 +47,18 @@ describe("getAgentPerformanceReport", () => {
     expect(result.report.agents).toEqual([]);
     expect(result.report.topics).toEqual([]);
     expect(result.report.summary).toEqual({
+      totalConversations: 0,
       conversationsHandled: 0,
+      totalMessages: 0,
       aiReplies: 0,
       handoffs: 0,
       inHumanMode: 0,
+      technicalErrors: 0,
+      reportedErrors: 0,
     });
   });
 
-  // Seeded agent with AI + handoff aggregates → metrics map onto that agent row.
+  // Seeded agent with AI + handoff + volume + error aggregates → metrics map onto that agent row.
   it("maps AI reply and handoff aggregates onto listed agents", async () => {
     mockSelect
       .mockReturnValueOnce(
@@ -64,6 +71,9 @@ describe("getAgentPerformanceReport", () => {
       )
       .mockReturnValueOnce(chainSelect([{ agentId: "agent-1", handoffs: 3 }]))
       .mockReturnValueOnce(chainSelect([{ agentId: "agent-1", inHumanMode: 2 }]))
+      .mockReturnValueOnce(chainSelect([{ totalConversations: 8, totalMessages: 40 }]))
+      .mockReturnValueOnce(chainSelect([{ total: 1 }]))
+      .mockReturnValueOnce(chainSelect([{ total: 2 }]))
       .mockReturnValueOnce(chainSelect([]));
 
     const { getAgentPerformanceReport } = await import("./reports.js");
@@ -81,13 +91,25 @@ describe("getAgentPerformanceReport", () => {
         inHumanMode: 2,
       },
     ]);
-    expect(result.report.summary.handoffs).toBe(3);
+    expect(result.report.summary).toEqual({
+      totalConversations: 8,
+      conversationsHandled: 5,
+      totalMessages: 40,
+      aiReplies: 12,
+      handoffs: 3,
+      inHumanMode: 2,
+      technicalErrors: 1,
+      reportedErrors: 2,
+    });
   });
 
   // Topic aggregates without a known entry id → No topic bucket for unmatched handoffs.
   it("rolls unmatched topic entry ids into No topic", async () => {
     mockSelect
       .mockReturnValueOnce(chainSelect([{ id: "agent-1", profileName: "Bot" }]))
+      .mockReturnValueOnce(chainSelect([]))
+      .mockReturnValueOnce(chainSelect([]))
+      .mockReturnValueOnce(chainSelect([]))
       .mockReturnValueOnce(chainSelect([]))
       .mockReturnValueOnce(chainSelect([]))
       .mockReturnValueOnce(chainSelect([]))

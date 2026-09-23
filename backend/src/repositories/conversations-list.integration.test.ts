@@ -158,4 +158,31 @@ describe.skipIf(!hasDb)("listConversations (real DB)", () => {
     expect(result.hasMore).toBe(false);
     expect(result.total).toBe(0);
   });
+
+  // Failed sends (status="failed") are technical errors and must never become
+  // the rail preview — the newest visible message stays the preview.
+  it("excludes failed sends from the latest message preview", async () => {
+    const inserted = await db
+      .select({ id: conversations.id, title: conversations.title })
+      .from(conversations)
+      .where(eq(conversations.workspaceId, workspaceId));
+    const middle = inserted.find((c) => c.title === "Chat middle");
+    expect(middle).toBeDefined();
+
+    await db.insert(messages).values([
+      {
+        workspaceId,
+        conversationId: middle!.id,
+        role: "assistant",
+        content: "Failed send that must not show",
+        outgoingSenderType: "ai_agent",
+        status: "failed",
+        createdAt: new Date("2026-08-02T12:00:00Z"),
+      },
+    ]);
+
+    const result = await listConversations(workspaceId, { limit: 10, offset: 0 });
+    const middleRow = result.conversations.find((c) => c.title === "Chat middle");
+    expect(middleRow?.lastMessage?.content).toBe("middle chat message");
+  });
 });

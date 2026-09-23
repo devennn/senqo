@@ -1556,6 +1556,39 @@ export async function createConversationMessage(
   }
 }
 
+/**
+ * Persists an outbound send that failed so it is countable in Reports
+ * (technical errors). Failed rows carry status="failed", are excluded from
+ * thread queries and AI context, and are never sent to WhatsApp.
+ */
+export async function recordFailedOutboundMessage(input: {
+  workspaceId: string;
+  conversationId: string;
+  content: string;
+  outgoingSenderType: "ai_agent" | "human";
+  errorMessage: string | null;
+}): Promise<void> {
+  try {
+    await db.insert(messages).values({
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      role: "assistant",
+      content: input.content,
+      outgoingSenderType: input.outgoingSenderType,
+      status: "failed",
+      metadata: {
+        source: "send_failure",
+        send_error: input.errorMessage ?? "unknown",
+      },
+    });
+    console.info(
+      `[${scope}/recordFailedOutboundMessage] Success: workspaceId=${input.workspaceId} conversationId=${input.conversationId} senderType=${input.outgoingSenderType}`,
+    );
+  } catch (error) {
+    console.error(`[${scope}/recordFailedOutboundMessage] Unexpected error: ${String(error)}`);
+  }
+}
+
 function sanitizeStorageFileName(fileName: string): string {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
 }

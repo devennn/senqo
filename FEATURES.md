@@ -9,11 +9,14 @@
 - AI / Human toggle — per-conversation control over automated vs manual replies
 - Handoff WhatsApp notify — when a chat switches to human handling, chosen verified teammates get a WhatsApp alert with reason, customer phone, WhatsApp line, workspace, and a dashboard link to open the conversation
 - Conversation labels — apply workspace labels; filter inbox by label
+- Report as wrong — flag a conversation from the chats rail (flag icon on the row) or the thread header "Report" button with a required reason; report history shows inside the dialog; reports land in Reports → Reported conversations
 - Delete conversation — permanently remove thread, messages, and AI history (CRM contact preserved)
 
 ## Reports
 
-- Agent performance — workspace summary and per-agent table for conversations handled, AI replies, handoffs, handoff rate, and chats still in human mode; handoff topics ranked by volume (query by From/To date; defaults to last 30 days)
+- Agent performance — workspace summary cards (total conversations, conversations handled by agent, total messages, AI replies, handoffs, handoff rate, technical errors, reported errors) and a per-agent table (conversations, AI replies, handoffs, handoff rate, chats still in human mode); handoff topics ranked by volume; filter by From/To date (defaults to last 7 days) and by agent; metric and column definitions behind info hints
+- Reported conversations tab — full history of conversations reported as wrong (date reported, conversation link, contact, reason, reported by, agent), filtered by the same date window and agent; metrics count reports on the date submitted
+- Technical errors — outbound WhatsApp sends that fail after retries (agent or manual) are persisted as failed messages, counted under Technical errors (agent- or workspace-scoped), and are hidden from threads and AI context
 
 ## AI agents
 

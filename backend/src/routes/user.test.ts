@@ -272,6 +272,12 @@ vi.mock("../repositories/reports.js", () => ({
   getAgentPerformanceReport: vi.fn(),
 }));
 
+vi.mock("../repositories/conversation-reports.js", () => ({
+  createConversationReport: vi.fn(),
+  listConversationReportsForConversation: vi.fn(),
+  listConversationReportsForWorkspace: vi.fn(),
+}));
+
 vi.mock("../services/knowledge-ref-links.js", () => ({
   resolveKnowledgeRefLinks: vi.fn(),
 }));
@@ -360,6 +366,11 @@ import { listApiKeys, createApiKey, deleteApiKey } from "../repositories/api-key
 import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentConfig } from "../repositories/agent.js";
 import { validateHandoffTopicGroupIdsForWorkspace } from "../repositories/handoff-topic-groups.js";
 import { getAgentPerformanceReport } from "../repositories/reports.js";
+import {
+  createConversationReport,
+  listConversationReportsForConversation,
+  listConversationReportsForWorkspace,
+} from "../repositories/conversation-reports.js";
 import { scheduleHandoffNotify } from "../services/handoff-notify.js";
 import { generateCustomToolDraft } from "../services/custom-tool-generate.js";
 import { findUserById } from "../repositories/auth-users.js";
@@ -398,6 +409,11 @@ const getAgentConfigByIdMock = vi.mocked(getAgentConfigById);
 const updateAgentConfigMock = vi.mocked(updateAgentConfig);
 const validateHandoffTopicGroupIdsMock = vi.mocked(validateHandoffTopicGroupIdsForWorkspace);
 const getAgentPerformanceReportMock = vi.mocked(getAgentPerformanceReport);
+const createConversationReportMock = vi.mocked(createConversationReport);
+const listConversationReportsForConversationMock = vi.mocked(
+  listConversationReportsForConversation,
+);
+const listConversationReportsForWorkspaceMock = vi.mocked(listConversationReportsForWorkspace);
 const scheduleHandoffNotifyMock = vi.mocked(scheduleHandoffNotify);
 const generateCustomToolDraftMock = vi.mocked(generateCustomToolDraft);
 const resolveKnowledgeRefLinksMock = vi.mocked(resolveKnowledgeRefLinks);
@@ -948,10 +964,14 @@ describe("GET /reports/agents", () => {
           },
         ],
         summary: {
+          totalConversations: 12,
           conversationsHandled: 10,
+          totalMessages: 40,
           aiReplies: 20,
           handoffs: 2,
           inHumanMode: 1,
+          technicalErrors: 1,
+          reportedErrors: 2,
         },
       },
     });
@@ -966,10 +986,55 @@ describe("GET /reports/agents", () => {
       "ws-1",
       "2026-07-01",
       "2026-07-31",
+      undefined,
     );
     expect(body.agents[0].name).toBe("Front desk");
     expect(body.topics[0].topicName).toBe("Refund request");
     expect(body.summary.handoffs).toBe(2);
+  });
+
+  // Optional agent filter is forwarded so the report can be scoped to one agent.
+  it("forwards a valid agentId filter to the repository", async () => {
+    getAgentPerformanceReportMock.mockResolvedValue({
+      ok: true,
+      report: {
+        agents: [],
+        topics: [],
+        summary: {
+          totalConversations: 0,
+          conversationsHandled: 0,
+          totalMessages: 0,
+          aiReplies: 0,
+          handoffs: 0,
+          inHumanMode: 0,
+          technicalErrors: 0,
+          reportedErrors: 0,
+        },
+      },
+    });
+
+    const res = await app.request(
+      "/reports/agents?from=2026-07-01&to=2026-07-31&agentId=11111111-1111-4111-8111-111111111111",
+      { headers: AUTH },
+    );
+
+    expect(res.status).toBe(200);
+    expect(getAgentPerformanceReportMock).toHaveBeenCalledWith(
+      "ws-1",
+      "2026-07-01",
+      "2026-07-31",
+      "11111111-1111-4111-8111-111111111111",
+    );
+  });
+
+  // A malformed agent filter must 400 instead of silently matching nothing.
+  it("returns 400 for a malformed agentId filter", async () => {
+    const res = await app.request("/reports/agents?from=2026-07-01&to=2026-07-31&agentId=abc", {
+      headers: AUTH,
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_agent_filter" });
+    expect(getAgentPerformanceReportMock).not.toHaveBeenCalled();
   });
 
   // Missing or malformed dates must 400 before hitting the repository.
@@ -1018,6 +1083,172 @@ describe("GET /reports/agents", () => {
     const res = await app.request("/reports/agents?from=2026-07-01&to=2026-07-31");
     expect(res.status).toBe(401);
     expect(getAgentPerformanceReportMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /reports/conversation-reports", () => {
+  const sampleRow = {
+    id: "report-1",
+    conversationId: "conv-1",
+    conversationName: "Amara Okafor",
+    contactName: "Amara Okafor",
+    reason: "Wrong refund policy",
+    reportedByName: "User One",
+    agentId: null,
+    agentName: null,
+    createdAt: "2026-07-15T12:00:00.000Z",
+  };
+
+  // Happy path returns paged reported conversations for the date window.
+  it("returns reported conversations for a valid range", async () => {
+    listConversationReportsForWorkspaceMock.mockResolvedValue({
+      reports: [sampleRow],
+      total: 1,
+    });
+
+    const res = await app.request("/reports/conversation-reports?from=2026-07-01&to=2026-07-31", {
+      headers: AUTH,
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.reports).toHaveLength(1);
+    expect(body.reports[0].reason).toBe("Wrong refund policy");
+    expect(body.total).toBe(1);
+    const call = listConversationReportsForWorkspaceMock.mock.calls[0];
+    expect(call[1].limit).toBe(25);
+    expect(call[1].offset).toBe(0);
+    expect(call[1].agentId).toBeUndefined();
+  });
+
+  // Invalid date range must 400 before the repository runs.
+  it("returns 400 for a missing date range", async () => {
+    const res = await app.request("/reports/conversation-reports", { headers: AUTH });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_date_range" });
+    expect(listConversationReportsForWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  // Malformed agent filter must 400 instead of silently matching nothing.
+  it("returns 400 for a malformed agentId", async () => {
+    const res = await app.request(
+      "/reports/conversation-reports?from=2026-07-01&to=2026-07-31&agentId=nope",
+      { headers: AUTH },
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_agent_filter" });
+    expect(listConversationReportsForWorkspaceMock).not.toHaveBeenCalled();
+  });
+
+  // Forwarded pagination + agent filter — the Reports tab depends on these.
+  it("forwards agent filter and pagination to the repository", async () => {
+    listConversationReportsForWorkspaceMock.mockResolvedValue({ reports: [], total: 0 });
+
+    const res = await app.request(
+      "/reports/conversation-reports?from=2026-07-01&to=2026-07-31&agentId=11111111-1111-4111-8111-111111111111&limit=7&offset=14",
+      { headers: AUTH },
+    );
+
+    expect(res.status).toBe(200);
+    expect(listConversationReportsForWorkspaceMock).toHaveBeenCalledWith(
+      "ws-1",
+      expect.objectContaining({
+        agentId: "11111111-1111-4111-8111-111111111111",
+        limit: 7,
+        offset: 14,
+      }),
+    );
+  });
+});
+
+describe("POST /conversations/:id/reports", () => {
+  // Reporting a conversation as wrong persists a report entry with the actor.
+  it("creates a report with the acting user", async () => {
+    getConversationWithContactMock.mockResolvedValue({ id: "conv-1" } as never);
+    createConversationReportMock.mockResolvedValue({
+      ok: true,
+      report: {
+        id: "report-1",
+        reason: "Agent gave the wrong refund policy",
+        reportedByName: "User One",
+        createdAt: "2026-07-15T12:00:00.000Z",
+      },
+    });
+
+    const res = await app.request("/conversations/conv-1/reports", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ reason: "Agent gave the wrong refund policy" }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.report.reason).toBe("Agent gave the wrong refund policy");
+    expect(createConversationReportMock).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      reportedByUserId: "user-1",
+      reason: "Agent gave the wrong refund policy",
+    });
+  });
+
+  // Whitespace-only or oversized reasons are rejected before persistence.
+  it("returns 400 for a blank reason", async () => {
+    getConversationWithContactMock.mockResolvedValue({ id: "conv-1" } as never);
+
+    const res = await app.request("/conversations/conv-1/reports", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ reason: "   " }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_reason" });
+    expect(createConversationReportMock).not.toHaveBeenCalled();
+  });
+
+  // Unknown conversation in the workspace → 404.
+  it("returns 404 when the conversation does not exist in the workspace", async () => {
+    getConversationWithContactMock.mockResolvedValue(null);
+
+    const res = await app.request("/conversations/conv-x/reports", {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({ reason: "Wrong answer" }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(createConversationReportMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /conversations/:id/reports", () => {
+  // Report history for the detail dialog — workspace-scoped listing.
+  it("returns report history for the conversation", async () => {
+    getConversationWithContactMock.mockResolvedValue({ id: "conv-1" } as never);
+    listConversationReportsForConversationMock.mockResolvedValue([
+      {
+        id: "report-1",
+        reason: "Wrong refund policy",
+        reportedByName: "User One",
+        createdAt: "2026-07-15T12:00:00.000Z",
+      },
+    ]);
+
+    const res = await app.request("/conversations/conv-1/reports", { headers: AUTH });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.reports).toHaveLength(1);
+    expect(body.reports[0].reason).toBe("Wrong refund policy");
+  });
+
+  // Unknown conversation → 404 instead of an empty list leak.
+  it("returns 404 for an unknown conversation", async () => {
+    getConversationWithContactMock.mockResolvedValue(null);
+    const res = await app.request("/conversations/conv-x/reports", { headers: AUTH });
+    expect(res.status).toBe(404);
+    expect(listConversationReportsForConversationMock).not.toHaveBeenCalled();
   });
 });
 

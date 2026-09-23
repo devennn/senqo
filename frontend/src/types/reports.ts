@@ -13,10 +13,14 @@ export type AgentPerformanceRow = {
 };
 
 export type AgentPerformanceSummary = {
+  totalConversations: number;
   conversationsHandled: number;
+  totalMessages: number;
   aiReplies: number;
   handoffs: number;
   inHumanMode: number;
+  technicalErrors: number;
+  reportedErrors: number;
 };
 
 export type HandoffTopicPerformanceRow = {
@@ -33,3 +37,24 @@ export const REPORTS_OTHER_TOPIC_ID = "other";
 
 /** Display label for handoffs that did not match a configured topic. */
 export const REPORTS_NO_TOPIC_LABEL = "No topic";
+
+/** One "reported as wrong" entry shown in the Reports → Reported conversations tab. */
+export type ConversationReportRow = {
+  id: string;
+  conversationId: string;
+  conversationName: string;
+  contactName: string | null;
+  reason: string;
+  reportedByName: string;
+  agentId: string | null;
+  agentName: string | null;
+  createdAt: string;
+};
+
+/** Report history entry shown inside the conversation report dialog. */
+export type ConversationReportEntry = {
+  id: string;
+  reason: string;
+  reportedByName: string;
+  createdAt: string;
+};

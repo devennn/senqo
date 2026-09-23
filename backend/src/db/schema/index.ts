@@ -166,6 +166,8 @@ export const messages = pgTable(
       .defaultNow(),
     metadata: jsonb("metadata").notNull().default({}),
     outgoingSenderType: text("outgoing_sender_type"),
+    /** null = delivered; "failed" = outbound send that failed after retries. */
+    status: text("status"),
     whatsappSenderChatId: text("whatsapp_sender_chat_id"),
     whatsappSenderName: text("whatsapp_sender_name"),
     waMessageId: text("wa_message_id"),
@@ -179,9 +181,39 @@ export const messages = pgTable(
       t.workspaceId,
       t.createdAt.desc(),
     ),
+    index("idx_messages_failed_workspace_created")
+      .on(t.workspaceId, t.createdAt.desc())
+      .where(sql`${t.status} = 'failed'`),
     uniqueIndex("idx_messages_workspace_wa_message_id_unique")
       .on(t.workspaceId, t.waMessageId)
       .where(sql`${t.waMessageId} is not null`),
+  ],
+);
+
+export const conversationReports = pgTable(
+  "conversation_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    // Plain uuid (no FK) like workspaceMembers.userId so report history
+    // survives user deletion; reporter display name resolves via profiles.
+    reportedByUserId: uuid("reported_by_user_id").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_conversation_reports_workspace_created").on(
+      t.workspaceId,
+      t.createdAt.desc(),
+    ),
+    index("idx_conversation_reports_conversation").on(t.conversationId),
   ],
 );
 

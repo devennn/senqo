@@ -179,6 +179,11 @@ import { scheduleHandoffNotify } from "../services/handoff-notify.js";
 import { listAgentMessages, listAgentMessagesPage } from "../repositories/agent-messages.js";
 import { getAgentPerformanceReport } from "../repositories/reports.js";
 import {
+  createConversationReport,
+  listConversationReportsForConversation,
+  listConversationReportsForWorkspace,
+} from "../repositories/conversation-reports.js";
+import {
   scheduleAgentTask,
   cancelScheduledTask,
 } from "../services/job-scheduler.js";
@@ -291,29 +296,80 @@ const reportDateSchema = z.object({
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
-app.get("/reports/agents", async (c) => {
-  const workspaceId = c.get("workspaceId");
+const reportsAgentUuidRe =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves the optional agent filter from the query string.
+ * Returns undefined when absent, the uuid when valid, or null when invalid.
+ */
+function parseReportsAgentId(raw: string | undefined): string | undefined | null {
+  const trimmed = raw?.trim() ?? "";
+  if (trimmed.length === 0) return undefined;
+  return reportsAgentUuidRe.test(trimmed) ? trimmed : null;
+}
+
+/** Shared date-window validation for report endpoints. */
+function parseReportDateQuery(req: {
+  query: (name: string) => string | undefined;
+}): { from: string; to: string } | { error: string } {
   const parsed = reportDateSchema.safeParse({
-    from: c.req.query("from"),
-    to: c.req.query("to"),
+    from: req.query("from"),
+    to: req.query("to"),
   });
   if (!parsed.success) {
-    return c.json({ error: "invalid_date_range" }, 400);
+    return { error: "invalid_date_range" };
   }
   const { from, to } = parsed.data;
   if (from > to) {
-    return c.json({ error: "invalid_date_range" }, 400);
+    return { error: "invalid_date_range" };
   }
   const todayYmd = new Date().toISOString().slice(0, 10);
   if (from > todayYmd || to > todayYmd) {
-    return c.json({ error: "invalid_date_range" }, 400);
+    return { error: "invalid_date_range" };
+  }
+  return { from, to };
+}
+
+app.get("/reports/agents", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const dates = parseReportDateQuery(c.req);
+  if ("error" in dates) {
+    return c.json({ error: dates.error }, 400);
+  }
+  const agentId = parseReportsAgentId(c.req.query("agentId"));
+  if (agentId === null) {
+    return c.json({ error: "invalid_agent_filter" }, 400);
   }
 
-  const result = await getAgentPerformanceReport(workspaceId, from, to);
+  const result = await getAgentPerformanceReport(workspaceId, dates.from, dates.to, agentId);
   if (!result.ok) {
     return c.json({ error: "reports_failed" }, 500);
   }
   return c.json(result.report);
+});
+
+app.get("/reports/conversation-reports", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const dates = parseReportDateQuery(c.req);
+  if ("error" in dates) {
+    return c.json({ error: "invalid_date_range" }, 400);
+  }
+  const agentId = parseReportsAgentId(c.req.query("agentId"));
+  if (agentId === null) {
+    return c.json({ error: "invalid_agent_filter" }, 400);
+  }
+
+  const limitRaw = parseOptionalIntQuery(c.req.query("limit"));
+  const offsetRaw = parseOptionalIntQuery(c.req.query("offset"));
+  const page = await listConversationReportsForWorkspace(workspaceId, {
+    fromDate: new Date(`${dates.from}T00:00:00.000Z`),
+    toDate: new Date(`${dates.to}T23:59:59.999Z`),
+    agentId: agentId ?? undefined,
+    limit: typeof limitRaw === "number" ? limitRaw : 25,
+    offset: typeof offsetRaw === "number" ? offsetRaw : 0,
+  });
+  return c.json(page);
 });
 
 // ── Agents ──────────────────────────────────────────────────────────────────
@@ -1827,6 +1883,49 @@ function isValidConversationMessageCursor(
   if (Number.isNaN(Date.parse(beforeCreatedAt))) return false;
   return true;
 }
+
+const conversationReportSchema = z.object({
+  reason: z.string().trim().min(1).max(1000),
+});
+
+app.post("/conversations/:id/reports", async (c) => {
+  const userId = c.get("userId");
+  const workspaceId = c.get("workspaceId");
+  const conversationId = c.req.param("id");
+
+  const existing = await getConversationWithContact(workspaceId, conversationId);
+  if (!existing) return c.json({ error: "conversation_not_found" }, 404);
+
+  const parsed = conversationReportSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: "invalid_reason" }, 400);
+  }
+
+  const result = await createConversationReport({
+    workspaceId,
+    conversationId,
+    reportedByUserId: userId,
+    reason: parsed.data.reason,
+  });
+  if (!result.ok) {
+    if (result.message === "conversation_not_found") {
+      return c.json({ error: "conversation_not_found" }, 404);
+    }
+    return c.json({ error: "conversation_report_failed" }, 500);
+  }
+  return c.json({ report: result.report }, 201);
+});
+
+app.get("/conversations/:id/reports", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const conversationId = c.req.param("id");
+
+  const existing = await getConversationWithContact(workspaceId, conversationId);
+  if (!existing) return c.json({ error: "conversation_not_found" }, 404);
+
+  const reports = await listConversationReportsForConversation(workspaceId, conversationId);
+  return c.json({ reports });
+});
 
 app.get("/conversations", async (c) => {
   const workspaceId = c.get("workspaceId");

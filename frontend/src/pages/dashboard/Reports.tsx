@@ -3,14 +3,20 @@ import { BarChart3, MessageSquareWarning } from "lucide-react";
 import { AppFrame } from "@/components/layout/app-frame";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { useAgentReports } from "@/hooks/useAgentReports";
+import { useConversationReports } from "@/hooks/useConversationReports";
 import { TablePagination } from "@/pages/dashboard/components/table-pagination";
 import { TableListLoading } from "@/pages/dashboard/components/table-list-loading";
+import { ReportsAgentFilter } from "@/pages/dashboard/reports/components/reports-agent-filter";
 import { ReportsAgentsTable } from "@/pages/dashboard/reports/components/reports-agents-table";
 import { ReportsDateRangeToolbar } from "@/pages/dashboard/reports/components/reports-date-range-toolbar";
 import { ReportsHandoffTopicsTable } from "@/pages/dashboard/reports/components/reports-handoff-topics-table";
+import { ReportsReportedConversationsTable } from "@/pages/dashboard/reports/components/reports-reported-conversations-table";
 import { ReportsSummaryCards } from "@/pages/dashboard/reports/components/reports-summary-cards";
+import { ReportsTabBar } from "@/pages/dashboard/reports/components/reports-tab-bar";
+import type { ReportsTab } from "@/pages/dashboard/reports/components/reports-tab-bar";
 import {
   REPORTS_AGENTS_PAGE_SIZE,
+  REPORTS_REPORTED_PAGE_SIZE,
   REPORTS_TOPICS_PAGE_SIZE,
   defaultReportsDateRange,
 } from "@/pages/dashboard/reports/reports-format";
@@ -18,9 +24,29 @@ import type { ReportsDateRange } from "@/types/reports";
 
 export default function ReportsPage() {
   const [range, setRange] = useState<ReportsDateRange>(() => defaultReportsDateRange());
+  const [agentId, setAgentId] = useState<string | null>(null);
+  const [tab, setTab] = useState<ReportsTab>("metrics");
   const [agentsPage, setAgentsPage] = useState(1);
   const [topicsPage, setTopicsPage] = useState(1);
-  const { agents, topics, summary, loading, error } = useAgentReports(range);
+  const [reportedPage, setReportedPage] = useState(1);
+
+  const {
+    agents,
+    topics,
+    summary,
+    agentOptions,
+    loading,
+    error,
+  } = useAgentReports(range, agentId ?? undefined);
+
+  const reportedPageSafe = reportedPage;
+  const { reports: reportedRows, total: reportedTotal, loading: reportedLoading, error: reportedError } =
+    useConversationReports({
+      range,
+      agentId: agentId ?? undefined,
+      page: reportedPageSafe,
+      pageSize: REPORTS_REPORTED_PAGE_SIZE,
+    });
 
   const agentsTotalPages = Math.max(1, Math.ceil(agents.length / REPORTS_AGENTS_PAGE_SIZE));
   const agentsSafePage = Math.min(agentsPage, agentsTotalPages);
@@ -36,10 +62,24 @@ export default function ReportsPage() {
     topicsSafePage * REPORTS_TOPICS_PAGE_SIZE,
   );
 
+  const reportedListTotalPages = Math.max(
+    1,
+    Math.ceil(reportedTotal / REPORTS_REPORTED_PAGE_SIZE),
+  );
+  const reportedSafePageFinal = Math.min(reportedPageSafe, reportedListTotalPages);
+
   function handleRangeChange(next: ReportsDateRange) {
     setRange(next);
     setAgentsPage(1);
     setTopicsPage(1);
+    setReportedPage(1);
+  }
+
+  function handleAgentChange(nextAgentId: string | null) {
+    setAgentId(nextAgentId);
+    setAgentsPage(1);
+    setTopicsPage(1);
+    setReportedPage(1);
   }
 
   return (
@@ -55,16 +95,24 @@ export default function ReportsPage() {
                 <h1 className="text-2xl font-extrabold tracking-tight">Reports</h1>
                 <InlineHelpHint label="About agent reports">
                   <p>
-                    Use these numbers to see how automation is performing: volume handled, replies
-                    sent, and how often chats escalate to a human.
+                    Use these numbers to see how automation is performing: conversation volume,
+                    messages sent, handoffs to humans, and errors — both technical send failures and
+                    conversations your team reported as wrong.
                   </p>
                 </InlineHelpHint>
               </div>
               <p className="mt-1.5 text-base text-muted-foreground">
-                Review each agent’s conversation volume and handoffs.
+                Review agent volume, handoffs, errors, and reported conversations.
               </p>
             </div>
-            <ReportsDateRangeToolbar range={range} onRangeChange={handleRangeChange} />
+            <div className="flex flex-wrap items-end justify-end gap-3">
+              <ReportsAgentFilter
+                agents={agentOptions}
+                value={agentId ?? ""}
+                onChange={handleAgentChange}
+              />
+              <ReportsDateRangeToolbar range={range} onRangeChange={handleRangeChange} />
+            </div>
           </div>
 
           {error ? (
@@ -73,74 +121,118 @@ export default function ReportsPage() {
             </p>
           ) : null}
 
-          {loading ? (
-            <div className="mt-6">
-              <TableListLoading label="Loading reports" />
-            </div>
-          ) : (
-            <>
-              <ReportsSummaryCards summary={summary} />
+          <ReportsTabBar value={tab} onChange={setTab} reportedCount={reportedTotal} />
 
-              <div className="mt-8">
-                <div className="mb-4 flex flex-wrap items-center gap-2 text-lg font-semibold">
-                  <BarChart3 className="size-5 text-primary" />
-                  <h2 className="text-lg font-semibold">Agents</h2>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-muted-foreground">
-                    {agents.length}
-                  </span>
-                </div>
-                {agents.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-border/70 px-4 py-8 text-center text-muted-foreground">
-                    No agents in this workspace yet.
-                  </p>
-                ) : (
-                  <>
-                    <ReportsAgentsTable agents={pageRows} />
-                    <TablePagination
-                      page={agentsSafePage}
-                      total={agents.length}
-                      pageSize={REPORTS_AGENTS_PAGE_SIZE}
-                      onPage={setAgentsPage}
-                    />
-                  </>
-                )}
+          {tab === "metrics" ? (
+            loading ? (
+              <div className="mt-6">
+                <TableListLoading label="Loading reports" />
               </div>
+            ) : (
+              <>
+                <ReportsSummaryCards summary={summary} />
 
-              <div className="mt-10">
-                <div className="mb-4 flex flex-wrap items-center gap-2 text-lg font-semibold">
-                  <MessageSquareWarning className="size-5 text-primary" />
-                  <h2 className="text-lg font-semibold">Handoff topics</h2>
-                  <InlineHelpHint label="About handoff topic reports">
-                    <p>
-                      Topics ranked by how often agents handed conversations to a human for that
-                      topic in the selected date range. Click a topic to open it under Knowledge →
-                      Human handoff. “No topic” means the handoff had no matching configured topic.
+                <div className="mt-8">
+                  <div className="mb-4 flex flex-wrap items-center gap-2 text-lg font-semibold">
+                    <BarChart3 className="size-5 text-primary" />
+                    <h2 className="text-lg font-semibold">Agents</h2>
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-muted-foreground">
+                      {agents.length}
+                    </span>
+                  </div>
+                  {agents.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-border/70 px-4 py-8 text-center text-muted-foreground">
+                      No agents in this workspace yet.
                     </p>
-                  </InlineHelpHint>
-                  <span className="rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-muted-foreground">
-                    {topics.length}
-                  </span>
+                  ) : (
+                    <>
+                      <ReportsAgentsTable agents={pageRows} />
+                      <TablePagination
+                        page={agentsSafePage}
+                        total={agents.length}
+                        pageSize={REPORTS_AGENTS_PAGE_SIZE}
+                        onPage={setAgentsPage}
+                      />
+                    </>
+                  )}
                 </div>
-                {topics.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-border/70 px-4 py-8 text-center text-muted-foreground">
-                    No handoffs in this date range.
+
+                <div className="mt-10">
+                  <div className="mb-4 flex flex-wrap items-center gap-2 text-lg font-semibold">
+                    <MessageSquareWarning className="size-5 text-primary" />
+                    <h2 className="text-lg font-semibold">Handoff topics</h2>
+                    <InlineHelpHint label="About handoff topic reports">
+                      <p>
+                        Topics ranked by how often agents handed conversations to a human for that
+                        topic in the selected date range. Click a topic to open it under Knowledge →
+                        Human handoff. “No topic” means the handoff had no matching configured topic.
+                      </p>
+                    </InlineHelpHint>
+                    <span className="rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-muted-foreground">
+                      {topics.length}
+                    </span>
+                  </div>
+                  {topics.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-border/70 px-4 py-8 text-center text-muted-foreground">
+                      No handoffs in this date range.
+                    </p>
+                  ) : (
+                    <>
+                      <ReportsHandoffTopicsTable
+                        topics={pageTopics}
+                        totalHandoffs={summary.handoffs}
+                      />
+                      <TablePagination
+                        page={topicsSafePage}
+                        total={topics.length}
+                        pageSize={REPORTS_TOPICS_PAGE_SIZE}
+                        onPage={setTopicsPage}
+                      />
+                    </>
+                  )}
+                </div>
+              </>
+            )
+          ) : (
+            <div className="mt-8">
+              <div className="mb-4 flex flex-wrap items-center gap-2 text-lg font-semibold">
+                <BarChart3 className="size-5 text-primary" />
+                <h2 className="text-lg font-semibold">Reported conversations</h2>
+                <InlineHelpHint label="About reported conversations">
+                  <p>
+                    Conversations your team flagged as wrong from the chats list or an open
+                    conversation, with the reason they gave. Reports are counted on the date they
+                    were submitted.
                   </p>
-                ) : (
-                  <>
-                    <ReportsHandoffTopicsTable
-                      topics={pageTopics}
-                      totalHandoffs={summary.handoffs}
-                    />
-                    <TablePagination
-                      page={topicsSafePage}
-                      total={topics.length}
-                      pageSize={REPORTS_TOPICS_PAGE_SIZE}
-                      onPage={setTopicsPage}
-                    />
-                  </>
-                )}
+                </InlineHelpHint>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-muted-foreground">
+                  {reportedTotal}
+                </span>
               </div>
-            </>
+              {reportedLoading ? (
+                <div className="mt-6">
+                  <TableListLoading label="Loading reported conversations" />
+                </div>
+              ) : reportedError ? (
+                <p className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {reportedError}
+                </p>
+              ) : reportedRows.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border/70 px-4 py-8 text-center text-muted-foreground">
+                  No reported conversations in this date range.
+                </p>
+              ) : (
+                <>
+                  <ReportsReportedConversationsTable rows={reportedRows} />
+                  <TablePagination
+                    page={reportedSafePageFinal}
+                    total={reportedTotal}
+                    pageSize={REPORTS_REPORTED_PAGE_SIZE}
+                    onPage={setReportedPage}
+                  />
+                </>
+              )}
+            </div>
           )}
         </section>
       }
