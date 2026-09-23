@@ -20,9 +20,6 @@ const REASON_MAX_LENGTH = 1000;
 type Props = {
   conversationId: string;
   conversationTitle: string;
-  /** "default" renders the header text button; "compact" renders an icon-only trigger. */
-  variant?: "default" | "compact";
-  className?: string;
 };
 
 type ReportResponse = {
@@ -36,8 +33,6 @@ function formatEntryDate(iso: string): string {
 export function ConversationReportDialog({
   conversationId,
   conversationTitle,
-  variant = "default",
-  className,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -96,37 +91,20 @@ export function ConversationReportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {variant === "compact" ? (
-        <DialogTrigger
-          render={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label={`Report conversation ${conversationTitle} as wrong`}
-              title="Report as wrong"
-              className={`size-7 shrink-0 p-0 ${className ?? ""}`}
-            />
-          }
-        >
-          <Flag className="size-3.5" />
-        </DialogTrigger>
-      ) : (
-        <DialogTrigger
-          render={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              title="Report as wrong"
-              className={`h-7 shrink-0 gap-1.5 px-2 text-xs ${className ?? ""}`}
-            />
-          }
-        >
-          <Flag className="size-3.5" />
-          Report
-        </DialogTrigger>
-      )}
+      <DialogTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            title="Report as wrong"
+            className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+          />
+        }
+      >
+        <Flag className="size-3.5" />
+        Report
+      </DialogTrigger>
       <DialogContent showCloseButton className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Report this conversation as wrong</DialogTitle>
