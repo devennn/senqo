@@ -176,7 +176,7 @@ function uniqueCatalogItems(items: KnowledgeCatalogItem[]): KnowledgeCatalogItem
   for (const item of items) {
     const label = item.label.trim();
     if (!label) continue;
-    const key = `${item.kind}:${label.toLowerCase()}`;
+    const key = `${item.kind}:${(item.groupLabel ?? "").trim().toLowerCase()}:${label.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ ...item, label });
@@ -193,30 +193,78 @@ export function buildKnowledgeSourceCatalog(input: {
   const items: KnowledgeCatalogItem[] = [];
   for (const grp of input.context) {
     for (const entry of grp.entries) {
-      items.push({ kind: "context", label: entry.title, id: entry.id, groupId: grp.id });
+      items.push({
+        kind: "context",
+        label: entry.title,
+        groupLabel: grp.name,
+        id: entry.id,
+        groupId: grp.id,
+      });
     }
-    items.push({ kind: "context", label: grp.name, id: grp.id, groupId: grp.id });
+    items.push({
+      kind: "context",
+      label: grp.name,
+      groupLabel: null,
+      id: grp.id,
+      groupId: grp.id,
+    });
   }
   for (const grp of input.templates) {
     for (const entry of grp.entries) {
-      items.push({ kind: "template", label: entry.question_text, id: entry.id, groupId: grp.id });
+      items.push({
+        kind: "template",
+        label: entry.question_text,
+        groupLabel: grp.name,
+        id: entry.id,
+        groupId: grp.id,
+      });
     }
-    items.push({ kind: "template", label: grp.name, id: grp.id, groupId: grp.id });
+    items.push({
+      kind: "template",
+      label: grp.name,
+      groupLabel: null,
+      id: grp.id,
+      groupId: grp.id,
+    });
   }
   for (const skill of input.skills) {
-    items.push({ kind: "skill", label: skill.name, id: skill.id, groupId: null });
-    items.push({ kind: "skill", label: skill.skillKey, id: skill.id, groupId: null });
+    items.push({
+      kind: "skill",
+      label: skill.name,
+      groupLabel: null,
+      id: skill.id,
+      groupId: null,
+    });
+    items.push({
+      kind: "skill",
+      label: skill.skillKey,
+      groupLabel: null,
+      id: skill.id,
+      groupId: null,
+    });
   }
   const handoffByEntryId: AgentKnowledgeSourceCatalog["handoffByEntryId"] = {};
   for (const grp of input.handoff) {
     for (const entry of grp.entries) {
       const topic = entry.topic.trim();
       if (!topic) continue;
-      const item = { kind: "handoff" as const, label: topic, id: entry.id, groupId: grp.id };
+      const item = {
+        kind: "handoff" as const,
+        label: topic,
+        groupLabel: grp.name,
+        id: entry.id,
+        groupId: grp.id,
+      };
       items.push(item);
       handoffByEntryId[entry.id] = item;
     }
-    items.push({ kind: "handoff", label: grp.name, id: grp.id, groupId: grp.id });
+    items.push({
+      kind: "handoff",
+      label: grp.name,
+      groupLabel: null,
+      id: grp.id,
+      groupId: grp.id,
+    });
   }
   return {
     items: uniqueCatalogItems(items),

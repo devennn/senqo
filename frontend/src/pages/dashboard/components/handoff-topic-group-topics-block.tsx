@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import {
@@ -17,29 +17,32 @@ type Props = {
   onWorkspaceStale: () => Promise<void>;
 };
 
+function pageForEntryId(
+  entries: WorkspaceHandoffTopicEntryRecord[],
+  entryId: string | null,
+  pageSize: number,
+): number {
+  if (!entryId) return 1;
+  const idx = entries.findIndex((entry) => entry.id === entryId);
+  if (idx < 0) return 1;
+  return Math.floor(idx / pageSize) + 1;
+}
+
 export function HandoffTopicGroupTopicsBlock({ groupId, entries, reloadGroup, onWorkspaceStale }: Props) {
   const [searchParams] = useSearchParams();
   const focusEntryId = searchParams.get("handoffEntryId");
-  const [page, setPage] = useState(1);
   const pageSize = HANDOFF_TOPIC_UI_PAGE_SIZE;
+  const focusPage = useMemo(
+    () => pageForEntryId(entries, focusEntryId, pageSize),
+    [entries, focusEntryId, pageSize],
+  );
+  const [page, setPage] = useState(focusPage);
 
   useEffect(() => {
-    setPage(1);
-  }, [groupId]);
+    setPage(focusPage);
+  }, [groupId, focusPage]);
 
-  useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
-    setPage((p) => Math.min(Math.max(p, 1), totalPages));
-  }, [entries.length, pageSize]);
-
-  useEffect(() => {
-    if (!focusEntryId) return;
-    const idx = entries.findIndex((entry) => entry.id === focusEntryId);
-    if (idx < 0) return;
-    setPage(Math.floor(idx / pageSize) + 1);
-  }, [entries, focusEntryId, pageSize]);
-
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize) || 1);
   const safePage = Math.min(Math.max(page, 1), totalPages);
   const startOffset = (safePage - 1) * pageSize;
   const slicedEntries = entries.slice(startOffset, startOffset + pageSize);

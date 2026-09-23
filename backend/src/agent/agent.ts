@@ -35,6 +35,7 @@ import {
 import { touchAgentSession } from "../repositories/agent-sessions.js";
 import { mergeAiReasoningOntoAgentRunMessages } from "../repositories/whatsapp.js";
 import {
+  needsKnowledgeSourcesRegen,
   resolveAgentReplySources,
   resolveHandoffTopicLabel,
 } from "./reply-sources.js";
@@ -51,6 +52,12 @@ import { getChatLLM } from "./llm.js";
 const logScope = "AgentRuntime";
 
 const DEFAULT_AGENT_TOOL_KEYS = BUILTIN_AGENT_TOOL_KEYS;
+
+const AGENT_RUN_RESULT_OUTPUT_DESCRIPTION =
+  "Return the final agent run result. Put customer WhatsApp bubbles in messages (0–3). Set handoff_enabled when you called handoff_to_human. Set knowledge_used and sources for workspace operators (never paste into messages).";
+
+const KNOWLEDGE_SOURCES_CORRECTION =
+  "Correction: your previous agent_run_result set knowledge_used to true but sources did not match Available Information (resolved empty). Either set knowledge_used false with sources [] for greetings/small talk, or set knowledge_used true with sources using exact kind, group, and label names from Available Information or a skill you loaded — group is the `####` heading and label is the item inside it. Return a corrected agent_run_result only.";
 
 function isMissingToolResultError(messageText: string): boolean {
   return /Tool result(s)? (is|are) missing for tool call(s)?/i.test(
@@ -214,8 +221,7 @@ export async function runAgentSession(
     output: Output.object({
       schema: agentOutputSchema,
       name: "agent_run_result",
-      description:
-        "Return the final agent run result. Put customer WhatsApp bubbles in messages (0–3). Set handoff_enabled when you called handoff_to_human. Include reasoning_for_operators and sources for workspace operators (never paste into messages).",
+      description: AGENT_RUN_RESULT_OUTPUT_DESCRIPTION,
     }),
     stopWhen: stepCountIs(20),
     prepareStep: ({ stepNumber, messages }) => {
@@ -361,7 +367,7 @@ export async function runAgentSession(
           schema: agentOutputSchema,
           name: "agent_run_result",
           description:
-            "Return the final agent run result without calling tools. Prefer empty messages, handoff_enabled false, and include reasoning_for_operators and sources.",
+            "Return the final agent run result without calling tools. Prefer empty messages, handoff_enabled false, knowledge_used false with sources [], and include reasoning_for_operators.",
         }),
         stopWhen: stepCountIs(20),
       });
@@ -374,12 +380,56 @@ export async function runAgentSession(
     }
   }
 
+  const handoffCalledFromTools = handoffToHumanCalls.length > 0;
+  const lastHandoff = handoffToHumanCalls[handoffToHumanCalls.length - 1];
+  const handoffTopicEntryId = lastHandoff?.topicEntryId ?? null;
+  const handoffReason = lastHandoff?.reason ?? null;
+
+  function resolveFromStructuredOutput(structured: typeof result.output) {
+    const handoffEnabled = Boolean(structured?.handoff_enabled);
+    const handoffCalled = handoffCalledFromTools || handoffEnabled;
+    const handoffTopicLabel = resolveHandoffTopicLabel(
+      handoffTopicEntryId,
+      sourceCatalog,
+      handoffCalled,
+    );
+    const replySources = resolveAgentReplySources({
+      modelSources: structured?.sources,
+      loadedSkillNames,
+      handoffTopicLabel,
+      catalog: sourceCatalog,
+    });
+    return {
+      handoffEnabled,
+      handoffCalled,
+      replySources,
+      knowledgeUsed: Boolean(structured?.knowledge_used),
+      reasoningForOperators: (structured?.reasoning_for_operators ?? "").trim(),
+      rawMessages: Array.isArray(structured?.messages) ? structured.messages : [],
+    };
+  }
+
+  let resolved = resolveFromStructuredOutput(result.output);
+  if (needsKnowledgeSourcesRegen(resolved.knowledgeUsed, resolved.replySources)) {
+    console.info(
+      `[${logScope}] Failed query: knowledge_used true with empty resolved sources; regenerating once`,
+    );
+    const firstGenerated = extractGeneratedModelMessages(result);
+    result = await agent.generate({
+      messages: [
+        ...primaryInputMessages,
+        ...firstGenerated,
+        { role: "user", content: KNOWLEDGE_SOURCES_CORRECTION },
+      ],
+    });
+    resolved = resolveFromStructuredOutput(result.output);
+  }
+
   const generated = extractGeneratedModelMessages(result);
-  const generatedToPersist = generated;
 
   if (!isDryRun) {
     const persisted = await insertAgentMessages(
-      generatedToPersist.map((message) => ({
+      generated.map((message) => ({
         workspaceId: input.workspaceId,
         sessionId,
         role: message.role,
@@ -394,29 +444,14 @@ export async function runAgentSession(
     await touchAgentSession(input.workspaceId, sessionId);
   }
 
-  const structuredOutput = result.output;
-  const rawMessages = Array.isArray(structuredOutput?.messages)
-    ? structuredOutput.messages
-    : [];
-  const handoffEnabled = Boolean(structuredOutput?.handoff_enabled);
-  const handoffCalled = handoffToHumanCalls.length > 0 || handoffEnabled;
-  const lastHandoff = handoffToHumanCalls[handoffToHumanCalls.length - 1];
-  const handoffTopicEntryId = lastHandoff?.topicEntryId ?? null;
-  const handoffReason = lastHandoff?.reason ?? null;
-  const reasoningForOperators = (
-    structuredOutput?.reasoning_for_operators ?? ""
-  ).trim();
-  const handoffTopicLabel = resolveHandoffTopicLabel(
-    handoffTopicEntryId,
-    sourceCatalog,
+  const {
+    handoffEnabled,
     handoffCalled,
-  );
-  const replySources = resolveAgentReplySources({
-    modelSources: structuredOutput?.sources,
-    loadedSkillNames,
-    handoffTopicLabel,
-    catalog: sourceCatalog,
-  });
+    replySources,
+    reasoningForOperators,
+    rawMessages,
+  } = resolved;
+  const structuredOutput = result.output;
 
   let outboundMessages = prepareOutboundMessages(rawMessages);
   let outboundSent = 0;

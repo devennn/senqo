@@ -89,12 +89,39 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("set `handoff_enabled` to false");
   });
 
-  // Operators need structured knowledge refs, not only free-text reasoning.
-  it("instructs dashboard-only sources with exact knowledge labels", () => {
+  // Operators need structured knowledge refs gated by knowledge_used.
+  it("instructs knowledge_used with exact knowledge labels in sources", () => {
     const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("Set `knowledge_used` to true");
     expect(prompt).toContain("fill `sources`");
     expect(prompt).toContain("Never invent labels");
     expect(prompt).toContain("Never put sources in `messages`");
+  });
+
+  // Reference chips only deep-link to an expanded entry when the ref names the entry and
+  // its group, so the prompt must per-kind name the exact field to copy into `label`.
+  it("instructs sources to name the group plus the specific item per kind", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("`group` is the `####` heading it sits under");
+    expect(prompt).toContain("for `context` the entry title on the `[n]` line");
+    expect(prompt).toContain("for `template` the Typical question intent text");
+    expect(prompt).toContain("for `handoff` the quoted topic");
+  });
+
+  // Skills are listed without a `####` heading, so the prompt must tell the model what to
+  // put in `group` for them rather than leaving it to guess or invent one.
+  it("instructs an empty group for skill sources", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain(
+      "Skills have no group: set `group` to an empty string and `label` to the skill name",
+    );
+  });
+
+  // A group heading in `label` produces a group-only link that does not expand the fact,
+  // which is the exact failure this rule exists to prevent.
+  it("forbids putting a group heading in label", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("Never put a `####` heading in `label`");
   });
 
   // Asset delivery uses messages[].assetFileName, not a send tool.

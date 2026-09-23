@@ -75,6 +75,8 @@ describe("formatAgentStructuredOutputBlock", () => {
       structuredOutput: {
         messages: [{ text: "Hello", assetFileName: "" }],
         reasoning_for_operators: "Greeting",
+        knowledge_used: false,
+        sources: [],
         handoff_enabled: false,
       },
       outboundPrepared: [{ text: "Hello" }],
@@ -99,6 +101,8 @@ describe("formatAgentStructuredOutputBlock", () => {
       structuredOutput: {
         messages: [],
         reasoning_for_operators: "Labeled VIP",
+        knowledge_used: false,
+        sources: [],
         handoff_enabled: false,
       },
       outboundPrepared: [],

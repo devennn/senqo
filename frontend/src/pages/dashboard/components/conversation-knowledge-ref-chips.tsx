@@ -16,6 +16,25 @@ const KIND_LABEL: Record<ConversationKnowledgeKind, string> = {
 const chipClass =
   "rounded-md border border-border/70 bg-secondary px-2 py-1 text-xs text-secondary-foreground";
 
+/** Kind, then the parent group, then the specific item the reply used. */
+function ChipBody({ ref: source, muted }: { ref: ConversationKnowledgeRef; muted: boolean }) {
+  return (
+    <>
+      <span className={muted ? "font-semibold text-muted-foreground" : "font-semibold"}>
+        {KIND_LABEL[source.kind]}
+      </span>
+      <span className="mx-1 text-muted-foreground/50">·</span>
+      {source.groupLabel ? (
+        <>
+          <span>{source.groupLabel}</span>
+          <span className="mx-1 text-muted-foreground/50">›</span>
+        </>
+      ) : null}
+      <span>{source.label}</span>
+    </>
+  );
+}
+
 export function ConversationKnowledgeRefChips({ sources }: { sources: ConversationKnowledgeRef[] }) {
   const hrefByKey = useKnowledgeRefLinks(sources);
 
@@ -29,21 +48,17 @@ export function ConversationKnowledgeRefChips({ sources }: { sources: Conversati
         {sources.map((ref) => {
           const href = ref.id ? hrefByKey[knowledgeRefLookupKey(ref)] : null;
           return (
-            <li key={`${ref.kind}-${ref.label}-${ref.id ?? ""}`}>
+            <li key={`${ref.kind}-${ref.groupLabel ?? ""}-${ref.label}-${ref.id ?? ""}`}>
               {href ? (
                 <Link
                   to={href}
                   className={`${chipClass} font-medium text-primary underline-offset-4 hover:underline`}
                 >
-                  <span className="font-semibold">{KIND_LABEL[ref.kind]}</span>
-                  <span className="mx-1 text-muted-foreground/50">·</span>
-                  <span>{ref.label}</span>
+                  <ChipBody ref={ref} muted={false} />
                 </Link>
               ) : (
                 <span className={chipClass}>
-                  <span className="font-semibold text-muted-foreground">{KIND_LABEL[ref.kind]}</span>
-                  <span className="mx-1 text-muted-foreground/50">·</span>
-                  <span>{ref.label}</span>
+                  <ChipBody ref={ref} muted />
                 </span>
               )}
             </li>

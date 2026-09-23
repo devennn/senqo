@@ -38,6 +38,44 @@ describe("getOperatorAiSources", () => {
       { kind: "context", label: "Refund policy", id: "ctx-1", groupId: "grp-1" },
     ]);
   });
+
+  // Chips show the parent group beside the fact, so groupLabel must survive parsing.
+  it("keeps groupLabel when the ref names a parent group", () => {
+    const message = msg({
+      id: "m1",
+      metadata: {
+        ai_sources: [
+          {
+            kind: "context",
+            label: "Operating Hours",
+            groupLabel: "Location & Facilities",
+            id: "ctx-5",
+            groupId: "grp-1",
+          },
+        ],
+      },
+    });
+    expect(getOperatorAiSources(message)).toEqual([
+      {
+        kind: "context",
+        label: "Operating Hours",
+        groupLabel: "Location & Facilities",
+        id: "ctx-5",
+        groupId: "grp-1",
+      },
+    ]);
+  });
+
+  // Refs stored before groupLabel existed must still parse, so old threads keep their chips.
+  it("omits groupLabel when metadata has none", () => {
+    const message = msg({
+      id: "m1",
+      metadata: {
+        ai_sources: [{ kind: "context", label: "Policies", id: "grp-1", groupId: "grp-1" }],
+      },
+    });
+    expect(getOperatorAiSources(message)[0]).not.toHaveProperty("groupLabel");
+  });
 });
 
 describe("shouldShowOperatorAiReasoningFooter", () => {

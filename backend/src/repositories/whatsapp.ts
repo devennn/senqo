@@ -1378,7 +1378,13 @@ export async function mergeAiReasoningOntoAgentRunMessages(input: {
   conversationId: string;
   agentRunId: string;
   aiReasoning: string;
-  aiSources?: Array<{ kind: string; label: string; id?: string; groupId?: string }>;
+  aiSources?: Array<{
+    kind: string;
+    label: string;
+    groupLabel?: string;
+    id?: string;
+    groupId?: string;
+  }>;
 }): Promise<{ ok: boolean }> {
   const { workspaceId, conversationId, agentRunId, aiReasoning, aiSources } = input;
   try {

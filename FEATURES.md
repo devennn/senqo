@@ -20,7 +20,7 @@
 - Agent profiles — create, rename, and archive configurable agents with custom behavior instructions
 - Multi-model — powered by OpenRouter; plug in any supported LLM
 - Inline saves — per-section save buttons when settings change; transient success feedback
-- Operator insights — dashboard-only explanation of what grounded each AI reply, plus knowledge references (context, templates, skills, handoff) that link to Knowledge when the item still exists
+- Operator insights — dashboard-only explanation of what grounded each AI reply, plus knowledge references (context, templates, skills, handoff) that link to Knowledge when the item still exists; knowledge-backed turns must cite refs (`knowledge_used`), greetings omit them. Each ref names its group and the specific fact, template, or topic used, so a chip reads `Context · Location & Facilities › Operating Hours` and clicking it opens that group with the entry expanded
 - Per-connection attach — bind an agent to one or more WhatsApp lines from Agent setup; Inactive / Testing / Live modes stay per connection
 - Tasks — when an agent has multiple attached lines, pick which WhatsApp connection the task sends on
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model

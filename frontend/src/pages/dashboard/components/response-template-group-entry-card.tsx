@@ -41,7 +41,12 @@ export function ResponseTemplateGroupEntryCard({
   useEffect(() => {
     if (!focusOpen) return;
     setExpanded(true);
-    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const el = rootRef.current;
+    if (!el) return;
+    const timerId = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => window.clearTimeout(timerId);
   }, [focusOpen]);
 
   useEffect(() => {
@@ -90,7 +95,13 @@ export function ResponseTemplateGroupEntryCard({
   }
 
   return (
-    <div ref={rootRef} className="rounded-lg border border-border/60 bg-muted/20">
+    <div
+      ref={rootRef}
+      className={cn(
+        "rounded-lg border bg-muted/20",
+        focusOpen ? "border-primary ring-2 ring-primary/25" : "border-border/60",
+      )}
+    >
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"

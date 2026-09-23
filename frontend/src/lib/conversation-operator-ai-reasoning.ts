@@ -5,6 +5,8 @@ export type ConversationKnowledgeKind = "context" | "template" | "skill" | "hand
 export type ConversationKnowledgeRef = {
   kind: ConversationKnowledgeKind;
   label: string;
+  /** Parent group name when the ref points at an item inside a group. */
+  groupLabel?: string;
   id?: string;
   groupId?: string;
 };
@@ -38,7 +40,17 @@ export function getOperatorAiSources(message: ConversationMessage): Conversation
       const id = typeof row.id === "string" && row.id.trim() ? row.id.trim() : undefined;
       const groupId =
         typeof row.groupId === "string" && row.groupId.trim() ? row.groupId.trim() : undefined;
-      sources.push({ kind, label, ...(id ? { id } : {}), ...(groupId ? { groupId } : {}) });
+      const groupLabel =
+        typeof row.groupLabel === "string" && row.groupLabel.trim()
+          ? row.groupLabel.trim()
+          : undefined;
+      sources.push({
+        kind,
+        label,
+        ...(groupLabel ? { groupLabel } : {}),
+        ...(id ? { id } : {}),
+        ...(groupId ? { groupId } : {}),
+      });
     }
   }
   return sources;

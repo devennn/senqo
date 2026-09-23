@@ -7,7 +7,10 @@ import {
   getWorkspaceResponseTemplateEntryForEval,
   getWorkspaceResponseTemplateGroupDetail,
 } from "../repositories/response-templates.js";
-import { getWorkspaceHandoffTopicGroupDetail } from "../repositories/handoff-topic-groups.js";
+import {
+  getWorkspaceHandoffTopicEntryForEval,
+  getWorkspaceHandoffTopicGroupDetail,
+} from "../repositories/handoff-topic-groups.js";
 
 export type KnowledgeRefKind = "context" | "template" | "skill" | "handoff";
 
@@ -27,12 +30,14 @@ function isEntryRef(ref: KnowledgeRefLinkInput): boolean {
   return Boolean(ref.groupId && ref.groupId !== ref.id);
 }
 
+/** Build Knowledge / Agent dashboard path that opens the group and expands the entry when present. */
 export function knowledgeRefHref(ref: KnowledgeRefLinkInput): string {
   if (ref.kind === "skill") {
     return `/agent?tab=skills&skillId=${encodeURIComponent(ref.id)}`;
   }
   if (ref.kind === "context") {
     const params = new URLSearchParams();
+    params.set("tab", "context");
     if (isEntryRef(ref) && ref.groupId) {
       params.set("contextGroupId", ref.groupId);
       params.set("contextEntryId", ref.id);
@@ -63,36 +68,55 @@ export function knowledgeRefHref(ref: KnowledgeRefLinkInput): string {
   return `/knowledge?${params.toString()}`;
 }
 
-async function knowledgeRefExists(
+async function resolveContextHref(
   workspaceId: string,
-  ref: KnowledgeRefLinkInput,
-): Promise<boolean> {
-  if (ref.kind === "skill") {
-    const skill = await getWorkspaceSkillById(workspaceId, ref.id);
-    return skill !== null;
+  id: string,
+): Promise<string | null> {
+  const entry = await getWorkspaceContextEntryForEval(workspaceId, id);
+  if (entry) {
+    return knowledgeRefHref({
+      kind: "context",
+      id: entry.id,
+      groupId: entry.groupId,
+    });
   }
-  if (ref.kind === "context") {
-    if (isEntryRef(ref)) {
-      const entry = await getWorkspaceContextEntryForEval(workspaceId, ref.id);
-      return entry !== null;
-    }
-    const group = await getWorkspaceContextGroupDetail(workspaceId, ref.id);
-    return group !== null;
+  const group = await getWorkspaceContextGroupDetail(workspaceId, id);
+  if (!group) return null;
+  return knowledgeRefHref({ kind: "context", id: group.id, groupId: group.id });
+}
+
+async function resolveTemplateHref(
+  workspaceId: string,
+  id: string,
+): Promise<string | null> {
+  const entry = await getWorkspaceResponseTemplateEntryForEval(workspaceId, id);
+  if (entry) {
+    return knowledgeRefHref({
+      kind: "template",
+      id: entry.id,
+      groupId: entry.groupId,
+    });
   }
-  if (ref.kind === "template") {
-    if (isEntryRef(ref)) {
-      const entry = await getWorkspaceResponseTemplateEntryForEval(workspaceId, ref.id);
-      return entry !== null;
-    }
-    const group = await getWorkspaceResponseTemplateGroupDetail(workspaceId, ref.id);
-    return group !== null;
+  const group = await getWorkspaceResponseTemplateGroupDetail(workspaceId, id);
+  if (!group) return null;
+  return knowledgeRefHref({ kind: "template", id: group.id, groupId: group.id });
+}
+
+async function resolveHandoffHref(
+  workspaceId: string,
+  id: string,
+): Promise<string | null> {
+  const entry = await getWorkspaceHandoffTopicEntryForEval(workspaceId, id);
+  if (entry) {
+    return knowledgeRefHref({
+      kind: "handoff",
+      id: entry.id,
+      groupId: entry.groupId,
+    });
   }
-  const groupId = isEntryRef(ref) ? ref.groupId : ref.id;
-  if (!groupId) return false;
-  const group = await getWorkspaceHandoffTopicGroupDetail(workspaceId, groupId);
-  if (!group) return false;
-  if (!isEntryRef(ref)) return true;
-  return group.entries.some((entry) => entry.id === ref.id);
+  const group = await getWorkspaceHandoffTopicGroupDetail(workspaceId, id);
+  if (!group) return null;
+  return knowledgeRefHref({ kind: "handoff", id: group.id, groupId: group.id });
 }
 
 export async function resolveKnowledgeRefLinks(
@@ -106,12 +130,24 @@ export async function resolveKnowledgeRefLinks(
       links.push({ kind: ref.kind, id: ref.id, href: null });
       continue;
     }
-    const exists = await knowledgeRefExists(workspaceId, { ...ref, id });
-    links.push({
-      kind: ref.kind,
-      id,
-      href: exists ? knowledgeRefHref({ ...ref, id }) : null,
-    });
+    if (ref.kind === "skill") {
+      const skill = await getWorkspaceSkillById(workspaceId, id);
+      links.push({
+        kind: ref.kind,
+        id,
+        href: skill ? knowledgeRefHref({ kind: "skill", id }) : null,
+      });
+      continue;
+    }
+    if (ref.kind === "context") {
+      links.push({ kind: ref.kind, id, href: await resolveContextHref(workspaceId, id) });
+      continue;
+    }
+    if (ref.kind === "template") {
+      links.push({ kind: ref.kind, id, href: await resolveTemplateHref(workspaceId, id) });
+      continue;
+    }
+    links.push({ kind: ref.kind, id, href: await resolveHandoffHref(workspaceId, id) });
   }
   return links;
 }

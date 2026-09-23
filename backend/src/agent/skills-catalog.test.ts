@@ -266,21 +266,49 @@ describe("buildKnowledgeSourceCatalog", () => {
     });
     expect(catalog.items).toEqual(
       expect.arrayContaining([
-        { kind: "context", label: "Refund policy", id: "ctx-e1", groupId: "ctx-g1" },
-        { kind: "context", label: "Policies", id: "ctx-g1", groupId: "ctx-g1" },
-        { kind: "template", label: "Hi there", id: "tpl-e1", groupId: "tpl-g1" },
-        { kind: "template", label: "Greetings", id: "tpl-g1", groupId: "tpl-g1" },
-        { kind: "skill", label: "Booking flow", id: "s1", groupId: null },
-        { kind: "skill", label: "booking_flow", id: "s1", groupId: null },
-        { kind: "handoff", label: "Billing", id: "entry-1", groupId: "ho-g1" },
-        { kind: "handoff", label: "Escalations", id: "ho-g1", groupId: "ho-g1" },
+        { kind: "context", label: "Refund policy", groupLabel: "Policies", id: "ctx-e1", groupId: "ctx-g1" },
+        { kind: "context", label: "Policies", groupLabel: null, id: "ctx-g1", groupId: "ctx-g1" },
+        { kind: "template", label: "Hi there", groupLabel: "Greetings", id: "tpl-e1", groupId: "tpl-g1" },
+        { kind: "template", label: "Greetings", groupLabel: null, id: "tpl-g1", groupId: "tpl-g1" },
+        { kind: "skill", label: "Booking flow", groupLabel: null, id: "s1", groupId: null },
+        { kind: "skill", label: "booking_flow", groupLabel: null, id: "s1", groupId: null },
+        { kind: "handoff", label: "Billing", groupLabel: "Escalations", id: "entry-1", groupId: "ho-g1" },
+        { kind: "handoff", label: "Escalations", groupLabel: null, id: "ho-g1", groupId: "ho-g1" },
       ]),
     );
     expect(catalog.handoffByEntryId["entry-1"]).toEqual({
       kind: "handoff",
       label: "Billing",
+      groupLabel: "Escalations",
       id: "entry-1",
       groupId: "ho-g1",
     });
+  });
+
+  // Two groups can hold facts with the same title. Keying dedupe on group + label keeps
+  // both so a ref can resolve to the entry in the group the model actually named.
+  it("keeps same-titled entries from different groups", async () => {
+    const { buildKnowledgeSourceCatalog } = await import("./skills-catalog.js");
+    const catalog = buildKnowledgeSourceCatalog({
+      context: [
+        {
+          id: "g-kl",
+          name: "Kuala Lumpur",
+          entries: [{ id: "e-kl", title: "Operating Hours", body_text: "7AM-11PM" }],
+        },
+        {
+          id: "g-pen",
+          name: "Penang",
+          entries: [{ id: "e-pen", title: "Operating Hours", body_text: "8AM-10PM" }],
+        },
+      ],
+      templates: [],
+      handoff: [],
+      skills: [],
+    });
+    const hours = catalog.items.filter(
+      (item) => item.kind === "context" && item.label === "Operating Hours",
+    );
+    expect(hours.map((item) => item.id).sort()).toEqual(["e-kl", "e-pen"]);
   });
 });

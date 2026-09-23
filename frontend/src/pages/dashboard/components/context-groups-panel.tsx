@@ -31,11 +31,16 @@ export function ContextGroupsPanel({ groups, agents, reload, agentId, refreshKey
   const { wsPath } = useWorkspace();
   const [createOpen, setCreateOpen] = useState(false);
 
-  function contextPanelHref(id: string | undefined, contextGroupId: string): string {
+  function contextPanelHref(
+    id: string | undefined,
+    contextGroupId: string,
+    contextEntryId?: string | null,
+  ): string {
     const params = new URLSearchParams();
     params.set("tab", "context");
     if (id) params.set("agentId", id);
     params.set("contextGroupId", contextGroupId);
+    if (contextEntryId) params.set("contextEntryId", contextEntryId);
     return `${wsPath("/knowledge")}?${params.toString()}`;
   }
 
@@ -48,7 +53,10 @@ export function ContextGroupsPanel({ groups, agents, reload, agentId, refreshKey
 
   const firstGroupId = groups[0]?.id;
 
-  const groupHref = useMemo(() => (id: string) => contextPanelHref(agentId, id), [agentId]);
+  const groupHref = useMemo(
+    () => (id: string) => contextPanelHref(agentId, id),
+    [agentId, wsPath],
+  );
 
   const sidebarSelectedId = canonicalGroupId ?? firstGroupId;
 

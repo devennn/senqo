@@ -1220,7 +1220,7 @@ describe("POST /knowledge-ref-links", () => {
       {
         kind: "context",
         id: "ctx-e1",
-        href: "/knowledge?contextGroupId=ctx-g1&contextEntryId=ctx-e1",
+        href: "/knowledge?tab=context&contextGroupId=ctx-g1&contextEntryId=ctx-e1",
       },
     ]);
 
@@ -1238,7 +1238,7 @@ describe("POST /knowledge-ref-links", () => {
         {
           kind: "context",
           id: "ctx-e1",
-          href: "/knowledge?contextGroupId=ctx-g1&contextEntryId=ctx-e1",
+          href: "/knowledge?tab=context&contextGroupId=ctx-g1&contextEntryId=ctx-e1",
         },
       ],
     });
