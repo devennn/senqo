@@ -45,7 +45,7 @@ export function AssetGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupH
             <InlineHelpHint className="size-7" label="About asset groups">
               <>
                 <p>Browse workspace file sets (images, videos, documents) with a short note on what each file is about.</p>
-                <p>Attach whichever groups fit an agent on the Profile tab.</p>
+                <p>Attach whichever groups fit an agent on Agent → Profile.</p>
               </>
             </InlineHelpHint>
           </CardTitle>

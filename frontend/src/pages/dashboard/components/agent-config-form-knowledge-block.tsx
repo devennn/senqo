@@ -50,7 +50,7 @@ export function AgentConfigFormKnowledgeBlock({
       )}
       templatesTabHref={knowledgeTabHref(wsPath, "templates")}
       contextTabHref={knowledgeTabHref(wsPath, "context")}
-      assetsTabHref={agentTabHref(wsPath, agent.id, "assets")}
+      assetsTabHref={knowledgeTabHref(wsPath, "assets")}
       handoffTabHref={knowledgeTabHref(wsPath, "handoff")}
       toolsTabHref={agentTabHref(wsPath, agent.id, "tools")}
       workspaceContextDirty={sectionDirty.workspaceContext}

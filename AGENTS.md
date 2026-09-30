@@ -356,4 +356,6 @@ On **Agent setup → Profile**, there is **no** bottom **Save agent** control. P
 
 On **Knowledge → Human handoff**, attach topic groups and the WhatsApp notify person per agent via the shared **Handoff settings** dialog (opened from **Handoff settings** beside Delete group, or from the group list ⋮ → **Handoff settings**). Inline **Save** when that slice is dirty. These settings are not edited on Profile.
 
+On **Knowledge → Assets**, create and edit sendable asset groups; attach them per agent on Profile → Capability with the inline **Save**.
+
 Banner and inline copy for **Agent saved.** / equivalent must **auto-dismiss** after a bounded delay—see [Transient success feedback](#transient-success-feedback).

@@ -11,11 +11,10 @@ import { AgentSetupTabBar, type AgentSetupTab } from "@/pages/dashboard/componen
 import { SkillsCatalogPanel } from "@/pages/dashboard/skills/components/skills-catalog-panel";
 import { ToolsCatalogPanel } from "@/pages/dashboard/tools/components/tools-catalog-panel";
 import type { ToolsNavConfig } from "@/hooks/useCustomTools";
-import { AssetGroupsPanel } from "@/pages/dashboard/components/asset-groups-panel";
 import { PageLoader } from "@/components/ui/spinner";
 import { TRANSIENT_SUCCESS_FEEDBACK_MS } from "@/lib/transient-feedback";
 
-const KNOWLEDGE_LEGACY_TABS = new Set(["context", "templates", "handoff"]);
+const KNOWLEDGE_LEGACY_TABS = new Set(["context", "templates", "handoff", "assets"]);
 
 function AgentErrorBanner({ error }: { error: string | null }) {
   if (!error) return null;
@@ -49,7 +48,6 @@ function AgentSuccessBanner({ success }: { success: string | null }) {
 function parseAgentTab(tabParam: string | null): AgentSetupTab {
   if (tabParam === "skills") return "skills";
   if (tabParam === "tools") return "tools";
-  if (tabParam === "assets") return "assets";
   return "profile";
 }
 
@@ -116,9 +114,6 @@ export default function AgentPage() {
     } else {
       p.set("tab", next);
     }
-    if (next !== "assets") {
-      p.delete("assetGroupId");
-    }
     if (next !== "tools") {
       p.delete("toolId");
       p.delete("mode");
@@ -157,14 +152,6 @@ export default function AgentPage() {
             ) : tab === "tools" ? (
               <div className="mt-6">
                 <ToolsCatalogPanel navigation={toolsNavigation} />
-              </div>
-            ) : tab === "assets" ? (
-              <div className="mt-6">
-                <AssetGroupsPanel
-                  groups={data.workspaceAssetGroups}
-                  reload={reload}
-                  agentId={selectedId ?? undefined}
-                />
               </div>
             ) : selectedAgent ? (
               <div className="mt-6 grid items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">

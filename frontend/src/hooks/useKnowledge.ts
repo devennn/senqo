@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import { useWorkspace } from "@/context/workspace";
 import type {
   AgentConfigRecord,
+  WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
   WorkspaceHandoffTopicGroupSummary,
   WorkspaceResponseTemplateGroupSummary,
@@ -13,6 +14,7 @@ export type KnowledgePageData = {
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
+  workspaceAssetGroups: WorkspaceAssetGroupSummary[];
 };
 
 function normalizeAgent(a: AgentConfigRecord): AgentConfigRecord {
@@ -36,6 +38,7 @@ export function useKnowledge() {
     responseTemplateGroups: [],
     handoffTopicGroups: [],
     workspaceContextGroups: [],
+    workspaceAssetGroups: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -49,12 +52,14 @@ export function useKnowledge() {
           responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
           handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
           workspaceContextGroups?: WorkspaceContextGroupSummary[];
+          workspaceAssetGroups?: WorkspaceAssetGroupSummary[];
         }>("/api/user/agents", { workspaceId });
         setData({
           agents: res.agents.map(normalizeAgent),
           responseTemplateGroups: res.responseTemplateGroups ?? [],
           handoffTopicGroups: res.handoffTopicGroups ?? [],
           workspaceContextGroups: res.workspaceContextGroups ?? [],
+          workspaceAssetGroups: res.workspaceAssetGroups ?? [],
         });
       } catch {
         // Page shows empty/loading; avoid unhandled rejection toast.

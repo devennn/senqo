@@ -17,21 +17,19 @@ import { AssetGroupsSidebar } from "@/pages/dashboard/components/asset-groups-si
 type Props = {
   groups: WorkspaceAssetGroupSummary[];
   reload: () => Promise<void>;
-  agentId: string | undefined;
 };
 
-export function AssetGroupsPanel({ groups, reload, agentId }: Props) {
+export function AssetGroupsPanel({ groups, reload }: Props) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { wsPath } = useWorkspace();
   const [createOpen, setCreateOpen] = useState(false);
 
-  function assetPanelHref(id: string | undefined, assetGroupId: string): string {
+  function assetPanelHref(assetGroupId: string): string {
     const params = new URLSearchParams();
     params.set("tab", "assets");
-    if (id) params.set("agentId", id);
     params.set("assetGroupId", assetGroupId);
-    return `${wsPath("/agent")}?${params.toString()}`;
+    return `${wsPath("/knowledge")}?${params.toString()}`;
   }
 
   const urlGroupId = searchParams.get("assetGroupId") ?? undefined;
@@ -41,7 +39,7 @@ export function AssetGroupsPanel({ groups, reload, agentId }: Props) {
   }, [groups, urlGroupId]);
 
   const firstGroupId = groups[0]?.id;
-  const groupHref = useMemo(() => (id: string) => assetPanelHref(agentId, id), [agentId]);
+  const groupHref = useMemo(() => (id: string) => assetPanelHref(id), [wsPath]);
   const sidebarSelectedId = canonicalGroupId ?? firstGroupId;
   const editorGroupId = groups.length > 0 ? canonicalGroupId ?? firstGroupId : undefined;
 
@@ -49,13 +47,13 @@ export function AssetGroupsPanel({ groups, reload, agentId }: Props) {
     if (groups.length === 0) return;
     const fallbackId = groups[0].id;
     if (!urlGroupId || !groups.some((g) => g.id === urlGroupId)) {
-      navigate(assetPanelHref(agentId, fallbackId), { replace: true });
+      navigate(assetPanelHref(fallbackId), { replace: true });
     }
-  }, [agentId, groups, navigate, urlGroupId]);
+  }, [groups, navigate, urlGroupId]);
 
   function handleCreated(newId: string) {
     setCreateOpen(false);
-    navigate(assetPanelHref(agentId, newId), { replace: true });
+    navigate(assetPanelHref(newId), { replace: true });
     void reload();
   }
 

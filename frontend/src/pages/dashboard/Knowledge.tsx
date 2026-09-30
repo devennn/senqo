@@ -11,10 +11,12 @@ import { KnowledgeImportDocsButton } from "@/pages/dashboard/components/knowledg
 import { ContextGroupsPanel } from "@/pages/dashboard/components/context-groups-panel";
 import { ResponseTemplatesPanel } from "@/pages/dashboard/components/response-templates-panel";
 import { HandoffTopicGroupsPanel } from "@/pages/dashboard/components/handoff-topic-groups-panel";
+import { AssetGroupsPanel } from "@/pages/dashboard/components/asset-groups-panel";
 
 function parseKnowledgeTab(tabParam: string | null): KnowledgeTab {
   if (tabParam === "templates") return "templates";
   if (tabParam === "handoff") return "handoff";
+  if (tabParam === "assets") return "assets";
   return "context";
 }
 
@@ -45,6 +47,9 @@ export default function KnowledgePage() {
       p.delete("contextEntryId");
       p.delete("context");
     }
+    if (next !== "assets") {
+      p.delete("assetGroupId");
+    }
     setSearchParams(p, { replace: true });
   }
 
@@ -64,13 +69,14 @@ export default function KnowledgePage() {
                   <h1 className="text-2xl font-extrabold tracking-tight">Knowledge</h1>
                   <InlineHelpHint label="About knowledge">
                     <p>
-                      Workspace facts, reply templates, and handoff topics. Attach groups to an agent on Agent →
-                      Profile → Attached knowledge. Groups older than 90 days show a may-be-outdated hint.
+                      Workspace facts, reply templates, handoff topics, and sendable files. Attach groups to an agent on
+                      Agent → Profile (Attached knowledge / Capability). Knowledge groups older than 90 days show a
+                      may-be-outdated hint.
                     </p>
                   </InlineHelpHint>
                 </div>
                 <p className="mt-1.5 text-base text-muted-foreground">
-                  Author workspace knowledge agents can use.
+                  Author workspace knowledge and assets agents can use.
                 </p>
               </div>
               <div className="sm:shrink-0">
@@ -98,6 +104,10 @@ export default function KnowledgePage() {
                   agentId={undefined}
                   agents={data.agents}
                 />
+              </div>
+            ) : tab === "assets" ? (
+              <div className="mt-6">
+                <AssetGroupsPanel groups={data.workspaceAssetGroups} reload={reload} />
               </div>
             ) : (
               <div className="mt-6">

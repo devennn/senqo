@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export type AgentSetupTab = "profile" | "skills" | "tools" | "assets";
+export type AgentSetupTab = "profile" | "skills" | "tools";
 
 type Props = {
   value: AgentSetupTab;
@@ -17,7 +17,6 @@ export function AgentSetupTabBar({ value, onChange }: Props) {
       <TabButton id="profile" label="Profile" selected={value === "profile"} onClick={() => onChange("profile")} />
       <TabButton id="skills" label="Skill Catalog" selected={value === "skills"} onClick={() => onChange("skills")} />
       <TabButton id="tools" label="Tool Catalog" selected={value === "tools"} onClick={() => onChange("tools")} />
-      <TabButton id="assets" label="Assets" selected={value === "assets"} onClick={() => onChange("assets")} />
     </div>
   );
 }

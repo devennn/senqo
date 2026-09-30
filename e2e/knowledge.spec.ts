@@ -3,6 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 const WORKSPACE_ID = "ws-1";
 const AGENT_ID = "agent-e2e-1";
 const CONTEXT_GROUP_ID = "ctx-group-1";
+const ASSET_GROUP_ID = "asset-group-1";
 
 async function seedSession(page: Page) {
   await page.addInitScript(() => {
@@ -27,6 +28,18 @@ async function mockKnowledgeApis(page: Page) {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({ user: authUser }),
+      });
+      return;
+    }
+    if (url.endsWith("/refresh") && method === "POST") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          accessToken: "e2e-access-token",
+          refreshToken: "e2e-refresh-token",
+          user: authUser,
+        }),
       });
       return;
     }
@@ -70,7 +83,25 @@ async function mockKnowledgeApis(page: Page) {
               entry_count: 2,
             },
           ],
-          workspaceAssetGroups: [],
+          workspaceAssetGroups: [
+            {
+              id: ASSET_GROUP_ID,
+              name: "Price lists",
+              updated_at: "2026-01-01T00:00:00.000Z",
+              asset_count: 1,
+            },
+          ],
+        }),
+      });
+      return;
+    }
+
+    if (url.includes(`/workspace-asset-groups/${ASSET_GROUP_ID}`) && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          group: { id: ASSET_GROUP_ID, name: "Price lists", assets: [] },
         }),
       });
       return;
@@ -159,5 +190,16 @@ test.describe("Knowledge page", () => {
     await page.goto(`/${WORKSPACE_ID}/agent?agentId=${AGENT_ID}`);
     await expect(page.getByRole("tab", { name: "Attached knowledge" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Capability" })).toBeVisible();
+  });
+
+  // Move: legacy Agent → Assets URLs land on Knowledge → Assets authoring.
+  test("Agent assets tab redirects to Knowledge Assets", async ({ page }) => {
+    await seedSession(page);
+    await mockKnowledgeApis(page);
+    await page.goto(`/${WORKSPACE_ID}/agent?tab=assets&agentId=${AGENT_ID}`);
+
+    await expect(page).toHaveURL(new RegExp(`/${WORKSPACE_ID}/knowledge\\?tab=assets`));
+    await expect(page.getByRole("tab", { name: "Assets" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Price lists/ })).toBeVisible();
   });
 });
