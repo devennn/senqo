@@ -9,7 +9,7 @@ export function useProfileSettings(): {
   loadError: string | null;
   reload: () => Promise<void>;
   savePersonal: (firstName: string, lastName: string) => Promise<void>;
-  saveWorkspaceName: (name: string) => Promise<void>;
+  saveWorkspace: (patch: { name?: string; timezone?: string }) => Promise<void>;
 } {
   const { workspaceId } = useWorkspace();
   const [bundle, setBundle] = useState<UserProfileSettingsApiResponse | null>(null);
@@ -48,13 +48,13 @@ export function useProfileSettings(): {
     [reload, workspaceId],
   );
 
-  const saveWorkspaceName = useCallback(
-    async (name: string) => {
-      await api.put("/api/user/workspace", { name }, { workspaceId });
+  const saveWorkspace = useCallback(
+    async (patch: { name?: string; timezone?: string }) => {
+      await api.put("/api/user/workspace", patch, { workspaceId });
       await reload({ silent: true });
     },
     [reload, workspaceId],
   );
 
-  return { bundle, loading, loadError, reload, savePersonal, saveWorkspaceName };
+  return { bundle, loading, loadError, reload, savePersonal, saveWorkspace };
 }

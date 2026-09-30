@@ -88,7 +88,7 @@ vi.mock("../repositories/workspaces.js", () => ({
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
   isWorkspaceTeammate: vi.fn(),
-  updateWorkspaceNameAsOwner: vi.fn(),
+  updateWorkspaceSettingsAsOwner: vi.fn(),
 }));
 
 vi.mock("../repositories/auth-users.js", () => ({
@@ -355,7 +355,7 @@ vi.mock("../repositories/evals.js", () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";
-import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser, isWorkspaceOwner } from "../repositories/workspaces.js";
+import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser, isWorkspaceOwner, updateWorkspaceSettingsAsOwner } from "../repositories/workspaces.js";
 import { listConversationLabels, createConversationLabel, deleteConversationLabel } from "../repositories/conversation-labels.js";
 import { listContactsPage } from "../repositories/contacts.js";
 import { listConversations, getConversationWithContact, updateConversationHandlingMode } from "../repositories/conversations.js";
@@ -428,6 +428,7 @@ const findUserByIdMock = vi.mocked(findUserById);
 const getProfileForSettingsMock = vi.mocked(getProfileForSettings);
 const updateProfileMock = vi.mocked(updateProfile);
 const getWorkspaceRowMock = vi.mocked(getWorkspaceRow);
+const updateWorkspaceSettingsAsOwnerMock = vi.mocked(updateWorkspaceSettingsAsOwner);
 const generateApiKeyMaterialMock = vi.mocked(generateApiKeyMaterial);
 
 // ── Test app setup ─────────────────────────────────────────────────────────────
@@ -908,6 +909,7 @@ describe("GET /profile", () => {
     getWorkspaceRowMock.mockResolvedValue({
       id: "ws-1",
       name: "Test Workspace",
+      timezone: "Asia/Kuala_Lumpur",
       ownerUserId: "user-1",
       createdAt: new Date(),
     });
@@ -919,7 +921,55 @@ describe("GET /profile", () => {
     expect(body.profile.email).toBe("user@example.com");
     expect(body.profile.firstName).toBe("Alice");
     expect(body.workspace.name).toBe("Test Workspace");
+    expect(body.workspace.timezone).toBe("Asia/Kuala_Lumpur");
     expect(body.workspace.role).toBe("owner");
+  });
+});
+
+describe("PUT /workspace", () => {
+  // Saving a valid IANA timezone delegates to the repository with the parsed patch.
+  it("updates the workspace timezone", async () => {
+    updateWorkspaceSettingsAsOwnerMock.mockResolvedValue({ ok: true });
+
+    const res = await app.request("/workspace", {
+      method: "PUT",
+      headers: AUTH,
+      body: JSON.stringify({ timezone: "Asia/Kuala_Lumpur" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(updateWorkspaceSettingsAsOwnerMock).toHaveBeenCalledWith("ws-1", "user-1", {
+      name: undefined,
+      timezone: "Asia/Kuala_Lumpur",
+    });
+  });
+
+  // A non-IANA timezone string must be rejected before it reaches the database.
+  it("rejects an invalid timezone", async () => {
+    const res = await app.request("/workspace", {
+      method: "PUT",
+      headers: AUTH,
+      body: JSON.stringify({ timezone: "Mars/Olympus" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid_timezone");
+    expect(updateWorkspaceSettingsAsOwnerMock).not.toHaveBeenCalled();
+  });
+
+  // A patch without any editable field is rejected by validation.
+  it("rejects an empty patch", async () => {
+    const res = await app.request("/workspace", {
+      method: "PUT",
+      headers: AUTH,
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    expect(updateWorkspaceSettingsAsOwnerMock).not.toHaveBeenCalled();
   });
 });
 

@@ -13,7 +13,7 @@ function queryMessage(raw: string): string {
 }
 
 export default function WorkspacePage() {
-  const { bundle, loading, loadError, reload, saveWorkspaceName } = useProfileSettings();
+  const { bundle, loading, loadError, reload, saveWorkspace } = useProfileSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [busy, setBusy] = useState(false);
   const success = searchParams.get("success");
@@ -28,10 +28,10 @@ export default function WorkspacePage() {
     }
   }, [success, error, setSearchParams]);
 
-  async function handleWorkspaceSave(name: string) {
+  async function handleWorkspaceSave(patch: { name?: string; timezone?: string }) {
     setBusy(true);
     try {
-      await saveWorkspaceName(name);
+      await saveWorkspace(patch);
       setSearchParams({ success: "workspace_updated" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "workspace_update_failed";
@@ -49,7 +49,7 @@ export default function WorkspacePage() {
   return (
     <section className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
       <h1 className="text-2xl font-extrabold tracking-tight">Workspace</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Name, storage usage, and membership for this workspace.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Name, timezone, storage usage, and membership for this workspace.</p>
 
       {error ? (
         <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -73,7 +73,11 @@ export default function WorkspacePage() {
         <div className="mt-6 grid w-full grid-cols-1 gap-6">
           <WorkspaceStorageUsageCard storage={bundle.storage} />
           {bundle.workspace ? (
-            <ProfileWorkspaceCard workspace={bundle.workspace} loading={busy} onSaveName={handleWorkspaceSave} />
+            <ProfileWorkspaceCard
+              workspace={bundle.workspace}
+              loading={busy}
+              onSave={handleWorkspaceSave}
+            />
           ) : (
             <Card>
               <CardHeader>

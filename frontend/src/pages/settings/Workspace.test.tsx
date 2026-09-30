@@ -33,7 +33,7 @@ vi.mock("@/pages/settings/components/settings-page-loader", () => ({
 
 const mockBundle = {
   profile: { id: "user-1", email: "user@example.com", firstName: "Alice", lastName: "Smith" },
-  workspace: { id: "ws-1", name: "Test WS", role: "owner" as const, createdAt: "2026-01-01" },
+  workspace: { id: "ws-1", name: "Test WS", timezone: "Asia/Kuala_Lumpur", role: "owner" as const, createdAt: "2026-01-01" },
   storage: { used: 128, limit: 2048 },
 };
 
@@ -43,7 +43,7 @@ function defaultHookState(overrides = {}) {
     loading: false,
     loadError: null,
     reload: vi.fn(),
-    saveWorkspaceName: vi.fn(),
+    saveWorkspace: vi.fn(),
     savePersonal: vi.fn(),
     ...overrides,
   };

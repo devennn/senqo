@@ -103,6 +103,10 @@ export type AgentSystemPromptInput = {
   assetGroups: AgentAssetInstructionGroup[];
   profileName: string;
   behavior: string;
+  /** ISO instant captured once per run. */
+  currentTimeIso: string;
+  /** IANA timezone the business operates in. */
+  timeZone: string;
 };
 
 export type GeocodingResult = {

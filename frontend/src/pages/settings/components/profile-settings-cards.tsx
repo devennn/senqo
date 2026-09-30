@@ -3,24 +3,37 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UserProfileSettingsWorkspace } from "@/types/repositories";
+
+function supportedTimeZones(current: string): string[] {
+  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: "timeZone") => string[] };
+  const zones = intl.supportedValuesOf?.("timeZone") ?? ["UTC"];
+  return zones.includes(current) ? zones : [current, ...zones];
+}
 
 export function ProfileWorkspaceCard(props: {
   workspace: UserProfileSettingsWorkspace;
   loading: boolean;
-  onSaveName: (name: string) => Promise<void>;
+  onSave: (patch: { name?: string; timezone?: string }) => Promise<void>;
 }) {
-  const { workspace, loading, onSaveName } = props;
+  const { workspace, loading, onSave } = props;
   const [name, setName] = useState(workspace.name);
+  const [timezone, setTimezone] = useState(workspace.timezone);
+  const timezoneOptions = supportedTimeZones(workspace.timezone);
 
   useEffect(() => {
     setName(workspace.name);
   }, [workspace.name]);
 
+  useEffect(() => {
+    setTimezone(workspace.timezone);
+  }, [workspace.timezone]);
+
   const trimmed = name.trim();
   const baseline = workspace.name.trim();
-  const isDirty = trimmed !== baseline;
+  const isDirty = trimmed !== baseline || timezone !== workspace.timezone;
   const canEdit = workspace.role === "owner";
 
   const created = new Intl.DateTimeFormat(undefined, {
@@ -31,7 +44,10 @@ export function ProfileWorkspaceCard(props: {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canEdit || !isDirty || loading || trimmed.length === 0) return;
-    await onSaveName(trimmed);
+    const patch: { name?: string; timezone?: string } = {};
+    if (trimmed !== baseline) patch.name = trimmed;
+    if (timezone !== workspace.timezone) patch.timezone = timezone;
+    await onSave(patch);
   }
 
   async function copyWorkspaceId() {
@@ -47,7 +63,7 @@ export function ProfileWorkspaceCard(props: {
     <Card>
       <CardHeader>
         <CardTitle>Workspace</CardTitle>
-        <CardDescription>Name and identifiers for this workspace.</CardDescription>
+        <CardDescription>Name, timezone, and identifiers for this workspace.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -81,8 +97,31 @@ export function ProfileWorkspaceCard(props: {
               required
             />
           </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1">
+              <Label htmlFor="workspaceTimezone">Timezone</Label>
+              <InlineHelpHint label="About the workspace timezone">
+                <p>Used for the agent's current time and to check opening hours, appointment times, and cutoffs.</p>
+                <p>Defaults to UTC until changed.</p>
+              </InlineHelpHint>
+            </div>
+            <select
+              id="workspaceTimezone"
+              name="workspaceTimezone"
+              value={timezone}
+              onChange={(ev) => setTimezone(ev.target.value)}
+              disabled={!canEdit || loading}
+              className="h-10 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-base outline-none transition-colors focus-visible:border-2 focus-visible:border-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+            >
+              {timezoneOptions.map((zone) => (
+                <option key={zone} value={zone}>
+                  {zone}
+                </option>
+              ))}
+            </select>
+          </div>
           {!canEdit ? (
-            <p className="text-sm text-muted-foreground">Only the workspace owner can change the workspace name.</p>
+            <p className="text-sm text-muted-foreground">Only the workspace owner can change workspace settings.</p>
           ) : null}
           {canEdit ? (
             <Button type="submit" className="w-full sm:w-auto" disabled={loading || !isDirty || trimmed.length === 0}>

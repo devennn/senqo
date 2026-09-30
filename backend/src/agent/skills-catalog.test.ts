@@ -46,6 +46,12 @@ vi.mock("../repositories/workspace-custom-tools.js", () => ({
   listWorkspaceCustomToolsByKeys: (...args: unknown[]) => mockListCustomTools(...args),
 }));
 
+const mockGetWorkspaceTimeZone = vi.fn();
+
+vi.mock("../repositories/workspaces.js", () => ({
+  getWorkspaceTimeZone: (...args: unknown[]) => mockGetWorkspaceTimeZone(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockListTemplates.mockResolvedValue([]);
@@ -56,6 +62,7 @@ beforeEach(() => {
   mockListHandoff.mockResolvedValue([]);
   mockListCustomTools.mockResolvedValue([]);
   mockListSkills.mockResolvedValue([]);
+  mockGetWorkspaceTimeZone.mockResolvedValue("UTC");
 });
 
 describe("formatConversationLabelsInstruction", () => {
@@ -310,5 +317,62 @@ describe("buildKnowledgeSourceCatalog", () => {
       (item) => item.kind === "context" && item.label === "Operating Hours",
     );
     expect(hours.map((item) => item.id).sort()).toEqual(["e-kl", "e-pen"]);
+  });
+});
+
+describe("buildAgentInstructions time context", () => {
+  // Without an explicit context the builder reads the workspace timezone so the clock
+  // block is business-local even though history rows are UTC.
+  it("renders the workspace timezone when no override is provided", async () => {
+    mockGetAgent.mockResolvedValue({
+      id: "agent-1",
+      profile_name: "Bot",
+      behavior: "",
+      tools: [],
+      skills: [],
+      response_template_groups: [],
+      handoff_topic_groups: [],
+      context_groups: [],
+      asset_groups: [],
+      auto_assign_conversation_labels: false,
+    });
+    mockGetWorkspaceTimeZone.mockResolvedValue("Asia/Kuala_Lumpur");
+
+    const { buildAgentInstructions } = await import("./skills-catalog.js");
+    const prompt = await buildAgentInstructions("ws-1", "agent-1");
+
+    expect(mockGetWorkspaceTimeZone).toHaveBeenCalledWith("ws-1");
+    expect(prompt).toContain("Current business-local time:");
+    expect(prompt).toContain("(Asia/Kuala_Lumpur");
+  });
+
+  // The runtime passes a captured clock so every step of a run sees the same "now".
+  it("uses the provided time context without querying the workspace", async () => {
+    mockGetAgent.mockResolvedValue({
+      id: "agent-1",
+      profile_name: "Bot",
+      behavior: "",
+      tools: [],
+      skills: [],
+      response_template_groups: [],
+      handoff_topic_groups: [],
+      context_groups: [],
+      asset_groups: [],
+      auto_assign_conversation_labels: false,
+    });
+
+    const { buildAgentInstructionsWithCatalog } = await import("./skills-catalog.js");
+    const { instructions } = await buildAgentInstructionsWithCatalog(
+      "ws-1",
+      "agent-1",
+      false,
+      undefined,
+      { now: new Date("2026-09-25T05:15:00.000Z"), timeZone: "Asia/Kuala_Lumpur" },
+    );
+
+    expect(mockGetWorkspaceTimeZone).not.toHaveBeenCalled();
+    expect(instructions).toContain(
+      "Friday, September 25, 2026 at 1:15 PM (Asia/Kuala_Lumpur, GMT+8)",
+    );
   });
 });

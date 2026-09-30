@@ -32,6 +32,8 @@ import {
   getAgentConfigById,
   markAgentConfigFirstUsed,
 } from "../repositories/agent.js";
+import { getWorkspaceTimeZone } from "../repositories/workspaces.js";
+import { formatZonedDateTimeFromIso } from "../lib/timezone.js";
 import { touchAgentSession } from "../repositories/agent-sessions.js";
 import { mergeAiReasoningOntoAgentRunMessages } from "../repositories/whatsapp.js";
 import {
@@ -65,6 +67,15 @@ function isMissingToolResultError(messageText: string): boolean {
   );
 }
 
+function formatLocalTimestampSuffix(iso: string, timeZone: string): string {
+  try {
+    const local = formatZonedDateTimeFromIso(iso, timeZone);
+    return local ? ` (${local})` : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function runAgentSession(
   input: RunAgentInput,
 ): Promise<RunAgentResult | null> {
@@ -80,6 +91,9 @@ export async function runAgentSession(
   }
 
   const agentRunId = !isDryRun ? crypto.randomUUID() : undefined;
+
+  const runNow = new Date();
+  const workspaceTimeZone = await getWorkspaceTimeZone(input.workspaceId);
 
   let historyMessages: ModelMessage[] = [];
   if (input.historyOverride) {
@@ -117,7 +131,7 @@ export async function runAgentSession(
   }
 
   const inboundMessageContent = input.messageTimestamp
-    ? `Incoming message timestamp: ${input.messageTimestamp}\n\n${input.message}`
+    ? `Incoming message timestamp: ${input.messageTimestamp}${formatLocalTimestampSuffix(input.messageTimestamp, workspaceTimeZone)}\n\n${input.message}`
     : input.message;
   const mediaParts = input.userMediaParts ?? [];
   const textPart: StoredUserTextPart = {
@@ -179,6 +193,7 @@ export async function runAgentSession(
     input.agentConfigId,
     isDryRun,
     sessionId,
+    { now: runNow, timeZone: workspaceTimeZone },
   );
   const config = input.agentConfigId
     ? await getAgentConfigById(input.workspaceId, input.agentConfigId)

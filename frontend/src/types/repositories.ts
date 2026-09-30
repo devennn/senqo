@@ -608,6 +608,7 @@ export type LeadContactRow = {
 export type UserProfileSettingsWorkspace = {
   id: string;
   name: string;
+  timezone: string;
   createdAt: string;
   role: "owner" | "member";
 };

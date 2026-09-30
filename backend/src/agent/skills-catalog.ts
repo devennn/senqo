@@ -16,6 +16,7 @@ import {
   listLabelBadgesForConversations,
 } from "../repositories/conversation-labels.js";
 import { listWorkspaceAssetsForInstructions } from "../repositories/workspace-asset-groups.js";
+import { getWorkspaceTimeZone } from "../repositories/workspaces.js";
 import {
   findWorkspaceSkillByNameOrKey,
   listActiveWorkspaceSkills,
@@ -272,8 +273,14 @@ export function buildKnowledgeSourceCatalog(input: {
   };
 }
 
+type AgentTimeContext = {
+  now: Date;
+  timeZone: string;
+};
+
 function emptyAgentSystemPromptInput(
   dryRun: boolean,
+  time: AgentTimeContext,
 ): Parameters<typeof buildAgentSystemPrompt>[0] {
   return {
     dryRun,
@@ -286,6 +293,8 @@ function emptyAgentSystemPromptInput(
     assetGroups: [],
     profileName: "",
     behavior: "",
+    currentTimeIso: time.now.toISOString(),
+    timeZone: time.timeZone,
   };
 }
 
@@ -294,13 +303,20 @@ export async function buildAgentInstructionsWithCatalog(
   agentConfigId?: string,
   dryRun = false,
   conversationId?: string,
+  timeContext?: AgentTimeContext,
 ): Promise<{
   instructions: string;
   sourceCatalog: AgentKnowledgeSourceCatalog;
 }> {
+  const time =
+    timeContext ?? {
+      now: new Date(),
+      timeZone: await getWorkspaceTimeZone(workspaceId),
+    };
+
   if (!agentConfigId) {
     return {
-      instructions: buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun)),
+      instructions: buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun, time)),
       sourceCatalog: emptyKnowledgeSourceCatalog(),
     };
   }
@@ -308,7 +324,7 @@ export async function buildAgentInstructionsWithCatalog(
   const activeConfig = await getAgentConfigById(workspaceId, agentConfigId);
   if (!activeConfig) {
     return {
-      instructions: buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun)),
+      instructions: buildAgentSystemPrompt(emptyAgentSystemPromptInput(dryRun, time)),
       sourceCatalog: emptyKnowledgeSourceCatalog(),
     };
   }
@@ -406,6 +422,8 @@ export async function buildAgentInstructionsWithCatalog(
       assetGroups,
       profileName: activeConfig.profile_name,
       behavior: activeConfig.behavior,
+      currentTimeIso: time.now.toISOString(),
+      timeZone: time.timeZone,
     }),
     sourceCatalog,
   };

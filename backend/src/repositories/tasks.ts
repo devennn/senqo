@@ -250,6 +250,7 @@ export async function getTaskById(
     | "schedule_type"
     | "status"
     | "job_payload"
+    | "timezone"
   > | null
 > {
   try {
@@ -266,6 +267,7 @@ export async function getTaskById(
         scheduleType: tasks.scheduleType,
         status: tasks.status,
         jobPayload: tasks.jobPayload,
+        timezone: tasks.timezone,
       })
       .from(tasks)
       .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.id, taskId)))
@@ -291,6 +293,7 @@ export async function getTaskById(
       schedule_type: data.scheduleType as TaskRecord["schedule_type"],
       status: data.status as TaskRecord["status"],
       job_payload: (data.jobPayload ?? {}) as Record<string, unknown>,
+      timezone: data.timezone,
     };
   } catch (error) {
     console.error(`[${scope}/getTaskById] Unexpected error: ${String(error)}`);

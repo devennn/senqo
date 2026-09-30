@@ -1,0 +1,1 @@
+ALTER TABLE "workspaces" ADD COLUMN IF NOT EXISTS "timezone" text DEFAULT 'UTC' NOT NULL;

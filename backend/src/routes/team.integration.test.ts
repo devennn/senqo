@@ -75,7 +75,7 @@ vi.mock("../repositories/workspaces.js", () => ({
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
   isWorkspaceTeammate: vi.fn(),
-  updateWorkspaceNameAsOwner: vi.fn(),
+  updateWorkspaceSettingsAsOwner: vi.fn(),
 }));
 
 vi.mock("../repositories/handoff-phones.js", () => ({

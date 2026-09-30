@@ -56,6 +56,8 @@ export const registrationInvites = pgTable(
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull().default("Default Workspace"),
+  /** IANA timezone the business operates in; agent clock and hours reasoning use it. */
+  timezone: text("timezone").notNull().default("UTC"),
   ownerUserId: uuid("owner_user_id")
     .notNull()
     .references(() => users.id),

@@ -56,7 +56,11 @@ export async function executeScheduledTask(payload: TaskExecutePayload): Promise
     }
 
     if (payload.conversationId) {
-      const agentMessage = buildTaskExecuteAgentMessage(payload.message, scheduledAt);
+      const agentMessage = buildTaskExecuteAgentMessage(
+        payload.message,
+        scheduledAt,
+        taskRow?.timezone ?? "UTC",
+      );
       const handlingMode = await getConversationHandlingMode(
         payload.workspaceId,
         payload.conversationId,
@@ -171,7 +175,11 @@ export async function executeScheduledTask(payload: TaskExecutePayload): Promise
       return { ok: true, mode: "batch_outreach" };
     }
 
-    const workspaceAgentMessage = buildWorkspaceScheduledAgentMessage(payload.message, scheduledAt);
+    const workspaceAgentMessage = buildWorkspaceScheduledAgentMessage(
+      payload.message,
+      scheduledAt,
+      taskRow?.timezone ?? "UTC",
+    );
     const workspaceResult = await runAgentSession({
       workspaceId: payload.workspaceId,
       message: workspaceAgentMessage,

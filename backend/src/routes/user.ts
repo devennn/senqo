@@ -166,7 +166,7 @@ import {
   getWorkspaceRow,
   isWorkspaceOwner,
   isWorkspaceTeammate,
-  updateWorkspaceNameAsOwner,
+  updateWorkspaceSettingsAsOwner,
   listUserWorkspaces,
   createWorkspaceForUser,
 } from "../repositories/workspaces.js";
@@ -206,6 +206,7 @@ import { waitForQrCode } from "../services/whatsapp-qr.js";
 import { findOrCreateLeadForContact } from "../repositories/leads.js";
 import { env } from "../lib/env.js";
 import { generateApiKeyMaterial } from "../lib/api-keys.js";
+import { isValidTimeZone } from "../lib/timezone.js";
 import {
   createApiKey,
   deleteApiKey,
@@ -2533,6 +2534,7 @@ app.get("/profile", async (c) => {
       ? {
           id: workspace.id,
           name: workspace.name,
+          timezone: workspace.timezone,
           createdAt: workspace.createdAt,
           role: isOwner ? ("owner" as const) : ("member" as const),
         }
@@ -2557,9 +2559,14 @@ app.put("/profile", async (c) => {
   return c.json({ ok: true });
 });
 
-const workspaceUpdateSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-});
+const workspaceUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+  })
+  .refine((value) => value.name !== undefined || value.timezone !== undefined, {
+    message: "empty_patch",
+  });
 
 app.put("/workspace", async (c) => {
   const userId = c.get("userId");
@@ -2567,11 +2574,14 @@ app.put("/workspace", async (c) => {
   const parsed = workspaceUpdateSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
 
-  const result = await updateWorkspaceNameAsOwner(
-    workspaceId,
-    userId,
-    parsed.data.name,
-  );
+  if (parsed.data.timezone !== undefined && !isValidTimeZone(parsed.data.timezone)) {
+    return c.json({ error: "invalid_timezone" }, 400);
+  }
+
+  const result = await updateWorkspaceSettingsAsOwner(workspaceId, userId, {
+    name: parsed.data.name,
+    timezone: parsed.data.timezone,
+  });
 
   if (!result.ok) {
     const status = result.message === "forbidden" ? 403 : 400;

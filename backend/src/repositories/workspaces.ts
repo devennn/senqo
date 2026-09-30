@@ -153,10 +153,10 @@ export async function deleteWorkspace(
   }
 }
 
-export async function updateWorkspaceNameAsOwner(
+export async function updateWorkspaceSettingsAsOwner(
   workspaceId: string,
   userId: string,
-  name: string,
+  patch: { name?: string; timezone?: string },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
     const [ws] = await db
@@ -164,19 +164,64 @@ export async function updateWorkspaceNameAsOwner(
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId));
 
-    if (!ws) return { ok: false, message: "workspace_not_found" };
-    if (ws.ownerUserId !== userId) return { ok: false, message: "forbidden" };
+    if (!ws) {
+      console.info(
+        `[${scope}/updateWorkspaceSettingsAsOwner] Failed query: workspace not found workspaceId=${workspaceId}`,
+      );
+      return { ok: false, message: "workspace_not_found" };
+    }
+    if (ws.ownerUserId !== userId) {
+      console.info(
+        `[${scope}/updateWorkspaceSettingsAsOwner] Failed query: forbidden workspaceId=${workspaceId} userId=${userId}`,
+      );
+      return { ok: false, message: "forbidden" };
+    }
+
+    const set: { name?: string; timezone?: string } = {};
+    if (patch.name !== undefined) set.name = patch.name.trim();
+    if (patch.timezone !== undefined) set.timezone = patch.timezone.trim();
+    if (Object.keys(set).length === 0) {
+      console.info(
+        `[${scope}/updateWorkspaceSettingsAsOwner] Failed query: empty patch workspaceId=${workspaceId}`,
+      );
+      return { ok: false, message: "empty_patch" };
+    }
 
     await db
       .update(workspaces)
-      .set({ name: name.trim() })
+      .set(set)
       .where(eq(workspaces.id, workspaceId));
 
-    console.info(`[${scope}/updateWorkspaceNameAsOwner] Success: workspaceId=${workspaceId}`);
+    console.info(`[${scope}/updateWorkspaceSettingsAsOwner] Success: workspaceId=${workspaceId}`);
     return { ok: true };
   } catch (error) {
-    console.error(`[${scope}/updateWorkspaceNameAsOwner] Unexpected error: ${String(error)}`);
+    console.error(`[${scope}/updateWorkspaceSettingsAsOwner] Unexpected error: ${String(error)}`);
     return { ok: false, message: "unexpected_error" };
+  }
+}
+
+export async function getWorkspaceTimeZone(workspaceId: string): Promise<string> {
+  try {
+    const [row] = await db
+      .select({ timezone: workspaces.timezone })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId));
+
+    if (!row) {
+      console.info(
+        `[${scope}/getWorkspaceTimeZone] Failed query: workspace not found workspaceId=${workspaceId}`,
+      );
+      return "UTC";
+    }
+
+    const timezone = row.timezone.trim() || "UTC";
+    console.info(
+      `[${scope}/getWorkspaceTimeZone] Success: workspaceId=${workspaceId} timezone=${timezone}`,
+    );
+    return timezone;
+  } catch (error) {
+    console.error(`[${scope}/getWorkspaceTimeZone] Unexpected error: ${String(error)}`);
+    return "UTC";
   }
 }
 

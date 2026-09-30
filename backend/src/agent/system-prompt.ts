@@ -1,4 +1,5 @@
 import type { AgentSystemPromptInput } from "../types/agent.js";
+import { formatZonedDateTimeFromIso } from "../lib/timezone.js";
 
 /** Matches default tools always enabled in agent runtime (`agent.ts`). */
 export const DEFAULT_TOOL_KEYS = [
@@ -35,6 +36,17 @@ export function resolveEnabledToolKeys(
   return Array.from(new Set([...DEFAULT_TOOL_KEYS, ...(configTools ?? [])]));
 }
 
+function formatCurrentTime(input: AgentSystemPromptInput): string {
+  try {
+    return (
+      formatZonedDateTimeFromIso(input.currentTimeIso, input.timeZone) ??
+      input.currentTimeIso
+    );
+  } catch {
+    return input.currentTimeIso;
+  }
+}
+
 export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
   const whatsappRule = input.dryRun
     ? "This is a dry run. Fill `messages` with the draft WhatsApp bubbles you would send (prefer one; at most three distinct). The runtime will not send them. Set `handoff_enabled` to false unless you would have handed off."
@@ -47,12 +59,18 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
   const assetsSection = formatAgentAssets(input.assetGroups);
   const profileName = input.profileName.trim();
   const behavior = input.behavior.trim();
+  const currentTime = formatCurrentTime(input);
 
   return `You are a helpful and capable WhatsApp assistant. Be concise, accurate, and safe.
 
 ## Identity
 - Your name: ${profileName}
 - Behavior: ${behavior}
+
+## Current Time
+- Current business-local time: ${currentTime}
+- Treat this as the authoritative "now". Resolve relative dates ("today", "tonight", "tomorrow") against it. All opening hours, appointment times, cutoffs, and deadlines refer to the business timezone above, not the customer's.
+- Incoming messages are prefixed with their UTC timestamp and the same business-local rendering. When those disagree with this line, this line is "now".
 
 ## Core Responsibilities
 - Answer customer WhatsApp messages using grounded workspace knowledge.
@@ -64,6 +82,7 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
 - When response templates match the customer's intent (paraphrases, typos, and short phrasing are OK), use the Answer exactly — same facts, numbers, ranges, and disclaimers.
 - If the customer writes in another language, deliver template answers in that language without changing meaning or factual details.
 - You may add a minimal WhatsApp lead-in before template content unless Behavior forbids it; combine into one outbound message in \`messages\`.
+- Before confirming any time-specific request (booking, slot, availability, cutoff, opening hours), check the requested date and time against workspace context, response templates, or loaded skills. If it falls outside the known hours or the information is missing, say what you know, offer a valid alternative, or hand off. Never invent availability or confirm a time you cannot verify.
 
 ## Tool Usage Rules
 - ${whatsappRule}

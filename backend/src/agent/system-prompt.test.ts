@@ -51,6 +51,8 @@ const baseInput = {
   assetGroups: [],
   profileName: "WidgetBot",
   behavior: "Be helpful and concise.",
+  currentTimeIso: "2026-09-25T05:15:00.000Z",
+  timeZone: "Asia/Kuala_Lumpur",
 };
 
 describe("buildAgentSystemPrompt", () => {
@@ -166,5 +168,28 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("previous 10 messages");
     expect(prompt).toContain("multiple labels in one call");
     expect(prompt).toContain("Do not answer and skip labeling");
+  });
+
+  // The clock is rendered in business-local time so the model never converts UTC itself.
+  it("renders the current time in the workspace timezone", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("## Current Time");
+    expect(prompt).toContain(
+      "Friday, September 25, 2026 at 1:15 PM (Asia/Kuala_Lumpur, GMT+8)",
+    );
+  });
+
+  // Relative dates and time-specific promises must be grounded, which is the exact
+  // failure where an agent confirmed an unavailable evening slot.
+  it("requires checking requested times against knowledge before confirming", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("Before confirming any time-specific request");
+    expect(prompt).toContain("Never invent availability or confirm a time you cannot verify");
+  });
+
+  // An invalid timezone must not crash prompt assembly; it falls back to the raw ISO clock.
+  it("falls back to the ISO timestamp when the timezone is invalid", () => {
+    const prompt = buildAgentSystemPrompt({ ...baseInput, timeZone: "Not/AZone" });
+    expect(prompt).toContain("Current business-local time: 2026-09-25T05:15:00.000Z");
   });
 });

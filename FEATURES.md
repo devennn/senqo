@@ -27,6 +27,7 @@
 - Per-connection attach — bind an agent to one or more WhatsApp lines from Agent setup; Inactive / Testing / Live modes stay per connection
 - Tasks — when an agent has multiple attached lines, pick which WhatsApp connection the task sends on
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model
+- Business time — every agent run receives the workspace timezone and current business-local time; relative dates ("tonight", "tomorrow") and time-specific requests are reasoned in that timezone, and the agent must check opening hours or availability from workspace knowledge before confirming any time; it offers alternatives or hands off instead of guessing
 - Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`
 - AI tool draft — on Create tool, Generate with AI (Execute code row) drafts name, description, required env, and execute code from pasted API examples or instructions; review before save
 - Workspace secrets — Settings → Secrets stores encrypted env values as `ctx.env` at tool runtime
@@ -73,7 +74,7 @@
 
 ## Team & settings
 
-- Workspace profile — display name, storage usage breakdown, 10 GB default quota
+- Workspace profile — display name, timezone (IANA, defaults to UTC; drives the agent's current time and hours checks), storage usage breakdown, 10 GB default quota
 - API keys — create, list, delete workspace API keys with optional expiry
 - Workspace secrets — encrypted key/value pairs for custom tool `requiredEnv`
 - Team — workspace owners add existing Senqo users to a workspace; unregistered emails are rejected with a clear error
