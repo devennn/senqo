@@ -12,10 +12,12 @@ interface EmailOptions {
 interface SmtpConfig {
   host: string;
   port: number;
-  secure: boolean; // true for port 465, false for 587
+  secure: boolean; // true for implicit TLS ports (465, 2465), false for STARTTLS ports (587, 2587)
   user: string;
   pass: string;
 }
+
+const IMPLICIT_TLS_SMTP_PORTS = new Set([465, 2465]);
 
 const SMTP_CONNECTION_TIMEOUT_MS = 10_000;
 const SMTP_GREETING_TIMEOUT_MS = 10_000;
@@ -49,10 +51,11 @@ async function sendEmail(options: EmailOptions): Promise<void> {
     );
   }
 
+  const port = parseInt(env.smtpPort);
   const config: SmtpConfig = {
     host: env.smtpHost,
-    port: parseInt(env.smtpPort),
-    secure: parseInt(env.smtpPort) === 465,
+    port,
+    secure: IMPLICIT_TLS_SMTP_PORTS.has(port),
     user: env.smtpUser,
     pass: env.smtpPass,
   };

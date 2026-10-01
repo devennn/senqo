@@ -76,6 +76,34 @@ describe("sendEmail", () => {
     );
   });
 
+  // SMTP port is 2465 → transport is created with secure:true, needed because providers offer 2465 as an implicit-TLS alternate for hosts that block 465.
+  it("uses secure transport when SMTP port is 2465", async () => {
+    envMock.smtpPort = "2465";
+
+    await sendEmail({
+      to: "recipient@example.com",
+      subject: "Alternate secure port test",
+    });
+
+    expect(mockCreateTransport).toHaveBeenCalledWith(
+      expect.objectContaining({ port: 2465, secure: true }),
+    );
+  });
+
+  // SMTP port is 2587 → transport is created with secure:false so STARTTLS is negotiated, needed because providers offer 2587 as an explicit-TLS alternate for hosts that block 587.
+  it("uses STARTTLS transport when SMTP port is 2587", async () => {
+    envMock.smtpPort = "2587";
+
+    await sendEmail({
+      to: "recipient@example.com",
+      subject: "Alternate STARTTLS port test",
+    });
+
+    expect(mockCreateTransport).toHaveBeenCalledWith(
+      expect.objectContaining({ port: 2587, secure: false }),
+    );
+  });
+
   // Required SMTP configuration is missing → throws before contacting nodemailer, needed to fail fast when email is misconfigured.
   it("throws when SMTP configuration is incomplete", async () => {
     envMock.smtpHost = "";
