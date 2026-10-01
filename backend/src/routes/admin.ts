@@ -15,7 +15,11 @@ import {
   setAllowPublicRegistration,
 } from "../repositories/instance-settings.js";
 import { deleteWorkspace, listAllWorkspaces } from "../repositories/workspaces.js";
-import { createRegistrationInvite } from "../repositories/registration-invites.js";
+import {
+  createRegistrationInvite,
+  deleteRegistrationInvite,
+  listPendingRegistrationInvites,
+} from "../repositories/registration-invites.js";
 import { sendRegistrationInviteEmail } from "../services/email.js";
 
 const settingsSchema = z.object({
@@ -62,8 +66,11 @@ app.delete("/workspaces/:id", async (c) => {
 });
 
 app.get("/users", async (c) => {
-  const users = await listAllUsers();
-  return c.json({ users });
+  const [users, pendingInvites] = await Promise.all([
+    listAllUsers(),
+    listPendingRegistrationInvites(),
+  ]);
+  return c.json({ users, pendingInvites });
 });
 
 app.post("/users/:id/disable", async (c) => {
@@ -181,7 +188,16 @@ app.post("/registration-invites", async (c) => {
     inviteToken: created.inviteToken,
   });
 
-  return c.json({ ok: true, emailSent: emailed.ok });
+  return c.json({ ok: true, emailSent: emailed.ok, invite: created.invite });
+});
+
+app.delete("/registration-invites/:id", async (c) => {
+  const result = await deleteRegistrationInvite(c.req.param("id"));
+  if (!result.ok) {
+    const status = result.message === "invite_not_found" ? 404 : 500;
+    return c.json({ error: result.message }, status);
+  }
+  return c.json({ ok: true });
 });
 
 export default app;

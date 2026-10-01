@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ASSET_ABOUT_DESCRIPTION_PLACEHOLDER,
@@ -21,6 +22,7 @@ export function AgentAssetRow({ asset, onSaveDescription, onDelete }: Props) {
   }, [asset.id, asset.description]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const dirty = description.trim() !== asset.description.trim();
 
   async function handleSave() {
@@ -33,10 +35,10 @@ export function AgentAssetRow({ asset, onSaveDescription, onDelete }: Props) {
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Remove "${asset.file_name}" from this agent?`)) return;
     setDeleting(true);
     try {
       await onDelete(asset.id);
+      setConfirmOpen(false);
     } finally {
       setDeleting(false);
     }
@@ -76,13 +78,23 @@ export function AgentAssetRow({ asset, onSaveDescription, onDelete }: Props) {
               size="sm"
               variant="destructive"
               disabled={deleting}
-              onClick={() => { void handleDelete(); }}
+              onClick={() => setConfirmOpen(true)}
             >
               {deleting ? "Removing…" : "Remove"}
             </Button>
           </div>
         </div>
       </div>
+      <ConfirmDestructiveDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Remove asset?"
+        description={`"${asset.file_name}" will be removed from this agent. This cannot be undone.`}
+        confirmLabel="Remove"
+        pendingConfirmLabel="Removing…"
+        isConfirming={deleting}
+        onConfirm={handleDelete}
+      />
     </li>
   );
 }

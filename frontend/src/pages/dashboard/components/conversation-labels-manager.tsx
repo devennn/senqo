@@ -7,7 +7,7 @@ import { PageLoader } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ConversationLabelRow } from "@/pages/dashboard/components/conversation-label-row";
 import { ConversationLabelCreateDialog } from "@/pages/dashboard/components/conversation-label-create-dialog";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import type { ConversationLabelRecord } from "@/types/repositories";
 
 export function ConversationLabelsManager() {

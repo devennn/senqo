@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import {
   deleteAdminWorkspace,
   fetchAdminWorkspaces,
@@ -11,7 +12,8 @@ export function InstanceAdminWorkspacesSection() {
   const [workspaces, setWorkspaces] = useState<AdminWorkspaceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AdminWorkspaceRecord | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -28,17 +30,17 @@ export function InstanceAdminWorkspacesSection() {
     void load();
   }, [load]);
 
-  async function handleDelete(id: string, name: string) {
-    if (!window.confirm(`Delete workspace “${name}”? This cannot be undone.`)) return;
-    setDeletingId(id);
-    setError(null);
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+
+    setConfirming(true);
     try {
-      await deleteAdminWorkspace(id);
+      await deleteAdminWorkspace(pendingDelete.id);
+      setPendingDelete(null);
       await load();
-    } catch (e) {
-      setError(String((e as Error).message));
+    } finally {
+      setConfirming(false);
     }
-    setDeletingId(null);
   }
 
   return (
@@ -67,14 +69,29 @@ export function InstanceAdminWorkspacesSection() {
                 type="button"
                 variant="destructive"
                 size="sm"
-                disabled={deletingId === ws.id}
-                onClick={() => void handleDelete(ws.id, ws.name)}
+                onClick={() => setPendingDelete(ws)}
               >
                 Delete
               </Button>
             </div>
           ))
         )}
+        <ConfirmDestructiveDialog
+          open={pendingDelete !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingDelete(null);
+          }}
+          title="Delete workspace?"
+          description={
+            pendingDelete
+              ? `“${pendingDelete.name}” and its data will be removed permanently. This cannot be undone.`
+              : undefined
+          }
+          confirmLabel="Delete"
+          pendingConfirmLabel="Deleting…"
+          isConfirming={confirming}
+          onConfirm={confirmDelete}
+        />
       </CardContent>
     </Card>
   );

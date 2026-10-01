@@ -53,6 +53,13 @@ export type AdminUserRecord = {
   owned_workspace_count: number;
 };
 
+export type AdminPendingInviteRecord = {
+  id: string;
+  email: string;
+  created_at: string;
+  expires_at: string;
+};
+
 export async function fetchAdminSettings(): Promise<{ allowPublicRegistration: boolean }> {
   return adminRequest("/api/admin/settings");
 }
@@ -73,9 +80,13 @@ export async function deleteAdminWorkspace(id: string): Promise<void> {
   await adminRequest(`/api/admin/workspaces/${id}`, { method: "DELETE" });
 }
 
-export async function fetchAdminUsers(): Promise<AdminUserRecord[]> {
-  const data = await adminRequest<{ users: AdminUserRecord[] }>("/api/admin/users");
-  return data.users;
+export async function fetchAdminUsers(): Promise<{
+  users: AdminUserRecord[];
+  pendingInvites: AdminPendingInviteRecord[];
+}> {
+  return adminRequest<{ users: AdminUserRecord[]; pendingInvites: AdminPendingInviteRecord[] }>(
+    "/api/admin/users",
+  );
 }
 
 export async function disableAdminUser(id: string): Promise<void> {
@@ -98,9 +109,20 @@ export async function demoteAdminUser(id: string): Promise<void> {
   await adminRequest(`/api/admin/users/${id}/superadmin`, { method: "DELETE" });
 }
 
-export async function sendAdminRegistrationInvite(email: string): Promise<void> {
-  await adminRequest("/api/admin/registration-invites", {
+export async function sendAdminRegistrationInvite(
+  email: string,
+): Promise<{ emailSent: boolean; invite: AdminPendingInviteRecord }> {
+  const data = await adminRequest<{
+    ok: boolean;
+    emailSent: boolean;
+    invite: AdminPendingInviteRecord;
+  }>("/api/admin/registration-invites", {
     method: "POST",
     body: JSON.stringify({ email }),
   });
+  return { emailSent: data.emailSent, invite: data.invite };
+}
+
+export async function cancelAdminRegistrationInvite(id: string): Promise<void> {
+  await adminRequest(`/api/admin/registration-invites/${id}`, { method: "DELETE" });
 }

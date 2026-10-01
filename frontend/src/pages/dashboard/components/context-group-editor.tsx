@@ -8,7 +8,7 @@ import { CONTEXT_ENTRIES_MAX_PER_GROUP } from "@/lib/context-groups-limits";
 import type { WorkspaceContextEntryRecord, WorkspaceContextGroupWithEntries } from "@/types/repositories";
 import { ContextGroupFactsBlock } from "@/pages/dashboard/components/context-group-facts-block";
 import { ContextGroupNameFields } from "@/pages/dashboard/components/context-group-name-fields";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
 import { KnowledgeUpdatedAtLine } from "@/pages/dashboard/components/knowledge-updated-at-line";
 import { PageLoader } from "@/components/ui/spinner";

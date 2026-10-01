@@ -3,7 +3,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import type { ConversationLabelRecord } from "@/types/repositories";
 
 export function ConversationLabelRow({

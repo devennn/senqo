@@ -11,7 +11,7 @@ import type {
 } from "@/types/repositories";
 import { ResponseTemplateGroupNameFields } from "@/pages/dashboard/components/response-template-group-name-fields";
 import { ResponseTemplateGroupTemplatesBlock } from "@/pages/dashboard/components/response-template-group-templates-block";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
 import { KnowledgeUpdatedAtLine } from "@/pages/dashboard/components/knowledge-updated-at-line";
 import { PageLoader } from "@/components/ui/spinner";

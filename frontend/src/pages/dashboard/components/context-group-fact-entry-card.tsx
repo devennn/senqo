@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import { ContextGroupFactEntryCardExpanded } from "@/pages/dashboard/components/context-group-fact-entry-card-expanded";
 import {
   AddKnowledgeToEvalButton,

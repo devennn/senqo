@@ -8,7 +8,7 @@ import { ASSETS_MAX_PER_GROUP } from "@/lib/asset-groups-limits";
 import type { AgentAssetRecord } from "@/types/repositories";
 import { AssetGroupFilesBlock } from "@/pages/dashboard/components/asset-group-files-block";
 import { AssetGroupNameFields } from "@/pages/dashboard/components/asset-group-name-fields";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
 import { PageLoader } from "@/components/ui/spinner";
 

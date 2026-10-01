@@ -5,7 +5,7 @@ import { useHandoffTopicGroupEditor } from "@/hooks/useHandoffTopicGroupEditor";
 import { HANDOFF_TOPIC_ENTRIES_MAX_PER_GROUP } from "@/lib/agent-handoff-topic-limits";
 import { HandoffTopicGroupEditorContent } from "@/pages/dashboard/components/handoff-topic-group-editor-content";
 import { HandoffTopicGroupNameFields } from "@/pages/dashboard/components/handoff-topic-group-name-fields";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import { GroupEditorCardNameHeader } from "@/pages/dashboard/components/group-editor-card-name-header";
 import { KnowledgeUpdatedAtLine } from "@/pages/dashboard/components/knowledge-updated-at-line";
 import { PageLoader } from "@/components/ui/spinner";

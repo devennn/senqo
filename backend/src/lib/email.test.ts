@@ -48,6 +48,9 @@ describe("sendEmail", () => {
       port: 587,
       secure: false,
       auth: { user: "smtp-user", pass: "smtp-pass" },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
     expect(mockSendMail).toHaveBeenCalledWith({
       from: "Senqo <no-reply@example.com>",

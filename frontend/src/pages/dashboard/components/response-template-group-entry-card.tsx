@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { ConfirmDestructiveDialog } from "@/pages/dashboard/components/confirm-destructive-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import { ResponseTemplateGroupEntryCardExpanded } from "@/pages/dashboard/components/response-template-group-entry-card-expanded";
 import { AddKnowledgeToEvalButton, KNOWLEDGE_ROW_ACTION_BTN } from "@/pages/dashboard/evals/components/add-knowledge-to-eval-button";
 import type { WorkspaceResponseTemplateEntryRecord } from "@/types/repositories";
