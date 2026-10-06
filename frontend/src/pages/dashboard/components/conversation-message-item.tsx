@@ -67,7 +67,10 @@ export function ConversationMessageItem({
         : threadEventType === "manual_toggle_human" &&
             typeof metadata?.manual_toggle_reason === "string"
           ? metadata.manual_toggle_reason.trim() || null
-          : null;
+          : threadEventType === "agent_error" &&
+              typeof metadata?.agent_error_message === "string"
+            ? metadata.agent_error_message.trim() || null
+            : null;
     return (
       <ConversationThreadEvent
         eventType={threadEventType}

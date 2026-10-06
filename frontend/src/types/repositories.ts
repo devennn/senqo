@@ -17,9 +17,10 @@ export type TeamMemberRecord = {
   id: string;
   userId: string;
   email: string | null;
-  role: string;
+  role: "owner" | "admin" | "member";
   joined_at: string | null;
   handoffPhones: TeamMemberHandoffPhone[];
+  receivesErrorAlerts: boolean;
 };
 
 export type WorkspaceResponseTemplateEntryInput = {
@@ -610,7 +611,7 @@ export type UserProfileSettingsWorkspace = {
   name: string;
   timezone: string;
   createdAt: string;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
 };
 
 /** GET /api/user/profile — account, workspace summary for settings UI. */

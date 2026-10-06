@@ -81,4 +81,21 @@ describe("ConversationMessageItem", () => {
       screen.getByText("Customer asked for a human agent"),
     ).toBeInTheDocument();
   });
+
+  // Agent errors are operator-only: the pill plus the stored error must show so
+  // operators know why no AI reply was sent while the customer saw nothing.
+  it("renders the stored error under the AI error pill", () => {
+    render(
+      <ConversationMessageItem
+        message={buildThreadEventMessage({
+          thread_event: "agent_error",
+          agent_error_message: "OpenRouter request failed",
+        })}
+        {...baseProps}
+      />,
+    );
+
+    expect(screen.getByText("AI error")).toBeInTheDocument();
+    expect(screen.getByText("OpenRouter request failed")).toBeInTheDocument();
+  });
 });

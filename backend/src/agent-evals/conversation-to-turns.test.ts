@@ -35,6 +35,14 @@ describe("conversationMessagesToEvalTurns", () => {
         content: "Handoff",
         metadata: { thread_event: "handoff_to_human" },
       }),
+      msg({
+        role: "assistant",
+        content: "AI could not reply",
+        metadata: {
+          thread_event: "agent_error",
+          agent_error_message: "OpenRouter request failed",
+        },
+      }),
     ]);
 
     expect(turns).toEqual([

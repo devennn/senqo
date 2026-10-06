@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { connectionPhonesToDigits } from "@/lib/handoff-phone";
 import { teamMemberErrorMessage } from "@/lib/team-member-errors";
 import { TRANSIENT_SUCCESS_FEEDBACK_MS } from "@/lib/transient-feedback";
-import { useIsWorkspaceOwner } from "@/hooks/useIsWorkspaceOwner";
+import { useWorkspaceRole } from "@/hooks/useWorkspaceRole";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,8 @@ import type { TeamMemberRecord, WhatsappConnection } from "@/types/repositories"
 export default function TeamPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const { isOwner, loading: ownerLoading } = useIsWorkspaceOwner();
+  const { role, loading: roleLoading } = useWorkspaceRole();
+  const canManageTeam = role === "owner" || role === "admin";
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [connections, setConnections] = useState<WhatsappConnection[]>([]);
   const [connectionPhoneDigits, setConnectionPhoneDigits] = useState<string[]>([]);
@@ -78,7 +79,7 @@ export default function TeamPage() {
     setAddLoading(false);
   }
 
-  if (loadingMembers || ownerLoading) {
+  if (loadingMembers || roleLoading) {
     return <SettingsPageLoader label="Loading team" />;
   }
 
@@ -106,7 +107,7 @@ export default function TeamPage() {
       ) : null}
 
       <div className="mt-6 flex w-full flex-col gap-6">
-        {isOwner ? (
+        {canManageTeam ? (
           <Card>
             <CardHeader>
               <CardTitle>Add to workspace</CardTitle>
@@ -133,7 +134,7 @@ export default function TeamPage() {
         <TeamMembersCard
           members={members}
           currentUserId={user?.id}
-          isOwner={Boolean(isOwner)}
+          actorRole={role}
           connections={connections}
           connectionPhoneDigits={connectionPhoneDigits}
           onChanged={loadMembers}

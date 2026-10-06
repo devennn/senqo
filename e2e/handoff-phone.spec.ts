@@ -183,7 +183,7 @@ test.describe("Handoff phone registration", () => {
     const state = { member: ownerMember() };
     await seedSession(page);
     await mockApis(page, state);
-    await page.goto("/settings/team");
+    await page.goto(`/${WORKSPACE_ID}/settings/team`);
 
     await expect(page.getByRole("heading", { name: "Team" })).toBeVisible();
     await page.getByRole("button", { name: "Manage" }).click();
@@ -215,7 +215,7 @@ test.describe("Handoff phone registration", () => {
     };
     await seedSession(page);
     await mockApis(page, state);
-    await page.goto("/settings/team");
+    await page.goto(`/${WORKSPACE_ID}/settings/team`);
     await page.getByRole("button", { name: "Manage" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
 
@@ -233,7 +233,7 @@ test.describe("Handoff phone registration", () => {
     };
     await seedSession(page);
     await mockApis(page, state);
-    await page.goto("/settings/team");
+    await page.goto(`/${WORKSPACE_ID}/settings/team`);
     await page.getByRole("button", { name: "Manage" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
 

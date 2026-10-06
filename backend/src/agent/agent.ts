@@ -17,6 +17,7 @@ import {
 } from "../agent/messages.js";
 import { resolveSessionId } from "../agent/session.js";
 import { buildAgentInstructionsWithCatalog } from "../agent/skills-catalog.js";
+import { createCustomToolFailureTracker } from "../agent/tool-failures.js";
 import { getAgentTools } from "../agent/tools/index.js";
 import { normalizeStoredContentForModelMessage } from "../lib/agent-multimodal-normalize.js";
 import { BUILTIN_AGENT_TOOL_KEYS } from "../lib/builtin-agent-tool-keys.js";
@@ -50,6 +51,7 @@ import {
 } from "../lib/agent-run-log.js";
 import { agentOutputSchema } from "./agent-output-schema.js";
 import { getChatLLM } from "./llm.js";
+import { handoffAfterAgentRunFailure } from "../services/agent-run-failure.js";
 
 const logScope = "AgentRuntime";
 
@@ -215,6 +217,11 @@ export async function runAgentSession(
     enabledToolKeys,
   );
   const activeTools = Object.keys(tools);
+  const customToolFailureTracker = createCustomToolFailureTracker(
+    enabledToolKeys.filter(
+      (key) => !(BUILTIN_AGENT_TOOL_KEYS as readonly string[]).includes(key),
+    ),
+  );
 
   console.info(
     `[${logScope}/tools] active=${activeTools.length > 0 ? activeTools.join(",") : "none"}`,
@@ -260,6 +267,7 @@ export async function runAgentSession(
       const toolResults = Array.isArray(event.toolResults)
         ? event.toolResults
         : [];
+      customToolFailureTracker.observeToolResults(toolResults);
       const toolNames =
         toolCalls.length > 0
           ? toolCalls.map((call) => call.toolName).join(", ")
@@ -438,6 +446,31 @@ export async function runAgentSession(
       ],
     });
     resolved = resolveFromStructuredOutput(result.output);
+  }
+
+  const customToolFailureSummary = customToolFailureTracker.summarize();
+  if (!isDryRun && input.sessionId && customToolFailureSummary) {
+    console.info(
+      `[${logScope}] Failed query: custom tool failure suppresses reply sessionId=${sessionId} detail=${customToolFailureSummary}`,
+    );
+    if (!resolved.handoffCalled) {
+      await handoffAfterAgentRunFailure({
+        workspaceId: input.workspaceId,
+        conversationId: sessionId,
+        agentConfigId: input.agentConfigId,
+        errorMessage: customToolFailureSummary,
+      });
+    }
+    const failureNote = `Internal tool failure (${customToolFailureSummary}). No customer reply was sent; the conversation was handed off to a human.`;
+    resolved = {
+      ...resolved,
+      handoffEnabled: true,
+      handoffCalled: true,
+      rawMessages: [],
+      reasoningForOperators: resolved.reasoningForOperators
+        ? `${resolved.reasoningForOperators} ${failureNote}`
+        : failureNote,
+    };
   }
 
   const generated = extractGeneratedModelMessages(result);

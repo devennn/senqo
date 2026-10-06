@@ -5,6 +5,9 @@ const TEAM_MEMBER_ERROR_MESSAGES: Record<string, string> = {
   already_member: "This person is already a member of this workspace.",
   already_owner: "This person already owns this workspace.",
   forbidden: "You do not have permission to do that.",
+  invalid_role: "Choose either Member or Admin as the role.",
+  cannot_change_owner_role: "The workspace owner's role cannot be changed.",
+  target_not_member: "That person is not on this workspace team.",
   invalid_payload: "Enter a valid email address or phone number.",
   unexpected_error: "Something went wrong. Try again.",
   no_whatsapp_connection: "Connect a WhatsApp line first.",
@@ -17,6 +20,9 @@ const TEAM_MEMBER_ERROR_MESSAGES: Record<string, string> = {
   too_many_attempts: "Too many incorrect codes. Tap Resend code.",
   send_failed: "Could not send the code over WhatsApp. Try again.",
   user_not_teammate: "That person is not on this workspace team.",
+  no_verified_handoff_phone:
+    "Add a verified handoff phone with Manage before turning on AI error alerts.",
+  save_failed: "Could not save. Try again.",
 };
 
 export function teamMemberErrorMessage(code: string): string {

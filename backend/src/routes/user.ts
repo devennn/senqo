@@ -155,8 +155,9 @@ import {
   getTaskById,
   cancelTaskById,
 } from "../repositories/tasks.js";
-import { addMember, listMembers } from "../repositories/team.js";
+import { addMember, listMembers, updateMemberRole } from "../repositories/team.js";
 import { userHasVerifiedHandoffPhone } from "../repositories/handoff-phones.js";
+import { setErrorAlertSubscriber } from "../repositories/error-alert-subscribers.js";
 import {
   updateProfile,
   getProfileForSettings,
@@ -165,6 +166,8 @@ import {
 import {
   getWorkspaceRow,
   isWorkspaceOwner,
+  isWorkspaceOwnerOrAdmin,
+  getWorkspaceMemberRole,
   isWorkspaceTeammate,
   updateWorkspaceSettingsAsOwner,
   listUserWorkspaces,
@@ -2376,8 +2379,8 @@ app.get("/team", async (c) => {
 app.post("/team", async (c) => {
   const workspaceId = c.get("workspaceId");
   const userId = c.get("userId");
-  const owner = await isWorkspaceOwner(workspaceId, userId);
-  if (!owner) return c.json({ error: "forbidden" }, 403);
+  const canManage = await isWorkspaceOwnerOrAdmin(workspaceId, userId);
+  if (!canManage) return c.json({ error: "forbidden" }, 403);
 
   const parsed = emailSchema.safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
@@ -2395,6 +2398,45 @@ app.post("/team", async (c) => {
   return c.json({ ok: true });
 });
 
+const teamRoleSchema = z.object({
+  userId: z.string().uuid(),
+  role: z.enum(["admin", "member"]),
+});
+
+app.patch("/team/role", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const actorUserId = c.get("userId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = teamRoleSchema.safeParse(body);
+  if (!parsed.success) {
+    const roleValue = (body as { role?: unknown } | null)?.role;
+    const roleInvalid = roleValue !== "admin" && roleValue !== "member";
+    return c.json({ error: roleInvalid ? "invalid_role" : "invalid_payload" }, 400);
+  }
+
+  const actorRole = await getWorkspaceMemberRole(workspaceId, actorUserId);
+  if (actorRole !== "owner" && actorRole !== "admin") {
+    return c.json({ error: "forbidden" }, 403);
+  }
+
+  const targetRole = await getWorkspaceMemberRole(workspaceId, parsed.data.userId);
+  if (!targetRole) return c.json({ error: "target_not_member" }, 404);
+  if (targetRole === "owner") {
+    return c.json({ error: "cannot_change_owner_role" }, 403);
+  }
+  if (actorRole === "admin" && targetRole === "admin") {
+    return c.json({ error: "forbidden" }, 403);
+  }
+
+  const result = await updateMemberRole(workspaceId, parsed.data.userId, parsed.data.role);
+  if (!result.ok) {
+    const status = result.message === "target_not_member" ? 404 : 500;
+    return c.json({ error: result.message }, status);
+  }
+
+  return c.json({ ok: true });
+});
+
 const handoffPhoneUserSchema = z.object({
   userId: z.string().uuid(),
   whatsappConnectionId: z.string().uuid(),
@@ -2409,6 +2451,15 @@ const handoffPhoneConfirmSchema = handoffPhoneUserSchema.extend({
 });
 
 async function assertCanManageHandoffPhone(
+  workspaceId: string,
+  actorUserId: string,
+  targetUserId: string,
+): Promise<boolean> {
+  if (actorUserId === targetUserId) return true;
+  return isWorkspaceOwnerOrAdmin(workspaceId, actorUserId);
+}
+
+async function assertCanManageErrorAlerts(
   workspaceId: string,
   actorUserId: string,
   targetUserId: string,
@@ -2503,6 +2554,42 @@ app.delete("/team/handoff-phone", async (c) => {
   return c.json({ ok: true });
 });
 
+const errorAlertsSchema = z.object({
+  userId: z.string().uuid(),
+  enabled: z.boolean(),
+});
+
+app.patch("/team/error-alerts", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const actorUserId = c.get("userId");
+  const parsed = errorAlertsSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const allowed = await assertCanManageErrorAlerts(
+    workspaceId,
+    actorUserId,
+    parsed.data.userId,
+  );
+  if (!allowed) return c.json({ error: "forbidden" }, 403);
+
+  const teammate = await isWorkspaceTeammate(workspaceId, parsed.data.userId);
+  if (!teammate) return c.json({ error: "user_not_teammate" }, 404);
+
+  if (parsed.data.enabled) {
+    const hasPhone = await userHasVerifiedHandoffPhone(workspaceId, parsed.data.userId);
+    if (!hasPhone) return c.json({ error: "no_verified_handoff_phone" }, 400);
+  }
+
+  const saved = await setErrorAlertSubscriber(
+    workspaceId,
+    parsed.data.userId,
+    parsed.data.enabled,
+  );
+  if (!saved.ok) return c.json({ error: "save_failed" }, 500);
+
+  return c.json({ ok: true });
+});
+
 // ── Profile ───────────────────────────────────────────────────────────────────
 
 app.get("/profile", async (c) => {
@@ -2516,6 +2603,8 @@ app.get("/profile", async (c) => {
   const isOwner = workspace
     ? workspace.ownerUserId.trim().toLowerCase() === userId.trim().toLowerCase()
     : false;
+  const memberRole =
+    workspace && !isOwner ? await getWorkspaceMemberRole(workspaceId, userId) : null;
 
   const dbFirst = profileRow?.first_name?.trim() ?? "";
   const dbLast = profileRow?.last_name?.trim() ?? "";
@@ -2536,7 +2625,11 @@ app.get("/profile", async (c) => {
           name: workspace.name,
           timezone: workspace.timezone,
           createdAt: workspace.createdAt,
-          role: isOwner ? ("owner" as const) : ("member" as const),
+          role: isOwner
+            ? ("owner" as const)
+            : memberRole === "admin"
+              ? ("admin" as const)
+              : ("member" as const),
         }
       : null,
     storage: await getWorkspaceStorageUsage(workspaceId),

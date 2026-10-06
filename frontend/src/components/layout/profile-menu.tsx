@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { logout } from "@/lib/auth-client";
 import { useWorkspace } from "@/context/workspace";
+import { workspaceDisplayName } from "@/lib/workspace-display";
 import { cn } from "@/lib/utils";
 
 function userInitials(email: string | undefined): string {
@@ -33,9 +34,10 @@ export function ProfileMenu({
 }) {
   const navigate = useNavigate();
   const { user, loading, setUser } = useAuth();
-  const { wsPath } = useWorkspace();
+  const { workspaceId, workspaceName, wsPath } = useWorkspace();
   const email = user?.email ?? (loading ? "" : "Account");
   const initials = user?.email ? userInitials(user.email) : loading ? "" : "?";
+  const workspaceLabel = workspaceDisplayName(workspaceName, workspaceId);
 
   async function handleSignOut() {
     onNavigate?.();
@@ -75,6 +77,22 @@ export function ProfileMenu({
             <div className="flex items-center gap-2">
               <User className="size-4 shrink-0 text-muted-foreground" />
               <span className="truncate text-sm font-medium text-foreground">{email}</span>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex items-center gap-2">
+              <LayoutGrid className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0">
+                <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Current workspace
+                </span>
+                <span
+                  className="block truncate text-sm font-medium text-foreground"
+                  title={workspaceLabel}
+                >
+                  {workspaceLabel}
+                </span>
+              </span>
             </div>
           </DropdownMenuLabel>
         </DropdownMenuGroup>

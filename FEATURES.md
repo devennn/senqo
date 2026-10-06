@@ -27,6 +27,7 @@
 - Per-connection attach — bind an agent to one or more WhatsApp lines from Agent setup; Inactive / Testing / Live modes stay per connection
 - Tasks — when an agent has multiple attached lines, pick which WhatsApp connection the task sends on
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model
+- Failed AI runs — when an internal AI error occurs (a thrown run, or a custom tool that still returns `ok: false` — a later successful retry does not count), the customer gets no reply: the runtime drops the draft reply, the chat switches to human handling, the thread shows an operator-only AI error event (customers never see it), and team members ticked for AI error alerts on Settings → Team are notified (default: nobody)
 - Business time — every agent run receives the workspace timezone and current business-local time; relative dates ("tonight", "tomorrow") and time-specific requests are reasoned in that timezone, and the agent must check opening hours or availability from workspace knowledge before confirming any time; it offers alternatives or hands off instead of guessing
 - Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`
 - AI tool draft — on Create tool, Generate with AI (Execute code row) drafts name, description, required env, and execute code from pasted API examples or instructions; review before save
@@ -77,6 +78,8 @@
 - Workspace profile — display name, timezone (IANA, defaults to UTC; drives the agent's current time and hours checks), storage usage breakdown, 10 GB default quota
 - API keys — create, list, delete workspace API keys with optional expiry
 - Workspace secrets — encrypted key/value pairs for custom tool `requiredEnv`
-- Team — workspace owners add existing Senqo users to a workspace; unregistered emails are rejected with a clear error
-- Handoff phone registration — owners (or the member themselves) register a personal WhatsApp number on Team per connected WhatsApp line, confirm with a dashboard OTP sent from that line only; the same personal number needs a separate registration for each line that should alert them
+- Team — workspace owners and admins add existing Senqo users to a workspace; unregistered emails are rejected with a clear error. Owners and admins change member roles between Member and Admin via the role picker; blocked targets (members acting, other admins, the owner) keep a greyed-out picker
+- Handoff phone registration — owners and admins (or the member themselves) register a personal WhatsApp number on Team per connected WhatsApp line, confirm with a dashboard OTP sent from that line only; the same personal number needs a separate registration for each line that should alert them
+- AI error alerts — on Team, tick Receive AI error alerts for a member with a verified handoff phone (confirm dialog on opt-in; owners can tick anyone, members themselves); when an internal AI error prevents a reply, ticked members get a WhatsApp alert from the conversation's line, while the chat switches to human handling with no customer reply (default: nobody)
+- Current workspace indicator — the sidebar footer workspace row shows the active workspace name (collapsed: its initial avatar) and links out to the workspace chooser; the mobile navigation sheet carries the same row, and Settings → Workspace name changes update the shell immediately
 - User profile — name fields; password change

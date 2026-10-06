@@ -78,6 +78,11 @@ export type NotifyHandoffHumanInput = {
   conversationId: string;
   agentConfigId?: string | null;
   reason?: string | null;
+  /**
+   * Explicit recipients (AI error alert subscribers). When set, the agent's
+   * handoff notify list is ignored. Default unset = use the agent notify list.
+   */
+  recipientUserIds?: string[];
 };
 
 /**
@@ -93,24 +98,36 @@ export function scheduleHandoffNotify(input: NotifyHandoffHumanInput): void {
 /** Sends WhatsApp alerts to each verified notify user on the conversation's line. Never throws. */
 export async function notifyHandoffHuman(input: NotifyHandoffHumanInput): Promise<void> {
   try {
-    const agentId = await resolveAgentConfigId(
-      input.workspaceId,
-      input.conversationId,
-      input.agentConfigId,
-    );
-    if (!agentId) {
-      console.info(
-        `[${scope}] Skipped: no agent for conversationId=${input.conversationId}`,
+    let notifyUserIds: string[];
+    const explicitRecipients = Array.isArray(input.recipientUserIds)
+      ? input.recipientUserIds
+      : null;
+    if (explicitRecipients) {
+      notifyUserIds = [
+        ...new Set(explicitRecipients.map((id) => id.trim()).filter(Boolean)),
+      ];
+    } else {
+      const agentId = await resolveAgentConfigId(
+        input.workspaceId,
+        input.conversationId,
+        input.agentConfigId,
       );
-      return;
-    }
+      if (!agentId) {
+        console.info(
+          `[${scope}] Skipped: no agent for conversationId=${input.conversationId}`,
+        );
+        return;
+      }
 
-    const agent = await getAgentConfigById(input.workspaceId, agentId);
-    const notifyUserIds = Array.isArray(agent?.handoff_notify_user_ids)
-      ? [...new Set(agent.handoff_notify_user_ids.map((id) => id.trim()).filter(Boolean))]
-      : [];
+      const agent = await getAgentConfigById(input.workspaceId, agentId);
+      notifyUserIds = Array.isArray(agent?.handoff_notify_user_ids)
+        ? [...new Set(agent.handoff_notify_user_ids.map((id) => id.trim()).filter(Boolean))]
+        : [];
+    }
     if (notifyUserIds.length === 0) {
-      console.info(`[${scope}] Success: no notify users agentId=${agentId}`);
+      console.info(
+        `[${scope}] Success: no notify users conversationId=${input.conversationId}`,
+      );
       return;
     }
 

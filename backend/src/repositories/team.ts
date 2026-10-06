@@ -1,4 +1,8 @@
-import { listWorkspaceMembers, addWorkspaceMember } from "./workspaces.js";
+import {
+  listWorkspaceMembers,
+  addWorkspaceMember,
+  updateWorkspaceMemberRole,
+} from "./workspaces.js";
 import type { TeamMemberRecord } from "../types/repositories.js";
 
 export async function listMembers(workspaceId: string): Promise<TeamMemberRecord[]> {
@@ -10,4 +14,12 @@ export async function addMember(
   email: string,
 ): Promise<{ ok: boolean; message: string }> {
   return addWorkspaceMember(workspaceId, email);
+}
+
+export async function updateMemberRole(
+  workspaceId: string,
+  userId: string,
+  role: "admin" | "member",
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return updateWorkspaceMemberRole(workspaceId, userId, role);
 }

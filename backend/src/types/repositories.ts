@@ -626,13 +626,16 @@ export type TeamMemberHandoffPhone = {
   status: HandoffPhoneStatus;
 };
 
+export type WorkspaceMemberRole = "owner" | "admin" | "member";
+
 export type TeamMemberRecord = {
   id: string;
   userId: string;
   email: string | null;
-  role: string;
+  role: WorkspaceMemberRole;
   joined_at: string | null;
   handoffPhones: TeamMemberHandoffPhone[];
+  receivesErrorAlerts: boolean;
 };
 
 export type WorkspaceHandoffPhoneRecord = {

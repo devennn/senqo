@@ -162,6 +162,20 @@
       "when": 1780540924821,
       "tag": "0022_workspaces_timezone",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1780540924822,
+      "tag": "0023_workspace_error_alert_subscribers",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1780540924823,
+      "tag": "0024_workspace_members_role_check",
+      "breakpoints": true
     }
   ]
 }

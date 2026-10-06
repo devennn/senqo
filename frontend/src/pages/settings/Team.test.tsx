@@ -6,20 +6,22 @@ import TeamPage from "@/pages/settings/Team";
 
 const mockGet = vi.hoisted(() => vi.fn());
 const mockPost = vi.hoisted(() => vi.fn());
+const mockPatch = vi.hoisted(() => vi.fn());
 const mockDelete = vi.hoisted(() => vi.fn());
-const mockUseIsWorkspaceOwner = vi.hoisted(() => vi.fn());
+const mockUseWorkspaceRole = vi.hoisted(() => vi.fn());
 const mockUseAuth = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", () => ({
   api: {
     get: mockGet,
     post: mockPost,
+    patch: mockPatch,
     delete: mockDelete,
   },
 }));
 
-vi.mock("@/hooks/useIsWorkspaceOwner", () => ({
-  useIsWorkspaceOwner: mockUseIsWorkspaceOwner,
+vi.mock("@/hooks/useWorkspaceRole", () => ({
+  useWorkspaceRole: mockUseWorkspaceRole,
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -66,7 +68,7 @@ const ownerBase = {
 describe("Team settings page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseIsWorkspaceOwner.mockReturnValue({ isOwner: true, loading: false });
+    mockUseWorkspaceRole.mockReturnValue({ role: "owner", loading: false });
     mockUseAuth.mockReturnValue({ user: { id: "user-owner", email: "owner@senqo.app" } });
     mockTeamApis();
   });
@@ -97,7 +99,7 @@ describe("Team settings page", () => {
 
   // Members-only view for non-owners: no add form.
   it("hides add form when the user is not the workspace owner", async () => {
-    mockUseIsWorkspaceOwner.mockReturnValue({ isOwner: false, loading: false });
+    mockUseWorkspaceRole.mockReturnValue({ role: "member", loading: false });
     renderTeam();
     await waitFor(() => expect(screen.getByText("Members")).toBeInTheDocument());
     expect(screen.queryByText("Add to workspace")).not.toBeInTheDocument();
@@ -181,7 +183,7 @@ describe("Team settings page", () => {
 
   // Non-owner cannot open another member's handoff phone panel.
   it("hides Manage button for non-owners viewing another member", async () => {
-    mockUseIsWorkspaceOwner.mockReturnValue({ isOwner: false, loading: false });
+    mockUseWorkspaceRole.mockReturnValue({ role: "member", loading: false });
     mockUseAuth.mockReturnValue({ user: { id: "user-self", email: "self@senqo.app" } });
     mockTeamApis({
       members: [
@@ -198,5 +200,110 @@ describe("Team settings page", () => {
     renderTeam();
     await waitFor(() => expect(screen.getByText("No handoff phone")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Manage" })).not.toBeInTheDocument();
+  });
+
+  // The owner can promote a member to admin; the PATCH reaches the API and the list reloads.
+  it("lets the owner promote a member to admin", async () => {
+    mockPatch.mockResolvedValue({ ok: true });
+    mockTeamApis({
+      members: [
+        {
+          id: "m2",
+          userId: "user-2",
+          email: "bob@senqo.app",
+          role: "member",
+          joined_at: "2026-01-01T00:00:00.000Z",
+          handoffPhones: [],
+          receivesErrorAlerts: false,
+        },
+      ],
+    });
+    renderTeam();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Change role for bob@senqo.app" }),
+    );
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Admin" }));
+
+    await waitFor(() =>
+      expect(mockPatch).toHaveBeenCalledWith("/api/user/team/role", {
+        userId: "user-2",
+        role: "admin",
+      }),
+    );
+  });
+
+  // Admins can manage plain members but cannot touch other admins; blocked pickers stay visible but disabled.
+  it("shows admins role controls only for plain members", async () => {
+    mockUseWorkspaceRole.mockReturnValue({ role: "admin", loading: false });
+    mockTeamApis({
+      members: [
+        {
+          id: "m2",
+          userId: "user-2",
+          email: "bob@senqo.app",
+          role: "member",
+          joined_at: "2026-01-01T00:00:00.000Z",
+          handoffPhones: [],
+          receivesErrorAlerts: false,
+        },
+        {
+          id: "m3",
+          userId: "user-3",
+          email: "carol@senqo.app",
+          role: "admin",
+          joined_at: "2026-01-02T00:00:00.000Z",
+          handoffPhones: [],
+          receivesErrorAlerts: false,
+        },
+      ],
+    });
+    renderTeam();
+
+    expect(
+      await screen.findByRole("button", { name: "Change role for bob@senqo.app" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Change role for carol@senqo.app" }),
+    ).toBeDisabled();
+    expect(screen.getByText("Admin")).toBeInTheDocument();
+  });
+
+  // Plain members can see roles but the picker is greyed out.
+  it("disables role controls for members", async () => {
+    mockUseWorkspaceRole.mockReturnValue({ role: "member", loading: false });
+    mockTeamApis({
+      members: [
+        {
+          id: "m2",
+          userId: "user-2",
+          email: "bob@senqo.app",
+          role: "member",
+          joined_at: "2026-01-01T00:00:00.000Z",
+          handoffPhones: [],
+          receivesErrorAlerts: false,
+        },
+      ],
+    });
+    renderTeam();
+
+    await waitFor(() => expect(screen.getByText("Members")).toBeInTheDocument());
+    expect(
+      screen.getByRole("button", { name: "Change role for bob@senqo.app" }),
+    ).toBeDisabled();
+    expect(screen.getByText("Member")).toBeInTheDocument();
+  });
+
+  // The owner role is fixed and its picker is always greyed out.
+  it("disables the role picker for the owner row", async () => {
+    mockTeamApis({
+      members: [{ ...ownerBase, handoffPhones: [], receivesErrorAlerts: false }],
+    });
+    renderTeam();
+
+    const ownerRole = await screen.findByRole("button", {
+      name: "Change role for owner@senqo.app",
+    });
+    expect(ownerRole).toBeDisabled();
+    expect(ownerRole).toHaveTextContent("Owner");
   });
 });

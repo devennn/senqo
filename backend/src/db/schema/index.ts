@@ -795,6 +795,28 @@ export const workspaceHandoffPhoneVerifications = pgTable(
   ],
 );
 
+export const workspaceErrorAlertSubscribers = pgTable(
+  "workspace_error_alert_subscribers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("workspace_error_alert_subscribers_workspace_user_uidx").on(
+      t.workspaceId,
+      t.userId,
+    ),
+  ],
+);
+
 export const workspaceContextGroups = pgTable("workspace_context_groups", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id")

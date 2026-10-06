@@ -1,4 +1,5 @@
 import {
+  THREAD_EVENT_AGENT_ERROR,
   THREAD_EVENT_HANDOFF_TO_HUMAN,
   THREAD_EVENT_MANUAL_TOGGLE,
 } from "../lib/conversation-thread-events.js";
@@ -7,7 +8,11 @@ import type { EvalKnowledgeRef, EvalTurn, EvalTurnMedia } from "../types/evals.j
 
 function isThreadEvent(metadata: Record<string, unknown> | null): boolean {
   const event = typeof metadata?.thread_event === "string" ? metadata.thread_event : null;
-  return event === THREAD_EVENT_HANDOFF_TO_HUMAN || event === THREAD_EVENT_MANUAL_TOGGLE;
+  return (
+    event === THREAD_EVENT_HANDOFF_TO_HUMAN ||
+    event === THREAD_EVENT_MANUAL_TOGGLE ||
+    event === THREAD_EVENT_AGENT_ERROR
+  );
 }
 
 function toMedia(media: ConversationMessage["media"]): EvalTurnMedia | null {

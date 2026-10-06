@@ -74,6 +74,8 @@ vi.mock("../repositories/workspaces.js", () => ({
   createWorkspaceForUser: vi.fn(),
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
+  isWorkspaceOwnerOrAdmin: vi.fn(),
+  getWorkspaceMemberRole: vi.fn(),
   isWorkspaceTeammate: vi.fn(),
   updateWorkspaceSettingsAsOwner: vi.fn(),
 }));
@@ -82,6 +84,11 @@ vi.mock("../repositories/handoff-phones.js", () => ({
   getHandoffPhone: vi.fn(),
   userHasVerifiedHandoffPhone: vi.fn(),
   listHandoffPhonesForUsers: vi.fn(),
+}));
+
+vi.mock("../repositories/error-alert-subscribers.js", () => ({
+  listErrorAlertSubscriberUserIds: vi.fn(),
+  setErrorAlertSubscriber: vi.fn(),
 }));
 
 vi.mock("../services/handoff-phone-verify.js", () => ({
@@ -276,6 +283,7 @@ vi.mock("../repositories/agent-messages.js", () => ({
 vi.mock("../repositories/team.js", () => ({
   listMembers: vi.fn(),
   addMember: vi.fn(),
+  updateMemberRole: vi.fn(),
 }));
 
 vi.mock("../agent-evals/index.js", () => ({
@@ -333,9 +341,13 @@ import { verifyToken } from "../lib/auth-jwt.js";
 import {
   validateWorkspaceMembership,
   isWorkspaceOwner,
+  isWorkspaceOwnerOrAdmin,
+  getWorkspaceMemberRole,
   isWorkspaceTeammate,
 } from "../repositories/workspaces.js";
-import { listMembers, addMember } from "../repositories/team.js";
+import { listMembers, addMember, updateMemberRole } from "../repositories/team.js";
+import { userHasVerifiedHandoffPhone } from "../repositories/handoff-phones.js";
+import { setErrorAlertSubscriber } from "../repositories/error-alert-subscribers.js";
 import {
   startHandoffPhoneVerification,
   confirmHandoffPhoneVerification,
@@ -344,9 +356,14 @@ import {
 const verifyTokenMock = vi.mocked(verifyToken);
 const validateWorkspaceMembershipMock = vi.mocked(validateWorkspaceMembership);
 const isWorkspaceOwnerMock = vi.mocked(isWorkspaceOwner);
+const isWorkspaceOwnerOrAdminMock = vi.mocked(isWorkspaceOwnerOrAdmin);
+const getWorkspaceMemberRoleMock = vi.mocked(getWorkspaceMemberRole);
 const isWorkspaceTeammateMock = vi.mocked(isWorkspaceTeammate);
 const listMembersMock = vi.mocked(listMembers);
 const addMemberMock = vi.mocked(addMember);
+const updateMemberRoleMock = vi.mocked(updateMemberRole);
+const userHasVerifiedHandoffPhoneMock = vi.mocked(userHasVerifiedHandoffPhone);
+const setErrorAlertSubscriberMock = vi.mocked(setErrorAlertSubscriber);
 const startHandoffPhoneVerificationMock = vi.mocked(startHandoffPhoneVerification);
 const confirmHandoffPhoneVerificationMock = vi.mocked(confirmHandoffPhoneVerification);
 
@@ -368,7 +385,10 @@ beforeEach(async () => {
   );
   validateWorkspaceMembershipMock.mockResolvedValue(true);
   isWorkspaceOwnerMock.mockResolvedValue(true);
+  isWorkspaceOwnerOrAdminMock.mockResolvedValue(true);
   isWorkspaceTeammateMock.mockResolvedValue(true);
+  userHasVerifiedHandoffPhoneMock.mockResolvedValue(true);
+  setErrorAlertSubscriberMock.mockResolvedValue({ ok: true });
 
   const { default: userRoute } = await import("../routes/user.js");
   app = new Hono().route("/", userRoute);
@@ -385,6 +405,7 @@ describe("GET /team", () => {
         role: "owner",
         joined_at: "2026-01-01T00:00:00.000Z",
         handoffPhones: [],
+        receivesErrorAlerts: true,
       },
       {
         id: "m2",
@@ -400,6 +421,7 @@ describe("GET /team", () => {
             status: "verified",
           },
         ],
+        receivesErrorAlerts: false,
       },
     ]);
 
@@ -410,6 +432,8 @@ describe("GET /team", () => {
     expect(body.members).toHaveLength(2);
     expect(body.members[0].email).toBe("alice@example.com");
     expect(body.members[1].handoffPhones[0].status).toBe("verified");
+    expect(body.members[0].receivesErrorAlerts).toBe(true);
+    expect(body.members[1].receivesErrorAlerts).toBe(false);
   });
 });
 
@@ -447,7 +471,7 @@ describe("POST /team", () => {
 
   // Non-owner cannot add members.
   it("returns 403 forbidden when caller is not workspace owner", async () => {
-    isWorkspaceOwnerMock.mockResolvedValue(false);
+    isWorkspaceOwnerOrAdminMock.mockResolvedValue(false);
 
     const res = await app.request("/team", {
       method: "POST",
@@ -477,6 +501,128 @@ describe("POST /team", () => {
   });
 });
 
+describe("PATCH /team/role", () => {
+  const TARGET_USER_ID = "22222222-2222-4222-8222-222222222222";
+
+  // Owner promotes an existing member to admin; the repo persists the new role.
+  it("owner promotes a member to admin", async () => {
+    getWorkspaceMemberRoleMock.mockImplementation(async (_workspaceId, userId) =>
+      userId === "user-1" ? "owner" : "member",
+    );
+    updateMemberRoleMock.mockResolvedValue({ ok: true });
+
+    const res = await app.request("/team/role", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, role: "admin" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(updateMemberRoleMock).toHaveBeenCalledWith("ws-1", TARGET_USER_ID, "admin");
+  });
+
+  // Admin can demote another member (but not other admins).
+  it("admin demotes a member", async () => {
+    getWorkspaceMemberRoleMock.mockImplementation(async (_workspaceId, userId) =>
+      userId === "user-1" ? "admin" : "member",
+    );
+    updateMemberRoleMock.mockResolvedValue({ ok: true });
+
+    const res = await app.request("/team/role", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, role: "member" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(updateMemberRoleMock).toHaveBeenCalledWith("ws-1", TARGET_USER_ID, "member");
+  });
+
+  // Members are read-only on the team page.
+  it("returns 403 forbidden when the actor is a member", async () => {
+    getWorkspaceMemberRoleMock.mockResolvedValue("member");
+
+    const res = await app.request("/team/role", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, role: "admin" }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("forbidden");
+    expect(updateMemberRoleMock).not.toHaveBeenCalled();
+  });
+
+  // Only the owner can act on admins; an admin cannot change another admin.
+  it("returns 403 when an admin targets another admin", async () => {
+    getWorkspaceMemberRoleMock.mockResolvedValue("admin");
+
+    const res = await app.request("/team/role", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, role: "member" }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("forbidden");
+    expect(updateMemberRoleMock).not.toHaveBeenCalled();
+  });
+
+  // The owner role is implicit (workspaces.owner_user_id) and never settable.
+  it("returns 403 cannot_change_owner_role when the target is the owner", async () => {
+    getWorkspaceMemberRoleMock.mockImplementation(async (_workspaceId, userId) =>
+      userId === "user-1" ? "admin" : "owner",
+    );
+
+    const res = await app.request("/team/role", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, role: "member" }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("cannot_change_owner_role");
+    expect(updateMemberRoleMock).not.toHaveBeenCalled();
+  });
+
+  // Targets that are not on the workspace team are rejected.
+  it("returns 404 target_not_member for a user outside the workspace", async () => {
+    getWorkspaceMemberRoleMock.mockImplementation(async (_workspaceId, userId) =>
+      userId === "user-1" ? "owner" : null,
+    );
+
+    const res = await app.request("/team/role", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, role: "member" }),
+    });
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toBe("target_not_member");
+    expect(updateMemberRoleMock).not.toHaveBeenCalled();
+  });
+
+  // "owner" is never an assignable value through this endpoint.
+  it("returns 400 invalid_role for an unsupported role value", async () => {
+    const res = await app.request("/team/role", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, role: "owner" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid_role");
+    expect(updateMemberRoleMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /team/handoff-phone", () => {
   // Owner registers a teammate phone → verification start is called.
   it("owner registers member phone and returns ok", async () => {
@@ -503,7 +649,7 @@ describe("POST /team/handoff-phone", () => {
 
   // Non-owner cannot register another member's phone.
   it("returns 403 when member tries to register another user", async () => {
-    isWorkspaceOwnerMock.mockResolvedValue(false);
+    isWorkspaceOwnerOrAdminMock.mockResolvedValue(false);
 
     const res = await app.request("/team/handoff-phone", {
       method: "POST",
@@ -562,5 +708,79 @@ describe("POST /team/handoff-phone/confirm", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe("invalid_code");
+  });
+});
+
+describe("PATCH /team/error-alerts", () => {
+  const TARGET_USER_ID = "11111111-1111-4111-8111-111111111111";
+
+  // Opting a teammate in with a verified handoff phone persists the subscription.
+  it("opts a teammate in when they have a verified handoff phone", async () => {
+    const res = await app.request("/team/error-alerts", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, enabled: true }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(userHasVerifiedHandoffPhoneMock).toHaveBeenCalledWith("ws-1", TARGET_USER_ID);
+    expect(setErrorAlertSubscriberMock).toHaveBeenCalledWith(
+      "ws-1",
+      TARGET_USER_ID,
+      true,
+    );
+  });
+
+  // No verified phone means alerts cannot be delivered, so enabling is rejected.
+  it("returns 400 no_verified_handoff_phone when the teammate has no verified phone", async () => {
+    userHasVerifiedHandoffPhoneMock.mockResolvedValue(false);
+
+    const res = await app.request("/team/error-alerts", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, enabled: true }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("no_verified_handoff_phone");
+    expect(setErrorAlertSubscriberMock).not.toHaveBeenCalled();
+  });
+
+  // A member cannot change another member's alert setting.
+  it("returns 403 when a member changes another user", async () => {
+    isWorkspaceOwnerMock.mockResolvedValue(false);
+
+    const res = await app.request("/team/error-alerts", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, enabled: true }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("forbidden");
+    expect(setErrorAlertSubscriberMock).not.toHaveBeenCalled();
+  });
+
+  // Turning alerts off needs no phone check: a removed phone must still be disable-able.
+  it("turns alerts off without requiring a verified phone", async () => {
+    userHasVerifiedHandoffPhoneMock.mockResolvedValue(false);
+
+    const res = await app.request("/team/error-alerts", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ userId: TARGET_USER_ID, enabled: false }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(userHasVerifiedHandoffPhoneMock).not.toHaveBeenCalled();
+    expect(setErrorAlertSubscriberMock).toHaveBeenCalledWith(
+      "ws-1",
+      TARGET_USER_ID,
+      false,
+    );
   });
 });

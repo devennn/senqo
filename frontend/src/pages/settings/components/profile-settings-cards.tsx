@@ -78,9 +78,9 @@ export function ProfileWorkspaceCard(props: {
         </div>
         <p className="text-sm text-muted-foreground">
           Created <span className="text-foreground">{created}</span>
-          {workspace.role === "member" ? (
-            <span className="ml-2 rounded-md border border-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              Member
+          {workspace.role !== "owner" ? (
+            <span className="ml-2 rounded-md border border-muted px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
+              {workspace.role}
             </span>
           ) : null}
         </p>

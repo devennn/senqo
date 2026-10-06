@@ -15,8 +15,10 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { cn } from "@/lib/utils";
+import { workspaceDisplayName, workspaceInitial } from "@/lib/workspace-display";
 import { useWorkspace } from "@/context/workspace";
 
 const navItemDefs = [
@@ -42,7 +44,9 @@ export function AppNavigation({
   className?: string;
 }) {
   const location = useLocation();
-  const { wsPath } = useWorkspace();
+  const { wsPath, workspaceId, workspaceName } = useWorkspace();
+  const workspaceLabel = workspaceDisplayName(workspaceName, workspaceId);
+  const workspaceBadge = workspaceInitial(workspaceName, workspaceId);
   const pathname = location.pathname;
 
   return (
@@ -75,10 +79,21 @@ export function AppNavigation({
         <Link
           to="/"
           onClick={onNavigate}
+          title={`Switch workspace: ${workspaceLabel}`}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent/10 hover:text-sidebar-foreground/75"
         >
-          <LayoutGrid className="size-[18px] shrink-0" />
-          {expanded && <span className="truncate">Workspaces</span>}
+          {expanded ? (
+            <>
+              <LayoutGrid className="size-[18px] shrink-0" />
+              <span className="truncate">{workspaceLabel}</span>
+            </>
+          ) : (
+            <Avatar size="sm" className="size-6">
+              <AvatarFallback className="bg-sidebar-accent text-[10px] font-bold text-sidebar-accent-foreground">
+                {workspaceBadge}
+              </AvatarFallback>
+            </Avatar>
+          )}
         </Link>
         <ProfileMenu expanded={expanded} onNavigate={onNavigate} />
       </div>
@@ -103,6 +118,8 @@ export function Sidebar({ className }: { className?: string }) {
           size="icon"
           className="shrink-0 text-sidebar-foreground/60 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground"
           onClick={() => setExpanded((s) => !s)}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          title={expanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           <Menu className="size-5" />
         </Button>

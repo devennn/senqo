@@ -6,6 +6,9 @@ const mockListConversationMessagesBareForAi = vi.fn();
 const mockGetContactIsTestForConversation = vi.fn();
 const mockGetWhatsappConnectionModeForInboundAi = vi.fn();
 const mockClearInboundAiDebouncePending = vi.fn();
+const mockUpdateConversationHandlingMode = vi.fn();
+const mockCreateConversationMessage = vi.fn();
+const mockScheduleHandoffNotify = vi.fn();
 
 vi.mock("../agent/agent.js", () => ({
   runAgentSession: mockRunAgentSession,
@@ -14,7 +17,7 @@ vi.mock("../agent/agent.js", () => ({
 vi.mock("../repositories/conversations.js", () => ({
   getConversationHandlingMode: mockGetConversationHandlingMode,
   listConversationMessagesBareForAi: mockListConversationMessagesBareForAi,
-  updateConversationHandlingMode: vi.fn(),
+  updateConversationHandlingMode: mockUpdateConversationHandlingMode,
 }));
 
 vi.mock("../repositories/contacts.js", () => ({
@@ -26,7 +29,7 @@ vi.mock("../repositories/inbound-ai-debounce-pending.js", () => ({
 }));
 
 vi.mock("../repositories/whatsapp.js", () => ({
-  createConversationMessage: vi.fn(),
+  createConversationMessage: mockCreateConversationMessage,
   getWhatsappConnectionModeForInboundAi: mockGetWhatsappConnectionModeForInboundAi,
 }));
 
@@ -35,7 +38,7 @@ vi.mock("../lib/inbound-media-resolve.js", () => ({
 }));
 
 vi.mock("./handoff-notify.js", () => ({
-  scheduleHandoffNotify: vi.fn(),
+  scheduleHandoffNotify: mockScheduleHandoffNotify,
   notifyHandoffHuman: vi.fn(),
 }));
 
@@ -62,12 +65,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetConversationHandlingMode.mockResolvedValue("ai");
   mockGetContactIsTestForConversation.mockResolvedValue(true);
+  mockGetWhatsappConnectionModeForInboundAi.mockResolvedValue("testing");
   mockRunAgentSession.mockResolvedValue({
     sessionId: "conv-1",
     messages: [{ text: "Hi there" }],
     handoff_enabled: false,
   });
   mockClearInboundAiDebouncePending.mockResolvedValue(true);
+  mockUpdateConversationHandlingMode.mockResolvedValue({ ok: true });
+  mockCreateConversationMessage.mockResolvedValue({ ok: true, created: true });
 });
 
 describe("executeInboundDebouncedAiRun", () => {
@@ -109,6 +115,67 @@ describe("executeInboundDebouncedAiRun", () => {
         skipInference: true,
         skipInferenceReason: "connection mode is inactive",
       }),
+    );
+  });
+
+  // A thrown agent run must not leave the chat in AI mode where the customer could
+  // get an "unable to access" reply; it switches to human and records the operator-only error.
+  it("hands off and records the error when the agent run throws", async () => {
+    mockTrailingUserMessage();
+    mockRunAgentSession.mockRejectedValue(new Error("OpenRouter request failed"));
+
+    const result = await executeInboundDebouncedAiRun(baseInput);
+
+    expect(result.ok).toBe(false);
+    expect(mockUpdateConversationHandlingMode).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "human",
+    );
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "AI could not reply",
+      {
+        thread_event: "agent_error",
+        agent_error_message: "OpenRouter request failed",
+      },
+      null,
+    );
+    expect(mockScheduleHandoffNotify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws-1",
+        conversationId: "conv-1",
+        agentConfigId: "agent-1",
+      }),
+    );
+  });
+
+  // A null agent result is also an internal failure: same handoff and error event,
+  // so operators see it and no reply is attempted.
+  it("hands off and records the error when the agent run returns null", async () => {
+    mockTrailingUserMessage();
+    mockRunAgentSession.mockResolvedValue(null);
+
+    const result = await executeInboundDebouncedAiRun(baseInput);
+
+    expect(result.ok).toBe(false);
+    expect(mockUpdateConversationHandlingMode).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "human",
+    );
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "AI could not reply",
+      {
+        thread_event: "agent_error",
+        agent_error_message: "Agent run returned no result",
+      },
+      null,
     );
   });
 });

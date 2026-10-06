@@ -77,6 +77,8 @@ vi.mock("../repositories/workspaces.js", () => ({
   createWorkspaceForUser: vi.fn(),
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
+  isWorkspaceOwnerOrAdmin: vi.fn(),
+  getWorkspaceMemberRole: vi.fn(),
   isWorkspaceTeammate: vi.fn(),
   updateWorkspaceSettingsAsOwner: vi.fn(),
 }));
@@ -279,6 +281,7 @@ vi.mock("../repositories/agent-messages.js", () => ({
 vi.mock("../repositories/team.js", () => ({
   listMembers: vi.fn(),
   addMember: vi.fn(),
+  updateMemberRole: vi.fn(),
 }));
 
 vi.mock("../services/knowledge-ref-links.js", () => ({

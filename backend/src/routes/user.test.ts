@@ -87,6 +87,8 @@ vi.mock("../repositories/workspaces.js", () => ({
   createWorkspaceForUser: vi.fn(),
   getWorkspaceRow: vi.fn(),
   isWorkspaceOwner: vi.fn(),
+  isWorkspaceOwnerOrAdmin: vi.fn(),
+  getWorkspaceMemberRole: vi.fn(),
   isWorkspaceTeammate: vi.fn(),
   updateWorkspaceSettingsAsOwner: vi.fn(),
 }));
@@ -316,6 +318,7 @@ vi.mock("../services/handoff-phone-verify.js", () => ({
 vi.mock("../repositories/team.js", () => ({
   addMember: vi.fn(),
   listMembers: vi.fn(),
+  updateMemberRole: vi.fn(),
 }));
 
 vi.mock("../agent-evals/index.js", () => ({
@@ -355,7 +358,7 @@ vi.mock("../repositories/evals.js", () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";
-import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser, isWorkspaceOwner, updateWorkspaceSettingsAsOwner } from "../repositories/workspaces.js";
+import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser, isWorkspaceOwner, getWorkspaceMemberRole, updateWorkspaceSettingsAsOwner } from "../repositories/workspaces.js";
 import { listConversationLabels, createConversationLabel, deleteConversationLabel } from "../repositories/conversation-labels.js";
 import { listContactsPage } from "../repositories/contacts.js";
 import { listConversations, getConversationWithContact, updateConversationHandlingMode } from "../repositories/conversations.js";
@@ -428,6 +431,7 @@ const findUserByIdMock = vi.mocked(findUserById);
 const getProfileForSettingsMock = vi.mocked(getProfileForSettings);
 const updateProfileMock = vi.mocked(updateProfile);
 const getWorkspaceRowMock = vi.mocked(getWorkspaceRow);
+const getWorkspaceMemberRoleMock = vi.mocked(getWorkspaceMemberRole);
 const updateWorkspaceSettingsAsOwnerMock = vi.mocked(updateWorkspaceSettingsAsOwner);
 const generateApiKeyMaterialMock = vi.mocked(generateApiKeyMaterial);
 
@@ -923,6 +927,37 @@ describe("GET /profile", () => {
     expect(body.workspace.name).toBe("Test Workspace");
     expect(body.workspace.timezone).toBe("Asia/Kuala_Lumpur");
     expect(body.workspace.role).toBe("owner");
+  });
+
+  // Admins report role "admin" (not member) so the team page can expose role controls.
+  it("returns admin role for a workspace admin", async () => {
+    findUserByIdMock.mockResolvedValue({
+      id: "user-1",
+      email: "admin@example.com",
+      passwordHash: "hash",
+      isInstanceAdmin: false,
+      disabledAt: null,
+      createdAt: new Date(),
+    });
+    getProfileForSettingsMock.mockResolvedValue({
+      id: "user-1",
+      first_name: "Ada",
+      last_name: "Min",
+    });
+    getWorkspaceRowMock.mockResolvedValue({
+      id: "ws-1",
+      name: "Test Workspace",
+      timezone: "UTC",
+      ownerUserId: "user-owner",
+      createdAt: new Date(),
+    });
+    getWorkspaceMemberRoleMock.mockResolvedValue("admin");
+
+    const res = await app.request("/profile", { headers: AUTH });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.workspace.role).toBe("admin");
   });
 });
 

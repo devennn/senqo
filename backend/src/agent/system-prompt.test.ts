@@ -187,6 +187,15 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("Never invent availability or confirm a time you cannot verify");
   });
 
+  // Internal failures must never reach the customer and must not produce a reply;
+  // this guards the exact "I'm unable to access" leak the rule exists to prevent.
+  it("forbids surfacing internal errors and requires handoff with no reply", () => {
+    const prompt = buildAgentSystemPrompt(baseInput);
+    expect(prompt).toContain("Internal errors, tool failures, and system limitations are never customer-facing");
+    expect(prompt).toContain("never say you cannot access information, data, or a system");
+    expect(prompt).toContain("leave `messages` empty");
+  });
+
   // An invalid timezone must not crash prompt assembly; it falls back to the raw ISO clock.
   it("falls back to the ISO timestamp when the timezone is invalid", () => {
     const prompt = buildAgentSystemPrompt({ ...baseInput, timeZone: "Not/AZone" });

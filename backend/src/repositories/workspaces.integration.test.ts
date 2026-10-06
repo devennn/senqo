@@ -10,10 +10,14 @@ if (databaseUrl.includes("@postgres:")) {
 }
 
 const { db } = await import("../db/index.js");
-const { users, workspaces } = await import("../db/schema/index.js");
-const { getWorkspaceTimeZone, updateWorkspaceSettingsAsOwner } = await import(
-  "./workspaces.js"
-);
+const { users, workspaces, workspaceMembers } = await import("../db/schema/index.js");
+const {
+  getWorkspaceTimeZone,
+  updateWorkspaceSettingsAsOwner,
+  getWorkspaceMemberRole,
+  isWorkspaceOwnerOrAdmin,
+  updateWorkspaceMemberRole,
+} = await import("./workspaces.js");
 
 const ownerId = randomUUID();
 const memberId = randomUUID();
@@ -107,5 +111,95 @@ describe.skipIf(!hasDb)("workspaces timezone (real DB)", () => {
     const result = await updateWorkspaceSettingsAsOwner(workspaceId, ownerId, {});
 
     expect(result).toEqual({ ok: false, message: "empty_patch" });
+  });
+});
+
+const roleOwnerId = randomUUID();
+const roleAdminId = randomUUID();
+const roleMemberId = randomUUID();
+const outsiderId = randomUUID();
+const roleWorkspaceId = randomUUID();
+
+async function cleanupRoleFixtures(): Promise<void> {
+  await db.delete(workspaces).where(eq(workspaces.id, roleWorkspaceId));
+  await db.delete(users).where(eq(users.id, roleOwnerId));
+  await db.delete(users).where(eq(users.id, roleAdminId));
+  await db.delete(users).where(eq(users.id, roleMemberId));
+  await db.delete(users).where(eq(users.id, outsiderId));
+}
+
+describe.skipIf(!hasDb)("workspace member roles (real DB)", () => {
+  beforeAll(async () => {
+    await cleanupRoleFixtures();
+
+    await db.insert(users).values([
+      { id: roleOwnerId, email: `ws-role-owner-${roleOwnerId.slice(0, 8)}@example.com` },
+      { id: roleAdminId, email: `ws-role-admin-${roleAdminId.slice(0, 8)}@example.com` },
+      { id: roleMemberId, email: `ws-role-member-${roleMemberId.slice(0, 8)}@example.com` },
+      { id: outsiderId, email: `ws-role-outsider-${outsiderId.slice(0, 8)}@example.com` },
+    ]);
+    await db.insert(workspaces).values({
+      id: roleWorkspaceId,
+      name: "Roles Workspace",
+      ownerUserId: roleOwnerId,
+    });
+    await db.insert(workspaceMembers).values([
+      { workspaceId: roleWorkspaceId, userId: roleAdminId, role: "admin" },
+      { workspaceId: roleWorkspaceId, userId: roleMemberId, role: "member" },
+    ]);
+  });
+
+  afterAll(async () => {
+    await cleanupRoleFixtures();
+  });
+
+  // The owner is stored on workspaces, not in workspace_members.
+  it("getWorkspaceMemberRole → returns owner for workspaces.owner_user_id", async () => {
+    expect(await getWorkspaceMemberRole(roleWorkspaceId, roleOwnerId)).toBe("owner");
+  });
+
+  // Admin rows are surfaced distinctly so the team page can gate role management.
+  it("getWorkspaceMemberRole → returns admin for a workspace_members admin row", async () => {
+    expect(await getWorkspaceMemberRole(roleWorkspaceId, roleAdminId)).toBe("admin");
+  });
+
+  // Plain member rows default to the member role.
+  it("getWorkspaceMemberRole → returns member for a workspace_members member row", async () => {
+    expect(await getWorkspaceMemberRole(roleWorkspaceId, roleMemberId)).toBe("member");
+  });
+
+  // Users outside the workspace must not receive a role.
+  it("getWorkspaceMemberRole → returns null for a non-teammate", async () => {
+    expect(await getWorkspaceMemberRole(roleWorkspaceId, outsiderId)).toBeNull();
+  });
+
+  // Owner and admin can manage the team; members cannot.
+  it("isWorkspaceOwnerOrAdmin → true for owner and admin, false for member", async () => {
+    expect(await isWorkspaceOwnerOrAdmin(roleWorkspaceId, roleOwnerId)).toBe(true);
+    expect(await isWorkspaceOwnerOrAdmin(roleWorkspaceId, roleAdminId)).toBe(true);
+    expect(await isWorkspaceOwnerOrAdmin(roleWorkspaceId, roleMemberId)).toBe(false);
+  });
+
+  // Promotion persists the new role on the membership row.
+  it("updateWorkspaceMemberRole → promotes a member to admin", async () => {
+    const result = await updateWorkspaceMemberRole(roleWorkspaceId, roleMemberId, "admin");
+
+    expect(result).toEqual({ ok: true });
+    expect(await getWorkspaceMemberRole(roleWorkspaceId, roleMemberId)).toBe("admin");
+  });
+
+  // Demotion persists the role back to member.
+  it("updateWorkspaceMemberRole → demotes an admin to member", async () => {
+    const result = await updateWorkspaceMemberRole(roleWorkspaceId, roleMemberId, "member");
+
+    expect(result).toEqual({ ok: true });
+    expect(await getWorkspaceMemberRole(roleWorkspaceId, roleMemberId)).toBe("member");
+  });
+
+  // A user without a membership row cannot be assigned a role.
+  it("updateWorkspaceMemberRole → rejects a non-teammate with target_not_member", async () => {
+    const result = await updateWorkspaceMemberRole(roleWorkspaceId, outsiderId, "admin");
+
+    expect(result).toEqual({ ok: false, message: "target_not_member" });
   });
 });

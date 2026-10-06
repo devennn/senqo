@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { WorkspaceProvider } from "@/context/workspace";
 
-const mockGet = vi.fn();
+const mockGet = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({
   api: { get: mockGet },
 }));

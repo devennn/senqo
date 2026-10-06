@@ -1,6 +1,7 @@
 import { ConversationOperatorAiReasoning } from "@/pages/dashboard/components/conversation-operator-ai-reasoning";
 import type { ConversationKnowledgeRef } from "@/lib/conversation-operator-ai-reasoning";
 import {
+  THREAD_EVENT_AGENT_ERROR,
   THREAD_EVENT_HANDOFF_TO_HUMAN,
   THREAD_EVENT_MANUAL_TOGGLE,
   type ConversationThreadEventType,
@@ -9,6 +10,7 @@ import {
 function getThreadEventLabel(eventType: ConversationThreadEventType): string {
   if (eventType === THREAD_EVENT_MANUAL_TOGGLE) return "Manual Toggle";
   if (eventType === THREAD_EVENT_HANDOFF_TO_HUMAN) return "Human handoff";
+  if (eventType === THREAD_EVENT_AGENT_ERROR) return "AI error";
   return "Event";
 }
 

@@ -10,6 +10,7 @@ import {
   isBareWhatsAppTypePlaceholderLine,
 } from "../lib/trailing-user-messages.js";
 import { THREAD_EVENT_HANDOFF_TO_HUMAN } from "../lib/conversation-thread-events.js";
+import { handoffAfterAgentRunFailure } from "./agent-run-failure.js";
 import { scheduleHandoffNotify } from "./handoff-notify.js";
 import { resolveInboundMediaSigned } from "../lib/inbound-media-resolve.js";
 import {
@@ -188,6 +189,13 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
     });
     if (!result) {
       console.error(`[${logScope}] Unexpected error: runAgentSession returned null`);
+      await handoffAfterAgentRunFailure({
+        workspaceId: input.workspaceId,
+        conversationId: input.conversationId,
+        agentConfigId: input.agentConfigId,
+        errorMessage: "Agent run returned no result",
+      });
+      void clearInboundAiDebouncePending(input.conversationId);
       return { ok: false, error: "agent_null" };
     }
     void clearInboundAiDebouncePending(input.conversationId);
@@ -196,6 +204,13 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
   } catch (error) {
     const messageText = error instanceof Error ? error.message : String(error);
     console.error(`[${logScope}] Unexpected error: ${messageText}`);
+    await handoffAfterAgentRunFailure({
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      agentConfigId: input.agentConfigId,
+      errorMessage: messageText,
+    });
+    void clearInboundAiDebouncePending(input.conversationId);
     return { ok: false, error: messageText };
   }
 }

@@ -5,6 +5,7 @@ import {
   type InboundMediaRaw,
 } from "./inbound-media-to-model-parts.js";
 import {
+  THREAD_EVENT_AGENT_ERROR,
   THREAD_EVENT_HANDOFF_TO_HUMAN,
   THREAD_EVENT_MANUAL_TOGGLE,
 } from "./conversation-thread-events.js";
@@ -36,7 +37,8 @@ export function collectTrailingUserBlockForAi(messages: ConversationMessageBareF
     const threadEvent = typeof metadata?.thread_event === "string" ? metadata.thread_event : null;
     if (
       threadEvent === THREAD_EVENT_HANDOFF_TO_HUMAN ||
-      threadEvent === THREAD_EVENT_MANUAL_TOGGLE
+      threadEvent === THREAD_EVENT_MANUAL_TOGGLE ||
+      threadEvent === THREAD_EVENT_AGENT_ERROR
     ) {
       continue;
     }

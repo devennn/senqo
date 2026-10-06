@@ -7,8 +7,9 @@ import {
 } from "../db/schema/index.js";
 import { isInstanceAdmin, findUserById, findUserByEmail } from "./auth-users.js";
 import { listHandoffPhonesForUsers } from "./handoff-phones.js";
+import { listErrorAlertSubscriberUserIds } from "./error-alert-subscribers.js";
 import { listConnections } from "./whatsapp.js";
-import type { WorkspaceSummary, TeamMemberRecord } from "../types/repositories.js";
+import type { WorkspaceSummary, TeamMemberRecord, WorkspaceMemberRole } from "../types/repositories.js";
 
 type WorkspaceRow = typeof workspaces.$inferSelect;
 
@@ -304,6 +305,7 @@ export async function listWorkspaceMembers(
       role: "owner",
       joined_at: workspace.createdAt.toISOString(),
       handoffPhones: [],
+      receivesErrorAlerts: false,
     });
 
     for (const row of rows) {
@@ -313,19 +315,25 @@ export async function listWorkspaceMembers(
         id: row.id,
         userId: row.userId,
         email: user?.email ?? row.inviteEmail ?? null,
-        role: row.role,
+        role: row.role === "admin" ? ("admin" as const) : ("member" as const),
         joined_at: row.createdAt.toISOString(),
         handoffPhones: [],
+        receivesErrorAlerts: false,
       });
     }
 
-    const [phones, connections] = await Promise.all([
+    const [phones, connections, errorAlertSubscriberUserIds] = await Promise.all([
       listHandoffPhonesForUsers(
         workspaceId,
         members.map((m) => m.userId),
       ),
       listConnections(workspaceId),
+      listErrorAlertSubscriberUserIds(workspaceId),
     ]);
+    const errorAlertSubscribers = new Set(errorAlertSubscriberUserIds);
+    for (const member of members) {
+      member.receivesErrorAlerts = errorAlertSubscribers.has(member.userId);
+    }
     const connectionNameById = new Map(
       connections.map((c) => [
         c.id,
@@ -476,6 +484,110 @@ export async function isWorkspaceOwner(workspaceId: string, userId: string): Pro
   } catch (error) {
     console.error(`[${scope}/isWorkspaceOwner] Unexpected error: ${String(error)}`);
     return false;
+  }
+}
+
+/** Resolves a user's role in a workspace: owner, admin, member, or null when not a teammate. */
+export async function getWorkspaceMemberRole(
+  workspaceId: string,
+  userId: string,
+): Promise<WorkspaceMemberRole | null> {
+  try {
+    const [ws] = await db
+      .select({ ownerUserId: workspaces.ownerUserId })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId));
+
+    if (!ws) {
+      console.info(
+        `[${scope}/getWorkspaceMemberRole] Failed query: workspace not found workspaceId=${workspaceId}`,
+      );
+      return null;
+    }
+    if (ws.ownerUserId === userId) {
+      console.info(
+        `[${scope}/getWorkspaceMemberRole] Success: workspaceId=${workspaceId} userId=${userId} role=owner`,
+      );
+      return "owner";
+    }
+
+    const [member] = await db
+      .select({ role: workspaceMembers.role })
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, userId),
+        ),
+      );
+
+    if (!member) {
+      console.info(
+        `[${scope}/getWorkspaceMemberRole] Success: workspaceId=${workspaceId} userId=${userId} role=none`,
+      );
+      return null;
+    }
+
+    const role = member.role === "admin" ? ("admin" as const) : ("member" as const);
+    console.info(
+      `[${scope}/getWorkspaceMemberRole] Success: workspaceId=${workspaceId} userId=${userId} role=${role}`,
+    );
+    return role;
+  } catch (error) {
+    console.error(`[${scope}/getWorkspaceMemberRole] Unexpected error: ${String(error)}`);
+    return null;
+  }
+}
+
+/** True when the user owns the workspace or holds the admin role in it. */
+export async function isWorkspaceOwnerOrAdmin(
+  workspaceId: string,
+  userId: string,
+): Promise<boolean> {
+  try {
+    const role = await getWorkspaceMemberRole(workspaceId, userId);
+    const allowed = role === "owner" || role === "admin";
+    console.info(
+      `[${scope}/isWorkspaceOwnerOrAdmin] Success: workspaceId=${workspaceId} userId=${userId} allowed=${allowed}`,
+    );
+    return allowed;
+  } catch (error) {
+    console.error(`[${scope}/isWorkspaceOwnerOrAdmin] Unexpected error: ${String(error)}`);
+    return false;
+  }
+}
+
+export async function updateWorkspaceMemberRole(
+  workspaceId: string,
+  userId: string,
+  role: "admin" | "member",
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const updated = await db
+      .update(workspaceMembers)
+      .set({ role })
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, userId),
+        ),
+      )
+      .returning({ id: workspaceMembers.id });
+
+    if (updated.length === 0) {
+      console.info(
+        `[${scope}/updateWorkspaceMemberRole] Failed query: member not found workspaceId=${workspaceId} userId=${userId}`,
+      );
+      return { ok: false, message: "target_not_member" };
+    }
+
+    console.info(
+      `[${scope}/updateWorkspaceMemberRole] Success: workspaceId=${workspaceId} userId=${userId} role=${role}`,
+    );
+    return { ok: true };
+  } catch (error) {
+    console.error(`[${scope}/updateWorkspaceMemberRole] Unexpected error: ${String(error)}`);
+    return { ok: false, message: "unexpected_error" };
   }
 }
 
