@@ -64,6 +64,15 @@ vi.mock("../services/whatsapp-client.js", () => ({
   destroyConnection: vi.fn(),
 }));
 
+vi.mock("../services/connection-check.js", () => ({
+  checkConnection: vi.fn(),
+  getConnectionDeletePreflight: vi.fn(),
+}));
+
+vi.mock("../services/connection-delete.js", () => ({
+  deleteConnectionWithTasks: vi.fn(),
+}));
+
 vi.mock("../services/whatsapp-qr.js", () => ({
   waitForQrCode: vi.fn(),
 }));

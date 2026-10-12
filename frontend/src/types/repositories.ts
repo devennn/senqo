@@ -417,6 +417,21 @@ export type ConversationRow = {
 
 export type WhatsappConnectionMode = "inactive" | "testing" | "live";
 
+/** Result of verifying a connection against the live WhatsApp service. */
+export type WhatsappConnectionCheckStatus =
+  | "connected"
+  | "disconnected"
+  | "pending_qr"
+  | "unavailable";
+
+/** Read-only preflight for the delete dialog: fresh live status, attached agent, and deletability. */
+export type WhatsappConnectionDeletePreflight = {
+  status: WhatsappConnectionCheckStatus;
+  agent: { id: string; name: string | null } | null;
+  deletable: boolean;
+  blockedReason: "connection_attached_to_agent" | null;
+};
+
 export type WhatsappConnection = {
   id: string;
   workspace_id?: string;

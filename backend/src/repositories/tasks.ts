@@ -544,3 +544,79 @@ export async function cancelTaskById(workspaceId: string, taskId: string): Promi
     return false;
   }
 }
+
+/** Non-cancelled tasks bound to a connection whose pending pg-boss jobs must be stopped first. */
+export async function listTasksForConnectionCleanup(
+  workspaceId: string,
+  connectionId: string,
+): Promise<Array<{ id: string; jobPayload: Record<string, unknown> }>> {
+  try {
+    const rows = await db
+      .select({ id: tasks.id, jobPayload: tasks.jobPayload })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.workspaceId, workspaceId),
+          eq(tasks.whatsappConnectionId, connectionId),
+          ne(tasks.status, "cancelled"),
+        ),
+      );
+
+    console.info(
+      `[${scope}/listTasksForConnectionCleanup] Success: userId=${workspaceId} count=${rows.length}`,
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      jobPayload: (row.jobPayload ?? {}) as Record<string, unknown>,
+    }));
+  } catch (error) {
+    console.error(
+      `[${scope}/listTasksForConnectionCleanup] Unexpected error: ${String(error)}`,
+    );
+    return [];
+  }
+}
+
+/**
+ * Cancels non-cancelled task rows bound to a connection and detaches every row from it.
+ * Detaching all rows is required: the tasks FK uses ON DELETE RESTRICT, so the connection
+ * row cannot be deleted while any task still references it.
+ */
+export async function cancelAndDetachTasksByConnection(
+  workspaceId: string,
+  connectionId: string,
+): Promise<{ ok: boolean; cancelled: number }> {
+  try {
+    const cancelledRows = await db
+      .update(tasks)
+      .set({ status: "cancelled" })
+      .where(
+        and(
+          eq(tasks.workspaceId, workspaceId),
+          eq(tasks.whatsappConnectionId, connectionId),
+          ne(tasks.status, "cancelled"),
+        ),
+      )
+      .returning({ id: tasks.id });
+
+    await db
+      .update(tasks)
+      .set({ whatsappConnectionId: null })
+      .where(
+        and(
+          eq(tasks.workspaceId, workspaceId),
+          eq(tasks.whatsappConnectionId, connectionId),
+        ),
+      );
+
+    console.info(
+      `[${scope}/cancelAndDetachTasksByConnection] Success: userId=${workspaceId} cancelled=${cancelledRows.length}`,
+    );
+    return { ok: true, cancelled: cancelledRows.length };
+  } catch (error) {
+    console.error(
+      `[${scope}/cancelAndDetachTasksByConnection] Unexpected error: ${String(error)}`,
+    );
+    return { ok: false, cancelled: 0 };
+  }
+}

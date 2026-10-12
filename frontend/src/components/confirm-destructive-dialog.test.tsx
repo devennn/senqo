@@ -79,4 +79,43 @@ describe("confirm-destructive-dialog", () => {
 
     expect(screen.getByRole("button", { name: "Deleting…" })).toBeInTheDocument();
   });
+
+  // Custom renderError: a failed confirm can render rich content (e.g. naming the blocker) instead of the raw message.
+  it("renders custom error content when renderError is provided", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ConfirmDestructiveDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        title="Delete connection?"
+        confirmLabel="Delete"
+        isConfirming={false}
+        onConfirm={vi.fn().mockRejectedValue(new Error("connection_delete_failed"))}
+        renderError={() => <p>Detach from agent first</p>}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByText("Detach from agent first")).toBeInTheDocument();
+    expect(screen.queryByText("connection_delete_failed")).not.toBeInTheDocument();
+  });
+
+  // confirmDisabled keeps the destructive confirm unavailable (e.g. while a preflight check runs or a delete is blocked).
+  it("keeps the confirm button disabled when confirmDisabled is true", () => {
+    render(
+      <ConfirmDestructiveDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        title="Delete connection?"
+        confirmLabel="Delete"
+        isConfirming={false}
+        confirmDisabled
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+  });
 });

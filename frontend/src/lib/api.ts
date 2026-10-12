@@ -26,6 +26,31 @@ function redirectToSignIn(): void {
   }
 }
 
+/**
+ * Error thrown for non-2xx responses. Extends Error so existing `error.message`
+ * handling keeps working, while callers that need the machine-readable error code
+ * or extra fields (e.g. an attached agent's name) can read `code` and `body`.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly body: Record<string, unknown>;
+
+  constructor(status: number, body: Record<string, unknown>) {
+    super(
+      typeof body.message === "string"
+        ? body.message
+        : typeof body.error === "string"
+          ? body.error
+          : `HTTP ${status}`,
+    );
+    this.name = "ApiError";
+    this.status = status;
+    this.code = typeof body.error === "string" ? body.error : null;
+    this.body = body;
+  }
+}
+
 async function request<T>(path: string, options: ApiRequestInit = {}, retried = false): Promise<T> {
   const { workspaceId: workspaceIdOverride, headers: userHeaders, ...rest } = options;
   let token = (await getAccessToken()) ?? "";
@@ -67,7 +92,7 @@ async function request<T>(path: string, options: ApiRequestInit = {}, retried = 
       error?: string;
       message?: string;
     };
-    throw new Error(body.message ?? body.error ?? `HTTP ${res.status}`);
+    throw new ApiError(res.status, body);
   }
   return res.json() as Promise<T>;
 }

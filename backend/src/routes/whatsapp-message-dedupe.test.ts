@@ -24,9 +24,13 @@ vi.mock("../repositories/whatsapp.js", () => ({
   findOrCreateConversationByWhatsappChatId: mockFindOrCreateConversationByWhatsappChatId,
   createConversationMessage: mockCreateConversationMessage,
   uploadIncomingMediaToStorage: vi.fn(),
-  removeConnectionFromWebhook: vi.fn(),
+  markConnectionDisconnected: vi.fn(),
   updateConnectionSyncStateFromWebhook: vi.fn(),
   updateConnectionSyncState: vi.fn(),
+}));
+
+vi.mock("../services/connection-delete.js", () => ({
+  deleteConnectionWithTasks: vi.fn(),
 }));
 
 vi.mock("../repositories/conversations.js", () => ({

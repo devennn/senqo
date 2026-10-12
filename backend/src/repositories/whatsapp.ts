@@ -325,13 +325,39 @@ export async function deleteConnectionByWorkspace(
   }
 }
 
-/** Deletes the connection row when the WhatsApp service reports disconnect. */
-export async function removeConnectionFromWebhook(
+/**
+ * Marks a connection row as disconnected while keeping the saved phone number, avatar,
+ * and device id so the card can still offer "Reconnect QR".
+ */
+export async function markConnectionDisconnected(
   workspaceId: string,
   connectionId: string,
-): Promise<{ ok: boolean; message: string }> {
-  const result = await deleteConnectionByWorkspace(workspaceId, connectionId);
-  return { ok: result.ok, message: result.message };
+): Promise<{ ok: boolean }> {
+  try {
+    await db
+      .update(whatsappConnections)
+      .set({
+        status: "not_authorized",
+        qrCodePayload: null,
+        lastStateInstance: "notAuthorized",
+        lastStatusInstance: null,
+        lastSyncAt: new Date(),
+      })
+      .where(
+        and(
+          eq(whatsappConnections.workspaceId, workspaceId),
+          eq(whatsappConnections.id, connectionId),
+        ),
+      );
+
+    console.info(
+      `[${scope}/markConnectionDisconnected] Success: workspaceId=${workspaceId} connectionId=${connectionId}`,
+    );
+    return { ok: true };
+  } catch (error) {
+    console.error(`[${scope}/markConnectionDisconnected] Unexpected error: ${String(error)}`);
+    return { ok: false };
+  }
 }
 
 export async function recordWebhookEvent(input: {

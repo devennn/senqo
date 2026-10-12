@@ -22,12 +22,12 @@ import {
   recordConnectionEvent,
   recordWebhookEvent,
   recordWebhookPayloadDump,
-  removeConnectionFromWebhook,
   uploadIncomingMediaToStorage,
   updateConnectionSyncStateFromWebhook,
   updateConnectionSyncState,
   getConnectionByPublicId,
   getConnectionById,
+  markConnectionDisconnected,
 } from "../repositories/whatsapp.js";
 import {
   getConversationHandlingMode,
@@ -54,6 +54,7 @@ import {
 import { buildWhatsappQuotedMetadata } from "../lib/whatsapp-quoted-metadata.js";
 import { getWorkspaceOwnerEmail } from "../repositories/profiles.js";
 import { sendWhatsappDisconnectEmail } from "../services/email.js";
+import { deleteConnectionWithTasks } from "../services/connection-delete.js";
 import { whatsappEventSchema } from "../types/whatsapp-events.js";
 import type {
   WhatsappBackendEvent,
@@ -200,6 +201,7 @@ async function handleConnectionStateEvent(
     const eventCreatedAt = toHumanReadableWebhookTimestamp(event.timestamp);
     const nameLabel = connection.display_name?.trim() || "Unnamed connection";
     const phoneLabel = connection.phone_number?.trim() || "unknown";
+    await markConnectionDisconnected(connection.workspace_id, connection.id);
     await recordConnectionEvent({
       workspaceId: connection.workspace_id,
       connectionIdSnapshot: connection.id,
@@ -227,7 +229,12 @@ async function handleConnectionStateEvent(
         );
       }
     }
-    await removeConnectionFromWebhook(connection.workspace_id, connection.id);
+    const removed = await deleteConnectionWithTasks(connection.workspace_id, connection.id);
+    if (!removed.ok) {
+      console.error(
+        `[${scope}/deauthorized] connection cleanup failed: connectionId=${connection.id}`,
+      );
+    }
     return Response.json({
       received: true,
       message: "processed: instance deauthorized",

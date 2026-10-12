@@ -1,7 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/context/workspace";
-import type { WhatsappConnection, WhatsappConnectionEvent, WhatsappConnectionMode } from "@/types/repositories";
+import type {
+  WhatsappConnection,
+  WhatsappConnectionCheckStatus,
+  WhatsappConnectionEvent,
+  WhatsappConnectionMode,
+} from "@/types/repositories";
 
 export type ConnectionUnavailableReason = "whatsapp_unavailable" | null;
 
@@ -75,6 +80,14 @@ export function useConnections() {
     await reload();
   }, [reload]);
 
+  const checkConnection = useCallback(async (id: string): Promise<WhatsappConnectionCheckStatus> => {
+    const result = await api.post<{ status: WhatsappConnectionCheckStatus }>(
+      `/api/user/connections/${id}/check`,
+    );
+    await reload();
+    return result.status;
+  }, [reload]);
+
   return {
     connections,
     events,
@@ -88,5 +101,6 @@ export function useConnections() {
     updateMode,
     updateDisplayName,
     deleteConnection,
+    checkConnection,
   };
 }
