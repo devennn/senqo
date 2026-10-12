@@ -101,4 +101,21 @@ describe("confirm-destructive-dialog", () => {
     expect(await screen.findByText("Detach from agent first")).toBeInTheDocument();
     expect(screen.queryByText("connection_delete_failed")).not.toBeInTheDocument();
   });
+
+  // confirmDisabled keeps the destructive confirm unavailable (e.g. while a preflight check runs or a delete is blocked).
+  it("keeps the confirm button disabled when confirmDisabled is true", () => {
+    render(
+      <ConfirmDestructiveDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        title="Delete connection?"
+        confirmLabel="Delete"
+        isConfirming={false}
+        confirmDisabled
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+  });
 });

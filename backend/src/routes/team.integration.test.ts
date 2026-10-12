@@ -62,11 +62,11 @@ vi.mock("../services/whatsapp-client.js", () => ({
   logoutConnection: vi.fn(),
   restartConnection: vi.fn(),
   destroyConnection: vi.fn(),
-  getConnectionLiveState: vi.fn(),
 }));
 
 vi.mock("../services/connection-check.js", () => ({
   checkConnection: vi.fn(),
+  getConnectionDeletePreflight: vi.fn(),
 }));
 
 vi.mock("../services/connection-delete.js", () => ({

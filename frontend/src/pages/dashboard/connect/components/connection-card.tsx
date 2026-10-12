@@ -138,7 +138,7 @@ export function ConnectionCard({
         </CardHeader>
         <CardContent className="space-y-2 pt-0">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 text-base">
+            <div className="flex flex-wrap items-center gap-2 text-base">
               {info.isHealthy ? (
                 <Wifi className="size-4 text-primary" />
               ) : (
@@ -153,6 +153,7 @@ export function ConnectionCard({
               >
                 {info.label}
               </span>
+              <ConnectionTestButton connectionId={conn.id} onCheck={onCheck} />
             </div>
             <ConnectionAiModeSegmented
               mode={mode}
@@ -190,21 +191,20 @@ export function ConnectionCard({
               />
             </div>
           )}
-          <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:flex-wrap sm:items-start">
-            <ConnectionTestButton connectionId={conn.id} onCheck={onCheck} />
-            {!isAuthorized && isLinked && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full sm:w-auto"
-                onClick={() => {
-                  void onRefreshQr(conn.id);
-                }}
-              >
-                Refresh QR
-              </Button>
-            )}
-            {!isAuthorized && (
+          {!isAuthorized && (
+            <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:flex-wrap">
+              {isLinked && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => {
+                    void onRefreshQr(conn.id);
+                  }}
+                >
+                  Refresh QR
+                </Button>
+              )}
               <Button
                 size="sm"
                 className="w-full sm:w-auto"
@@ -214,8 +214,8 @@ export function ConnectionCard({
               >
                 Reconnect QR
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
       <ConnectionRenameDialog
@@ -228,6 +228,7 @@ export function ConnectionCard({
       <ConnectionDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
+        connectionId={conn.id}
         displayName={conn.display_name}
         isDeleting={deleting}
         onConfirm={async () => {

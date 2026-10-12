@@ -203,10 +203,12 @@ import {
   logoutConnection,
   restartConnection,
   destroyConnection,
-  getConnectionLiveState,
 } from "../services/whatsapp-client.js";
 import { waitForQrCode } from "../services/whatsapp-qr.js";
-import { checkConnection } from "../services/connection-check.js";
+import {
+  checkConnection,
+  getConnectionDeletePreflight,
+} from "../services/connection-check.js";
 import { deleteConnectionWithTasks } from "../services/connection-delete.js";
 import { findOrCreateLeadForContact } from "../repositories/leads.js";
 import { env } from "../lib/env.js";
@@ -1695,14 +1697,13 @@ app.delete("/connections/:id", async (c) => {
   // Deleting a live line that an agent is attached to would silently stop that agent
   // from replying on this number — make the user detach it from the agent first.
   if (connection.agent_config_id) {
-    const live = await getConnectionLiveState(connectionId);
-    if (live.reachable && live.status === "authorized" && live.socketOpen) {
-      const agent = await getAgentConfigById(workspaceId, connection.agent_config_id);
-      const agentName = agent?.profile_name?.trim() || "an agent";
+    const preflight = await getConnectionDeletePreflight(workspaceId, connectionId);
+    if (preflight && !preflight.deletable) {
+      const agentName = preflight.agent?.name ?? "an agent";
       return c.json(
         {
           error: "connection_attached_to_agent",
-          agentId: connection.agent_config_id,
+          agentId: preflight.agent?.id ?? connection.agent_config_id,
           agentName,
           message: `"${connection.display_name}" is still live and attached to ${agentName}. Remove it from the agent before deleting.`,
         },
@@ -1744,6 +1745,15 @@ app.post("/connections/:id/check", async (c) => {
 
   const status = await checkConnection(workspaceId, connectionId);
   return c.json({ status });
+});
+
+app.get("/connections/:id/delete-preflight", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const connectionId = c.req.param("id");
+
+  const preflight = await getConnectionDeletePreflight(workspaceId, connectionId);
+  if (!preflight) return c.json({ error: "connection_not_found" }, 404);
+  return c.json(preflight);
 });
 
 // ── Contacts ─────────────────────────────────────────────────────────────────

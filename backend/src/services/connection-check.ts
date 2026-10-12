@@ -3,6 +3,7 @@ import {
   restartConnection,
   type ConnectionLiveState,
 } from "./whatsapp-client.js";
+import { getAgentConfigById } from "../repositories/agent.js";
 import {
   getConnectionById,
   markConnectionDisconnected,
@@ -20,6 +21,15 @@ export type ConnectionCheckStatus =
   | "pending_qr"
   | "unavailable";
 
+export type ConnectionDeletePreflight = {
+  /** Fresh live state straight from the WhatsApp service (no recovery attempt). */
+  status: ConnectionCheckStatus;
+  /** Agent the line is attached to, when one is attached. */
+  agent: { id: string; name: string | null } | null;
+  deletable: boolean;
+  blockedReason: "connection_attached_to_agent" | null;
+};
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -27,6 +37,43 @@ function sleep(ms: number): Promise<void> {
 /** A session counts as live only when the service reports it authorized with an open socket. */
 function isLive(state: ConnectionLiveState): boolean {
   return state.reachable && state.status === "authorized" && state.socketOpen;
+}
+
+function toCheckStatus(state: ConnectionLiveState): ConnectionCheckStatus {
+  if (!state.reachable) return "unavailable";
+  if (isLive(state)) return "connected";
+  if (state.status === "pending_qr") return "pending_qr";
+  return "disconnected";
+}
+
+/**
+ * Read-only preflight for the delete dialog: a fresh live call to the WhatsApp service,
+ * which agent holds the line, and whether deleting it is allowed right now. No recovery
+ * attempts and no DB writes — the DELETE route re-checks before acting.
+ */
+export async function getConnectionDeletePreflight(
+  workspaceId: string,
+  connectionId: string,
+): Promise<ConnectionDeletePreflight | null> {
+  const connection = await getConnectionById(workspaceId, connectionId);
+  if (!connection) return null;
+
+  const live = await getConnectionLiveState(connectionId);
+  const status = toCheckStatus(live);
+
+  let agent: { id: string; name: string | null } | null = null;
+  if (connection.agent_config_id) {
+    const config = await getAgentConfigById(workspaceId, connection.agent_config_id);
+    agent = { id: connection.agent_config_id, name: config?.profile_name?.trim() || null };
+  }
+
+  const blocked = status === "connected" && agent !== null;
+  return {
+    status,
+    agent,
+    deletable: !blocked,
+    blockedReason: blocked ? "connection_attached_to_agent" : null,
+  };
 }
 
 async function concludeDisconnected(

@@ -76,6 +76,23 @@ async function mockConnectApis(page: Page, state: ConnectState) {
       return;
     }
 
+    if (url.endsWith(`/connections/${CONN}/delete-preflight`) && method === "GET") {
+      const conn = state.connections[0];
+      const attached = Boolean(conn?.agent_config_id);
+      const blocked = state.deleteBlocked && attached;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          status: state.deleteBlocked ? "connected" : state.checkStatus,
+          agent: attached ? { id: AGENT_ID, name: "Support" } : null,
+          deletable: !blocked,
+          blockedReason: blocked ? "connection_attached_to_agent" : null,
+        }),
+      });
+      return;
+    }
+
     if (url.endsWith(`/connections/${CONN}/check`) && method === "POST") {
       if (state.checkStatus === "disconnected") {
         state.connections[0].status = "not_authorized";
@@ -158,7 +175,7 @@ test.describe("Connection check and guarded delete", () => {
     await expect(page.getByText("Authorized")).toBeVisible();
     await page.getByRole("button", { name: "Test connection" }).click();
 
-    await expect(page.getByText("Connection is live.")).toBeVisible();
+    await expect(page.getByTestId("connection-test-ok")).toBeVisible();
     await expect(page.getByText("Authorized")).toBeVisible();
   });
 
@@ -182,8 +199,8 @@ test.describe("Connection check and guarded delete", () => {
     await expect(page.getByRole("button", { name: "Reconnect QR" })).toBeVisible();
   });
 
-  // Critical: deleting a live line that an agent replies on is blocked with the agent named and a
-  // direct link to detach it from that agent's setup first.
+  // Critical: deleting a live line that an agent replies on is blocked — the dialog shows the fresh
+  // live status, names the agent, links to detach it, and keeps Delete unavailable.
   test("delete is blocked when a live line is attached to an agent", async ({ page }) => {
     const state: ConnectState = {
       connections: [connectionRow({ agent_config_id: AGENT_ID })],
@@ -196,14 +213,17 @@ test.describe("Connection check and guarded delete", () => {
 
     await page.getByRole("button", { name: "Open connection actions" }).click();
     await page.getByRole("menuitem", { name: "Delete" }).click();
-    await expect(page.getByText("Delete connection?")).toBeVisible();
-    await page.getByRole("button", { name: "Delete" }).click();
 
-    await expect(page.getByText(/still live and attached to agent/i)).toBeVisible();
-    await expect(page.getByText("Support")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Open agent setup" })).toHaveAttribute(
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Delete connection?")).toBeVisible();
+    await expect(dialog.getByText("Connection status:")).toBeVisible();
+    await expect(dialog.getByText("Live", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("connection-delete-agent")).toHaveText("Support");
+    await expect(dialog.getByText(/still live and attached to agent/i)).toBeVisible();
+    await expect(dialog.getByRole("link", { name: "Open agent setup" })).toHaveAttribute(
       "href",
       `/${WORKSPACE_ID}/agent?agentId=${AGENT_ID}`,
     );
+    await expect(dialog.getByRole("button", { name: "Delete" })).toBeDisabled();
   });
 });

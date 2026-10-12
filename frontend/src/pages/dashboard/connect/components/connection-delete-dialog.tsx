@@ -1,13 +1,16 @@
-import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { buttonVariants } from "@/components/ui/button";
+import { useEffect, useState, type ReactNode } from "react";
 import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
-import { useWorkspace } from "@/context/workspace";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import {
+  ConnectionDeleteBlockedNotice,
+  ConnectionDeleteStatus,
+} from "@/pages/dashboard/connect/components/connection-delete-status";
+import type { WhatsappConnectionDeletePreflight } from "@/types/repositories";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  connectionId: string;
   displayName: string;
   isDeleting: boolean;
   onConfirm: () => void | Promise<void>;
@@ -16,11 +19,40 @@ type Props = {
 export function ConnectionDeleteDialog({
   open,
   onOpenChange,
+  connectionId,
   displayName,
   isDeleting,
   onConfirm,
 }: Props) {
-  const { wsPath } = useWorkspace();
+  const [preflight, setPreflight] = useState<WhatsappConnectionDeletePreflight | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  // Fresh status + attached agent each time the dialog opens; Delete stays unavailable until it settles.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setPreflight(null);
+    setChecking(true);
+    void (async () => {
+      try {
+        const result = await api.get<WhatsappConnectionDeletePreflight>(
+          `/api/user/connections/${connectionId}/delete-preflight`,
+        );
+        if (!cancelled) setPreflight(result);
+      } catch {
+        if (!cancelled) {
+          setPreflight({ status: "unavailable", agent: null, deletable: true, blockedReason: null });
+        }
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, connectionId]);
+
+  const blocked = preflight?.blockedReason === "connection_attached_to_agent";
 
   function renderError(error: unknown): ReactNode {
     if (error instanceof ApiError && error.code === "connection_attached_to_agent") {
@@ -30,24 +62,11 @@ export function ConnectionDeleteDialog({
           : "an agent";
       const agentId = typeof error.body.agentId === "string" ? error.body.agentId : "";
       return (
-        <div className="space-y-3 text-sm">
-          <p>
-            This number is still live and attached to agent{" "}
-            <span className="font-medium text-foreground">{agentName}</span>. Remove it from the
-            agent before deleting — until then, the agent keeps replying on this number.
-          </p>
-          <Link
-            to={
-              agentId
-                ? `${wsPath("/agent")}?agentId=${encodeURIComponent(agentId)}`
-                : wsPath("/agent")
-            }
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-            onClick={() => onOpenChange(false)}
-          >
-            Open agent setup
-          </Link>
-        </div>
+        <ConnectionDeleteBlockedNotice
+          agentId={agentId}
+          agentName={agentName}
+          onNavigate={() => onOpenChange(false)}
+        />
       );
     }
 
@@ -71,8 +90,16 @@ export function ConnectionDeleteDialog({
         </>
       }
       confirmLabel="Delete"
-      pendingConfirmLabel="Deleting…"
-      isConfirming={isDeleting}
+      pendingConfirmLabel={checking ? "Checking…" : "Deleting…"}
+      isConfirming={isDeleting || checking}
+      confirmDisabled={blocked}
+      details={
+        <ConnectionDeleteStatus
+          checking={checking}
+          preflight={preflight}
+          onNavigate={() => onOpenChange(false)}
+        />
+      }
       onConfirm={onConfirm}
       renderError={renderError}
     />

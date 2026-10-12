@@ -75,11 +75,11 @@ vi.mock("../services/whatsapp-client.js", () => ({
   logoutConnection: vi.fn(),
   restartConnection: vi.fn(),
   destroyConnection: vi.fn(),
-  getConnectionLiveState: vi.fn(),
 }));
 
 vi.mock("../services/connection-check.js", () => ({
   checkConnection: vi.fn(),
+  getConnectionDeletePreflight: vi.fn(),
 }));
 
 vi.mock("../services/connection-delete.js", () => ({
@@ -389,8 +389,8 @@ import {
   sendManualConversationMessage,
 } from "../services/conversation-manual.js";
 import { generateCustomToolDraft } from "../services/custom-tool-generate.js";
-import { destroyConnection, getConnectionLiveState } from "../services/whatsapp-client.js";
-import { checkConnection } from "../services/connection-check.js";
+import { destroyConnection } from "../services/whatsapp-client.js";
+import { checkConnection, getConnectionDeletePreflight } from "../services/connection-check.js";
 import { deleteConnectionWithTasks } from "../services/connection-delete.js";
 import { findUserById } from "../repositories/auth-users.js";
 import { getProfileForSettings, updateProfile } from "../repositories/profiles.js";
@@ -419,8 +419,8 @@ const listRecentConnectionEventsMock = vi.mocked(listRecentConnectionEvents);
 const getConnectionByIdMock = vi.mocked(getConnectionById);
 const recordConnectionEventMock = vi.mocked(recordConnectionEvent);
 const destroyConnectionMock = vi.mocked(destroyConnection);
-const getConnectionLiveStateMock = vi.mocked(getConnectionLiveState);
 const checkConnectionMock = vi.mocked(checkConnection);
+const getConnectionDeletePreflightMock = vi.mocked(getConnectionDeletePreflight);
 const deleteConnectionWithTasksMock = vi.mocked(deleteConnectionWithTasks);
 const listWorkspaceSecretsMock = vi.mocked(listWorkspaceSecrets);
 const createWorkspaceSecretMock = vi.mocked(createWorkspaceSecret);
@@ -825,23 +825,11 @@ describe("DELETE /connections/:id", () => {
       ...connectionFixture,
       agent_config_id: "11111111-1111-4111-8111-111111111111",
     });
-    getConnectionLiveStateMock.mockResolvedValue({
-      reachable: true,
-      status: "authorized",
-      socketOpen: true,
-    });
-    getAgentConfigByIdMock.mockResolvedValue({
-      id: "11111111-1111-4111-8111-111111111111",
-      profile_name: "Support",
-      behavior: "",
-      tools: [],
-      skills: [],
-      response_template_groups: [],
-      handoff_topic_groups: [],
-      context_groups: [],
-      asset_groups: [],
-      handoff_notify_user_ids: [],
-      auto_assign_conversation_labels: true,
+    getConnectionDeletePreflightMock.mockResolvedValue({
+      status: "connected",
+      agent: { id: "11111111-1111-4111-8111-111111111111", name: "Support" },
+      deletable: false,
+      blockedReason: "connection_attached_to_agent",
     });
 
     const res = await app.request("/connections/conn-1", { method: "DELETE", headers: AUTH });
@@ -861,10 +849,11 @@ describe("DELETE /connections/:id", () => {
       ...connectionFixture,
       agent_config_id: "11111111-1111-4111-8111-111111111111",
     });
-    getConnectionLiveStateMock.mockResolvedValue({
-      reachable: true,
-      status: "not_authorized",
-      socketOpen: false,
+    getConnectionDeletePreflightMock.mockResolvedValue({
+      status: "disconnected",
+      agent: { id: "11111111-1111-4111-8111-111111111111", name: "Support" },
+      deletable: true,
+      blockedReason: null,
     });
     deleteConnectionWithTasksMock.mockResolvedValue({ ok: true, deleted: true });
 
@@ -878,15 +867,15 @@ describe("DELETE /connections/:id", () => {
     );
   });
 
-  // Unattached connections never need the live check — the WhatsApp service call is skipped entirely.
-  it("deletes an unattached connection without asking the WhatsApp service", async () => {
+  // Unattached connections never need the live check — the preflight (and its WhatsApp service call) is skipped entirely.
+  it("deletes an unattached connection without running the preflight", async () => {
     getConnectionByIdMock.mockResolvedValue(connectionFixture);
     deleteConnectionWithTasksMock.mockResolvedValue({ ok: true, deleted: true });
 
     const res = await app.request("/connections/conn-1", { method: "DELETE", headers: AUTH });
 
     expect(res.status).toBe(200);
-    expect(getConnectionLiveStateMock).not.toHaveBeenCalled();
+    expect(getConnectionDeletePreflightMock).not.toHaveBeenCalled();
     expect(deleteConnectionWithTasksMock).toHaveBeenCalledWith("ws-1", "conn-1");
   });
 
@@ -940,6 +929,36 @@ describe("POST /connections/:id/check", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.status).toBe("disconnected");
+  });
+});
+
+describe("GET /connections/:id/delete-preflight", () => {
+  // Unknown connection ids must not reach the WhatsApp service or leak agent info.
+  it("returns 404 when the connection does not exist", async () => {
+    getConnectionDeletePreflightMock.mockResolvedValue(null);
+
+    const res = await app.request("/connections/conn-1/delete-preflight", { headers: AUTH });
+
+    expect(res.status).toBe(404);
+  });
+
+  // The dialog needs the fresh live status, the attached agent, and whether deleting is allowed.
+  it("returns the preflight with agent and deletability", async () => {
+    getConnectionDeletePreflightMock.mockResolvedValue({
+      status: "connected",
+      agent: { id: "agent-1", name: "Support" },
+      deletable: false,
+      blockedReason: "connection_attached_to_agent",
+    });
+
+    const res = await app.request("/connections/conn-1/delete-preflight", { headers: AUTH });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe("connected");
+    expect(body.agent).toEqual({ id: "agent-1", name: "Support" });
+    expect(body.deletable).toBe(false);
+    expect(body.blockedReason).toBe("connection_attached_to_agent");
   });
 });
 

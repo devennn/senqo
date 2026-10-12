@@ -5,8 +5,8 @@ import { ConnectionTestButton } from "./connection-test-button";
 import type { WhatsappConnectionCheckStatus } from "@/types/repositories";
 
 describe("ConnectionTestButton", () => {
-  // Happy path: a live check result is reported so the user can trust the "Authorized" state.
-  it("shows the live message when the check reports connected", async () => {
+  // Happy path: a live check result shows a green tick on the button and is announced to screen readers.
+  it("shows a green tick and announces the live result when connected", async () => {
     const user = userEvent.setup();
     render(
       <ConnectionTestButton connectionId="conn-1" onCheck={vi.fn().mockResolvedValue("connected")} />,
@@ -14,7 +14,8 @@ describe("ConnectionTestButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Test connection" }));
 
-    expect(await screen.findByText("Connection is live.")).toBeInTheDocument();
+    expect(await screen.findByTestId("connection-test-ok")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Connection is live.");
   });
 
   // Stale-card case: an offline result must tell the user what to do next (reconnect with a new QR).
@@ -48,8 +49,8 @@ describe("ConnectionTestButton", () => {
     ).toBeInTheDocument();
   });
 
-  // While a check is in flight the button disables and shows the pending label so users cannot double-fire it.
-  it("disables the button and shows the pending label while checking", async () => {
+  // While a check is in flight the icon button disables so users cannot double-fire it, then reports the result.
+  it("disables the button while checking and reports the result after", async () => {
     const user = userEvent.setup();
     let resolveCheck!: (status: WhatsappConnectionCheckStatus) => void;
     const onCheck = vi.fn(
@@ -62,8 +63,8 @@ describe("ConnectionTestButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Test connection" }));
 
-    expect(screen.getByRole("button", { name: "Testing…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Test connection" })).toBeDisabled();
     resolveCheck("connected");
-    expect(await screen.findByText("Connection is live.")).toBeInTheDocument();
+    expect(await screen.findByTestId("connection-test-ok")).toBeInTheDocument();
   });
 });

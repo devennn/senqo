@@ -65,7 +65,7 @@
 - Activity sheet — recent connection/disconnection events
 - LID resolution — WhatsApp privacy identifiers resolved to phone-number JIDs
 - Connection check — Test connection asks the live WhatsApp session whether the number is still signed in; a stale Authorized card flips to Not Authorized (with an activity event) when the check confirms it is offline
-- Guarded deletion — deleting a live line that is attached to an agent is blocked; the dialog names the agent and links to its setup so the line is detached first. Dead or unattached lines delete normally
+- Guarded deletion — the delete dialog shows a fresh live status and the attached agent (Delete stays disabled while that check runs); deleting a live line attached to an agent is blocked with a link to the agent's setup so the line is detached first. Dead or unattached lines delete normally
 - Disconnect handling — when WhatsApp reports the device unlinked, the card is marked Not Authorized and the connection row is removed; scheduled tasks using that line are cancelled first
 
 ## Scheduled tasks
