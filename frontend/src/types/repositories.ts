@@ -417,6 +417,13 @@ export type ConversationRow = {
 
 export type WhatsappConnectionMode = "inactive" | "testing" | "live";
 
+/** Result of verifying a connection against the live WhatsApp service. */
+export type WhatsappConnectionCheckStatus =
+  | "connected"
+  | "disconnected"
+  | "pending_qr"
+  | "unavailable";
+
 export type WhatsappConnection = {
   id: string;
   workspace_id?: string;

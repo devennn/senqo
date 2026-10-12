@@ -72,15 +72,29 @@ export async function getQrCode(connectionId: string): Promise<QrResponse> {
   }
 }
 
-export async function getConnectionStatus(
+export type ConnectionLiveState =
+  | { reachable: true; status: string; socketOpen: boolean }
+  | { reachable: false };
+
+/**
+ * Reads the live session state from the service. `reachable: false` means the service
+ * could not be asked at all — callers must not treat that as "not authorized".
+ */
+export async function getConnectionLiveState(
   connectionId: string,
-): Promise<{ status: string; phone?: string }> {
+): Promise<ConnectionLiveState> {
   try {
-    return await svcFetch<{ status: string; phone?: string }>(
+    const res = await svcFetch<{ status?: string; socketOpen?: boolean }>(
       `/sessions/${encodeURIComponent(connectionId)}/state`,
     );
-  } catch {
-    return { status: "not_authorized" };
+    return {
+      reachable: true,
+      status: res.status ?? "not_authorized",
+      socketOpen: res.socketOpen === true,
+    };
+  } catch (error) {
+    console.warn(`[${scope}/getConnectionLiveState] ${String(error)}`);
+    return { reachable: false };
   }
 }
 

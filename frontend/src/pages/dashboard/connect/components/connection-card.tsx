@@ -5,12 +5,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Phone, Plug, Wifi, WifiOff } from "lucide-react";
 import type {
   WhatsappConnection,
+  WhatsappConnectionCheckStatus,
   WhatsappConnectionMode,
 } from "@/types/repositories";
 import { ConnectionAiModeSegmented } from "@/pages/dashboard/connect/components/connection-ai-mode-segmented";
 import { ConnectionCardMenu } from "@/pages/dashboard/connect/components/connection-card-menu";
 import { ConnectionRenameDialog } from "@/pages/dashboard/connect/components/connection-rename-dialog";
 import { ConnectionDeleteDialog } from "@/pages/dashboard/connect/components/connection-delete-dialog";
+import { ConnectionTestButton } from "@/pages/dashboard/connect/components/connection-test-button";
 
 type StateInfo = { label: string; note: string; isHealthy: boolean };
 
@@ -75,6 +77,7 @@ type Props = {
   onUpdateMode: (id: string, mode: WhatsappConnectionMode) => Promise<void>;
   onUpdateDisplayName: (id: string, displayName: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onCheck: (id: string) => Promise<WhatsappConnectionCheckStatus>;
 };
 
 export function ConnectionCard({
@@ -84,6 +87,7 @@ export function ConnectionCard({
   onUpdateMode,
   onUpdateDisplayName,
   onDelete,
+  onCheck,
 }: Props) {
   const [updatingMode, setUpdatingMode] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -186,20 +190,21 @@ export function ConnectionCard({
               />
             </div>
           )}
-          {!isAuthorized && (
-            <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:flex-wrap">
-              {isLinked && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => {
-                    void onRefreshQr(conn.id);
-                  }}
-                >
-                  Refresh QR
-                </Button>
-              )}
+          <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:flex-wrap sm:items-start">
+            <ConnectionTestButton connectionId={conn.id} onCheck={onCheck} />
+            {!isAuthorized && isLinked && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  void onRefreshQr(conn.id);
+                }}
+              >
+                Refresh QR
+              </Button>
+            )}
+            {!isAuthorized && (
               <Button
                 size="sm"
                 className="w-full sm:w-auto"
@@ -209,8 +214,8 @@ export function ConnectionCard({
               >
                 Reconnect QR
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
       <ConnectionRenameDialog

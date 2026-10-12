@@ -19,6 +19,8 @@ type Props = {
   pendingConfirmLabel?: string;
   isConfirming: boolean;
   onConfirm: () => void | Promise<void>;
+  /** Custom rendering for a failed confirm (e.g. to name an agent and offer a link). */
+  renderError?: (error: unknown) => ReactNode;
 };
 
 export function ConfirmDestructiveDialog({
@@ -31,8 +33,9 @@ export function ConfirmDestructiveDialog({
   pendingConfirmLabel,
   isConfirming,
   onConfirm,
+  renderError,
 }: Props) {
-  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<unknown>(null);
 
   useEffect(() => {
     if (open) setDialogError(null);
@@ -44,7 +47,7 @@ export function ConfirmDestructiveDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (caught) {
-      setDialogError(caught instanceof Error ? caught.message : "Something went wrong.");
+      setDialogError(caught);
     }
   }
 
@@ -57,7 +60,15 @@ export function ConfirmDestructiveDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        {dialogError ? <p className="text-sm text-destructive">{dialogError}</p> : null}
+        {dialogError ? (
+          renderError ? (
+            renderError(dialogError)
+          ) : (
+            <p className="text-sm text-destructive">
+              {dialogError instanceof Error ? dialogError.message : "Something went wrong."}
+            </p>
+          )
+        ) : null}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isConfirming}>
             {cancelLabel}

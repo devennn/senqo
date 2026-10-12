@@ -54,6 +54,7 @@ function defaultHookState(overrides = {}) {
     updateMode: vi.fn(),
     updateDisplayName: vi.fn(),
     deleteConnection: vi.fn(),
+    checkConnection: vi.fn(),
     ...overrides,
   };
 }

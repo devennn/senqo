@@ -144,4 +144,37 @@ describe("api client", () => {
       expect(headers["X-Workspace-Id"]).toBe("override-ws");
     });
   });
+
+  describe("API errors", () => {
+    // Non-2xx responses must throw an ApiError carrying the status, machine-readable code, and extra body
+    // fields — the connection delete dialog uses the code + agent name to explain why a delete is blocked.
+    it("throws ApiError with code, status, and body for non-2xx responses", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: () =>
+          Promise.resolve({
+            error: "connection_attached_to_agent",
+            agentName: "Support",
+            message: "blocked",
+          }),
+      });
+
+      const { api, ApiError } = await import("../lib/api.js");
+
+      let caught: unknown;
+      try {
+        await api.get("/test");
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(ApiError);
+      const apiError = caught as InstanceType<typeof ApiError>;
+      expect(apiError.status).toBe(409);
+      expect(apiError.code).toBe("connection_attached_to_agent");
+      expect(apiError.body.agentName).toBe("Support");
+      expect(apiError.message).toBe("blocked");
+    });
+  });
 });
