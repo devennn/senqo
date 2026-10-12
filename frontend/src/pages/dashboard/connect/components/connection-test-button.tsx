@@ -61,7 +61,8 @@ export function ConnectionTestButton({ connectionId, onCheck }: Props) {
             <Button
               type="button"
               size="icon-xs"
-              variant="outline"
+              variant="ghost"
+              className="border-border text-muted-foreground hover:text-foreground"
               aria-label="Test connection"
               disabled={testing}
               onClick={() => void handleTest()}
