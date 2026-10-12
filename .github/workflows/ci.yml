@@ -72,6 +72,9 @@ jobs:
         working-directory: ${{ matrix.package }}
         env:
           NODE_OPTIONS: ${{ matrix.package == 'backend' && '--no-node-snapshot' || '' }}
+          # Set only so importing DB modules does not throw in CI — no Postgres runs here, and
+          # integration tests skip themselves when the database is unreachable.
+          DATABASE_URL: ${{ matrix.package == 'backend' && 'postgresql://senqo:senqo@127.0.0.1:5432/senqo' || '' }}
         run: npm test
 
   build:
