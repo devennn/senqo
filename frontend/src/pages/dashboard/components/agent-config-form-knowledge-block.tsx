@@ -14,6 +14,7 @@ type Props = {
   | "responseTemplateGroups"
   | "workspaceContextGroups"
   | "workspaceAssetGroups"
+  | "workspaceLinkedDocs"
   | "handoffTopicGroups"
 >;
 
@@ -45,16 +46,19 @@ export function AgentConfigFormKnowledgeBlock({
       selectedResponseTemplateGroups={new Set(Array.isArray(agent.response_template_groups) ? agent.response_template_groups : [])}
       selectedContextGroups={new Set(Array.isArray(agent.context_groups) ? agent.context_groups : [])}
       selectedAssetGroups={new Set(Array.isArray(agent.asset_groups) ? agent.asset_groups : [])}
+      selectedLinkedDocs={new Set(Array.isArray(agent.linked_docs) ? agent.linked_docs : [])}
       selectedHandoffTopicGroups={new Set(
         Array.isArray(agent.handoff_topic_groups) ? agent.handoff_topic_groups : [],
       )}
       templatesTabHref={knowledgeTabHref(wsPath, "templates")}
       contextTabHref={knowledgeTabHref(wsPath, "context")}
       assetsTabHref={knowledgeTabHref(wsPath, "assets")}
+      docsTabHref={knowledgeTabHref(wsPath, "docs")}
       handoffTabHref={knowledgeTabHref(wsPath, "handoff")}
       toolsTabHref={agentTabHref(wsPath, agent.id, "tools")}
       workspaceContextDirty={sectionDirty.workspaceContext}
       assetGroupsDirty={sectionDirty.assetGroups}
+      linkedDocsDirty={sectionDirty.linkedDocs}
       responseTemplatesDirty={sectionDirty.responseTemplates}
       handoffTopicsDirty={sectionDirty.handoffTopics}
       toolsDirty={sectionDirty.tools}

@@ -170,6 +170,7 @@ export default function AgentPage() {
                   responseTemplateGroups={data.responseTemplateGroups}
                   workspaceContextGroups={data.workspaceContextGroups}
                   workspaceAssetGroups={data.workspaceAssetGroups}
+                  workspaceLinkedDocs={data.workspaceLinkedDocs}
                   handoffTopicGroups={data.handoffTopicGroups}
                   connections={agentConnectionOptions}
                   onSaved={() => {

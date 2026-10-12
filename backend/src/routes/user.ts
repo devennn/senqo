@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import type { AuthVariables } from "../middleware/auth.js";
 import { workspaceMiddleware } from "../middleware/workspace.js";
 import type { WorkspaceVariables } from "../middleware/workspace.js";
+import userAppsRoute from "./user-apps.js";
 import { findUserById, updateUserPassword } from "../repositories/auth-users.js";
 import { verifyPassword, hashPassword } from "../lib/auth-users.js";
 import { parseListPageParams } from "../lib/pagination.js";
@@ -435,6 +436,7 @@ const updateAgentSchema = z.object({
   handoffTopicGroups: z.array(z.string().uuid()).max(40).optional(),
   contextGroups: z.array(z.string().uuid()).max(40).optional(),
   assetGroups: z.array(z.string().uuid()).max(40).optional(),
+  linkedDocs: z.array(z.string().uuid()).max(40).optional(),
   handoffNotifyUserIds: z.array(z.string().uuid()).max(40).optional(),
 });
 
@@ -522,6 +524,29 @@ app.put("/agents/:id", async (c) => {
     assetGroups = validated.normalized;
   }
 
+  let linkedDocs = existing.linked_docs ?? [];
+  if (body.data.linkedDocs !== undefined) {
+    const { listWorkspaceLinkedDocsByIds } = await import(
+      "../repositories/workspace-linked-docs.js"
+    );
+    const found = await listWorkspaceLinkedDocsByIds(
+      workspaceId,
+      body.data.linkedDocs,
+    );
+    const foundIds = new Set(found.map((d) => d.id));
+    const missing = body.data.linkedDocs.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      return c.json(
+        {
+          error: "invalid_linked_docs",
+          message: `Unknown linked docs: ${missing.join(", ")}`,
+        },
+        400,
+      );
+    }
+    linkedDocs = [...new Set(body.data.linkedDocs)];
+  }
+
   let handoffNotifyUserIds = existing.handoff_notify_user_ids;
   if (body.data.handoffNotifyUserIds !== undefined) {
     const uniqueIds = [...new Set(body.data.handoffNotifyUserIds)];
@@ -550,6 +575,7 @@ app.put("/agents/:id", async (c) => {
     handoff_topic_groups: handoffTopicGroups,
     context_groups: contextGroups,
     asset_groups: assetGroups,
+    linked_docs: linkedDocs,
     handoff_notify_user_ids: handoffNotifyUserIds,
   });
   if (body.data.attachedConnectionIds !== undefined) {
@@ -2716,5 +2742,7 @@ app.post("/auth/ensure-profile", async (c) => {
   }
   return c.json({ ok: true });
 });
+
+app.route("/apps", userAppsRoute);
 
 export default app;

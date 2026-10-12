@@ -1,5 +1,9 @@
-import type { AgentSystemPromptInput } from "../types/agent.js";
+import type {
+  AgentCodeToolPromptEntry,
+  AgentSystemPromptInput,
+} from "../types/agent.js";
 import { formatZonedDateTimeFromIso } from "../lib/timezone.js";
+import { BUILTIN_AGENT_TOOL_KEYS } from "../lib/builtin-agent-tool-keys.js";
 
 /** Matches default tools always enabled in agent runtime (`agent.ts`). */
 export const DEFAULT_TOOL_KEYS = [
@@ -7,6 +11,7 @@ export const DEFAULT_TOOL_KEYS = [
   "load_skills",
   "handoff_to_human",
   "apply_conversation_labels",
+  "execute_code",
 ] as const;
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
@@ -15,19 +20,66 @@ const TOOL_DESCRIPTIONS: Record<string, string> = {
   handoff_to_human: "Transfer the conversation to a human teammate.",
   apply_conversation_labels:
     "Required when a Conversation labels catalog definition matches and AI labels are not already correct: assign one or more labels via workspace UUIDs (full set per call).",
+  execute_code:
+    "Run TypeScript in one script: callTool(toolKey, input) for attached catalog tools; readLinkedDoc(docId) for Linked docs; composioExecute(slug, args) only for allowlisted Google Drive reads (GOOGLEDRIVE_FIND_FILE, GOOGLEDRIVE_LIST_FILES, GOOGLEDRIVE_GET_FILE_METADATA, GOOGLEDRIVE_DOWNLOAD_FILE, GOOGLEDRIVE_GET_ABOUT, GOOGLEDRIVE_LIST_PERMISSIONS). Prefer readLinkedDoc for inventory. Return a plain object summary.",
 };
 
-function formatAvailableTools(
-  toolKeys: string[],
-  customToolDescriptions: Record<string, string>,
-): string {
-  return toolKeys
+function formatAvailableTools(toolKeys: string[]): string {
+  const discreteKeys = toolKeys.filter((key) =>
+    (BUILTIN_AGENT_TOOL_KEYS as readonly string[]).includes(key),
+  );
+  if (discreteKeys.length === 0) {
+    return "(none)";
+  }
+  return discreteKeys
     .map((key) => {
-      const description =
-        TOOL_DESCRIPTIONS[key] ?? customToolDescriptions[key] ?? "Workspace-configured tool.";
+      const description = TOOL_DESCRIPTIONS[key] ?? "Platform tool.";
       return `- \`${key}\`: ${description}`;
     })
     .join("\n");
+}
+
+function formatCodeTools(codeTools: AgentCodeToolPromptEntry[]): string {
+  if (codeTools.length === 0) {
+    return "(none attached — do not invent catalog tools)";
+  }
+  return codeTools
+    .map((tool) => {
+      const schemaJson = JSON.stringify(tool.inputSchema ?? {}, null, 2);
+      return [
+        `- \`${tool.toolKey}\`: ${tool.description}`,
+        `  Input schema:`,
+        "  ```json",
+        ...schemaJson.split("\n").map((line) => `  ${line}`),
+        "  ```",
+      ].join("\n");
+    })
+    .join("\n");
+}
+
+function formatLinkedDocs(
+  linkedDocs: AgentSystemPromptInput["linkedDocs"],
+): string {
+  if (!linkedDocs || linkedDocs.length === 0) {
+    return "(none attached — do not invent live file contents)";
+  }
+  const howto = [
+    "How to read (required when answering from these files):",
+    "1. Call tool `execute_code` with a TypeScript body for `async execute(callTool)`.",
+    "2. Inside the script, `const doc = await readLinkedDoc(\"<id>\")` using an exact id from the list below.",
+    "3. Use `doc.text` (or the returned payload fields). Multi-tab Sheets include every tab labeled `=== Sheet: … ===`; search past README for inventory.",
+    "4. Return a plain object summarizing what you found (e.g. `{ inStock, qty, product }`).",
+    "Do not invent stock counts. Prefer `readLinkedDoc` over `composioExecute`. Optional advanced Drive: `await composioExecute(\"GOOGLEDRIVE_FIND_FILE\", { … })` — only allowlisted GOOGLEDRIVE_* read slugs.",
+    "",
+    "Attached files:",
+  ].join("\n");
+  const list = linkedDocs
+    .map(
+      (doc) =>
+        `- id=\`${doc.id}\` · ${doc.fileName} (${doc.source}): ${doc.description}`,
+    )
+    .join("\n");
+  return `${howto}\n${list}`;
 }
 
 export function resolveEnabledToolKeys(
@@ -51,7 +103,9 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
   const whatsappRule = input.dryRun
     ? "This is a dry run. Fill `messages` with the draft WhatsApp bubbles you would send (prefer one; at most three distinct). The runtime will not send them. Set `handoff_enabled` to false unless you would have handed off."
     : "This is a WhatsApp conversation. Put customer-facing replies in `messages` (prefer one bubble; at most three distinct bubbles; never repeat the same text). The runtime sends them after your turn. Do not stop at drafting only.";
-  const toolsText = formatAvailableTools(input.enabledToolKeys, input.customToolDescriptions);
+  const toolsText = formatAvailableTools(input.enabledToolKeys);
+  const codeToolsText = formatCodeTools(input.codeTools ?? []);
+  const linkedDocsText = formatLinkedDocs(input.linkedDocs ?? []);
   const workspaceContext = input.workspaceContext.trim();
   const responseTemplates = input.responseTemplates.trim();
   const handoffTopics = input.handoffTopics.trim();
@@ -74,7 +128,8 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
 
 ## Core Responsibilities
 - Answer customer WhatsApp messages using grounded workspace knowledge.
-- Use tools when scheduling follow-ups, loading skills, handing off to a human, or labeling the conversation.
+- Use platform tools when scheduling follow-ups, loading skills, handing off to a human, or labeling the conversation.
+- Use \`execute_code\` for Tool Catalog / API work (including multi-step flows) and for Linked docs / live inventory. Catalog tools and Composio Drive are not discrete ToolLoop tools — only via \`execute_code\`.
 - Deliver customer WhatsApp text via structured output \`messages\` (not a send tool).
 
 ## Default Instructions
@@ -92,12 +147,20 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
 - Use \`handoff_to_human\` when configured handoff topics match or human judgment is required. When you hand off, set \`handoff_enabled\` to true, prefer empty \`messages\` (or one short courtesy bubble), and do not continue normal resolution.
 - When you do not hand off, set \`handoff_enabled\` to false. Do not set \`handoff_enabled\` true unless you called \`handoff_to_human\`.
 - Before final output, you MUST call \`apply_conversation_labels\` when any Conversation labels catalog definition matches this thread and the AI-sourced label set is not already correct (match each label's description/definition, not the name alone). Weigh the latest message with roughly the previous 10 messages; a single message or thread may need multiple labels in one call. Pass the full AI label set that should remain. Only skip when that set is already correct. Do not answer and skip labeling when a match is missing from AI labels.
-- In your final structured output, fill \`reasoning_for_operators\` for workspace operators only — never put this text in \`messages\`. For trivial small talk, one brief sentence. When the reply uses facts or policy, say what grounded it: recent customer messages, response templates, workspace context, loaded skills, and behavior rules. Say if handoff_to_human, apply_conversation_labels, or create_task materially drove the outcome.
+- For attached code tools (Tool Catalog): call \`execute_code\` with a TypeScript body for \`async execute(callTool)\`. Inside it, \`await callTool("tool_key", input)\` using exact keys from Code tools below. Prefer one script that chains multiple API steps. Do not invent discrete ToolLoop tool names for catalog tools. You may use \`fetch\` for public HTTP inside the script. Return a plain object summary for the next step.
+- For Linked docs (live files such as inventory spreadsheets): when the customer asks about stock, prices, or anything in an attached file, you MUST call \`execute_code\` and inside it \`await readLinkedDoc("<id>")\` with an exact id from **Linked docs** below — then answer from the returned text. Always re-read live content; never invent stock counts or spreadsheet values. Multi-tab Sheets include every tab (look past README). Prefer \`readLinkedDoc\` over \`composioExecute\`.
+- In your final structured output, fill \`reasoning_for_operators\` for workspace operators only — never put this text in \`messages\`. For trivial small talk, one brief sentence. When the reply uses facts or policy, say what grounded it: recent customer messages, response templates, workspace context, loaded skills, and behavior rules. Say if handoff_to_human, apply_conversation_labels, create_task, or execute_code materially drove the outcome.
 - Set \`knowledge_used\` to true only when the reply used workspace context, a response template, a loaded skill, or a handoff topic; then fill \`sources\` with those items (at least one). Each item is \`kind\` (\`context\`, \`template\`, \`skill\`, or \`handoff\`) plus \`group\` and \`label\`. For greetings and small talk with no knowledge, set \`knowledge_used\` false and \`sources\` to []. Never put sources in \`messages\`.
 - Every source names two things, both copied exactly from Available Information or a skill you loaded: \`group\` is the \`####\` heading it sits under, and \`label\` is the one item inside that group you used — for \`context\` the entry title on the \`[n]\` line, for \`template\` the Typical question intent text, for \`handoff\` the quoted topic. Add one source per item you used. Skills have no group: set \`group\` to an empty string and \`label\` to the skill name. Never put a \`####\` heading in \`label\`. Never invent labels.
 
 ## Available Tools
 ${toolsText}
+
+## Code tools (via execute_code only)
+${codeToolsText}
+
+## Linked docs (via execute_code / readLinkedDoc)
+${linkedDocsText}
 
 ## Available Information
 

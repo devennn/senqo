@@ -66,6 +66,13 @@ export function agentAssetGroupsDirty(
   return !stringArraysEqual(current.assetGroups, baseline.assetGroups);
 }
 
+export function agentLinkedDocsDirty(
+  baseline: AgentConfigFormNormalizedSnapshot,
+  current: AgentConfigFormNormalizedSnapshot,
+): boolean {
+  return !stringArraysEqual(current.linkedDocs, baseline.linkedDocs);
+}
+
 export function agentHandoffTopicGroupsDirty(
   baseline: AgentConfigFormNormalizedSnapshot,
   current: AgentConfigFormNormalizedSnapshot,
@@ -102,6 +109,7 @@ export function buildAgentConfigFormBaseline(input: {
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
+  workspaceLinkedDocs?: Array<{ id: string }>;
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
 }): AgentConfigFormNormalizedSnapshot {
   const configurableToolKeys = new Set(input.availableTools.map((t) => t.tool_key));
@@ -109,6 +117,7 @@ export function buildAgentConfigFormBaseline(input: {
   const templateGroupIds = new Set(input.responseTemplateGroups.map((g) => g.id));
   const contextGroupIds = new Set(input.workspaceContextGroups.map((g) => g.id));
   const assetGroupIds = new Set(input.workspaceAssetGroups.map((g) => g.id));
+  const linkedDocIds = new Set((input.workspaceLinkedDocs ?? []).map((d) => d.id));
   const handoffGroupIds = new Set(input.handoffTopicGroups.map((g) => g.id));
   const attachedConnectionIds = sortedCopy(
     input.connections
@@ -130,6 +139,9 @@ export function buildAgentConfigFormBaseline(input: {
   const assetSorted = sortedCopy(
     (input.agent.asset_groups ?? []).filter((id) => assetGroupIds.has(id)),
   );
+  const linkedSorted = sortedCopy(
+    (input.agent.linked_docs ?? []).filter((id) => linkedDocIds.has(id)),
+  );
   const handoffSorted = sortedCopy(
     (input.agent.handoff_topic_groups ?? []).filter((id) => handoffGroupIds.has(id)),
   );
@@ -141,6 +153,7 @@ export function buildAgentConfigFormBaseline(input: {
     responseTemplateGroups: groupsSorted,
     workspaceContextGroups: contextSorted,
     assetGroups: assetSorted,
+    linkedDocs: linkedSorted,
     handoffTopicGroups: handoffSorted,
     handoffNotifyUserIds: sortedCopy(input.agent.handoff_notify_user_ids ?? []),
     attachedConnectionIds,
@@ -158,6 +171,7 @@ export function readAgentConfigFormSnapshot(form: HTMLFormElement): AgentConfigF
     responseTemplateGroups: sortedCopy(fd.getAll("responseTemplateGroups").map(String)),
     workspaceContextGroups: sortedCopy(fd.getAll("contextGroups").map(String)),
     assetGroups: sortedCopy(fd.getAll("assetGroups").map(String)),
+    linkedDocs: sortedCopy(fd.getAll("linkedDocs").map(String)),
     handoffTopicGroups: sortedCopy(fd.getAll("handoffTopicGroups").map(String)),
     handoffNotifyUserIds: sortedCopy(fd.getAll("handoffNotifyUserIds").map(String)),
     attachedConnectionIds: sortedCopy(fd.getAll("attachedConnectionIds").map(String)),
@@ -179,6 +193,7 @@ export function agentConfigFormSnapshotsEqual(
     stringArraysEqual(a.responseTemplateGroups, b.responseTemplateGroups) &&
     stringArraysEqual(a.workspaceContextGroups, b.workspaceContextGroups) &&
     stringArraysEqual(a.assetGroups, b.assetGroups) &&
+    stringArraysEqual(a.linkedDocs, b.linkedDocs) &&
     stringArraysEqual(a.handoffTopicGroups, b.handoffTopicGroups)
   );
 }

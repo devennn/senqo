@@ -27,6 +27,7 @@ export type AgentConfigFormNormalizedSnapshot = {
   responseTemplateGroups: readonly string[];
   workspaceContextGroups: readonly string[];
   assetGroups: readonly string[];
+  linkedDocs: readonly string[];
   handoffTopicGroups: readonly string[];
   handoffNotifyUserIds: readonly string[];
   attachedConnectionIds: readonly string[];
@@ -47,6 +48,12 @@ export type AgentConfigFormProps = {
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
+  workspaceLinkedDocs: Array<{
+    id: string;
+    file_name: string;
+    description: string;
+    source: string;
+  }>;
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   onSaved?: () => void;
 };
@@ -65,6 +72,7 @@ export type AgentConfigFormSectionDirtyState = {
   connection: boolean;
   workspaceContext: boolean;
   assetGroups: boolean;
+  linkedDocs: boolean;
   responseTemplates: boolean;
   handoffTopics: boolean;
   tools: boolean;
@@ -92,20 +100,29 @@ export type AgentConfigKnowledgeCapabilityFieldsProps = {
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
+  workspaceLinkedDocs: Array<{
+    id: string;
+    file_name: string;
+    description: string;
+    source: string;
+  }>;
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   selectedTools: Set<string>;
   selectedSkills: Set<string>;
   selectedResponseTemplateGroups: Set<string>;
   selectedContextGroups: Set<string>;
   selectedAssetGroups: Set<string>;
+  selectedLinkedDocs: Set<string>;
   selectedHandoffTopicGroups: Set<string>;
   templatesTabHref: string;
   contextTabHref: string;
   assetsTabHref: string;
+  docsTabHref: string;
   handoffTabHref: string;
   toolsTabHref: string;
   workspaceContextDirty: boolean;
   assetGroupsDirty: boolean;
+  linkedDocsDirty: boolean;
   responseTemplatesDirty: boolean;
   handoffTopicsDirty: boolean;
   toolsDirty: boolean;

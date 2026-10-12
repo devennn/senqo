@@ -12,6 +12,7 @@ describe("DEFAULT_TOOL_KEYS", () => {
     expect(DEFAULT_TOOL_KEYS).toContain("load_skills");
     expect(DEFAULT_TOOL_KEYS).toContain("handoff_to_human");
     expect(DEFAULT_TOOL_KEYS).toContain("apply_conversation_labels");
+    expect(DEFAULT_TOOL_KEYS).toContain("execute_code");
     expect(DEFAULT_TOOL_KEYS).not.toContain("send_whatsapp_message");
   });
 });
@@ -44,6 +45,17 @@ const baseInput = {
   dryRun: false,
   enabledToolKeys: [...DEFAULT_TOOL_KEYS],
   customToolDescriptions: {},
+  codeTools: [] as Array<{
+    toolKey: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+  }>,
+  linkedDocs: [] as Array<{
+    id: string;
+    fileName: string;
+    description: string;
+    source: string;
+  }>,
   workspaceContext: "We sell widgets.",
   responseTemplates: "Q: Returns? A: 30 days.",
   handoffTopics: "Billing, Complaints",
@@ -126,6 +138,31 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("Never put a `####` heading in `label`");
   });
 
+  // Linked docs catalog includes how-to steps so the model calls execute_code + readLinkedDoc.
+  it("lists attached linked docs with id, name, description, and usage instructions", () => {
+    const prompt = buildAgentSystemPrompt({
+      ...baseInput,
+      linkedDocs: [
+        {
+          id: "doc-uuid-1",
+          fileName: "inventory.csv",
+          description: "Live kitchen stock counts",
+          source: "google_drive",
+        },
+      ],
+    });
+    expect(prompt).toContain("## Linked docs (via execute_code / readLinkedDoc)");
+    expect(prompt).toContain("How to read (required when answering from these files)");
+    expect(prompt).toContain('await readLinkedDoc("<id>")');
+    expect(prompt).toContain("doc-uuid-1");
+    expect(prompt).toContain("inventory.csv");
+    expect(prompt).toContain("Live kitchen stock counts");
+    expect(prompt).toContain("google_drive");
+    expect(prompt).toContain("Prefer `readLinkedDoc` over `composioExecute`");
+    expect(prompt).toContain("MUST call `execute_code`");
+    expect(prompt).toContain("never invent stock counts");
+  });
+
   // Asset delivery uses messages[].assetFileName, not a send tool.
   it("mentions assetFileName on messages items", () => {
     const prompt = buildAgentSystemPrompt({
@@ -148,16 +185,29 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("(none configured for this agent)");
   });
 
-  // The available tools section lists enabled tool keys with their descriptions.
-  it("includes available tools section with all enabled tool keys", () => {
+  // Discrete tools list builtins only; catalog tools appear under Code tools.
+  it("lists builtins as available tools and catalog tools under code tools", () => {
     const prompt = buildAgentSystemPrompt({
       ...baseInput,
-      enabledToolKeys: ["create_task", "get_weather"],
+      enabledToolKeys: ["create_task", "execute_code", "get_weather"],
       customToolDescriptions: { get_weather: "Look up weather for a city." },
+      codeTools: [
+        {
+          toolKey: "get_weather",
+          description: "Look up weather for a city.",
+          inputSchema: {
+            type: "object",
+            properties: { location: { type: "string" } },
+          },
+        },
+      ],
     });
     expect(prompt).toContain("`create_task`");
+    expect(prompt).toContain("`execute_code`");
+    expect(prompt).toContain("## Code tools (via execute_code only)");
     expect(prompt).toContain("`get_weather`");
     expect(prompt).toContain("Look up weather for a city.");
+    expect(prompt).toContain("callTool");
   });
 
   // Confirms multi-label / recent-thread guidance is present in the system prompt.

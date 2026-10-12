@@ -20,6 +20,7 @@ export function AgentConfigForm({
   responseTemplateGroups,
   workspaceContextGroups,
   workspaceAssetGroups,
+  workspaceLinkedDocs,
   handoffTopicGroups,
   onSaved,
 }: AgentConfigFormProps) {
@@ -35,6 +36,7 @@ export function AgentConfigForm({
     responseTemplateGroups,
     workspaceContextGroups,
     workspaceAssetGroups,
+    workspaceLinkedDocs,
     handoffTopicGroups,
   });
   useTransientBooleanReset(saved, setSaved, TRANSIENT_SUCCESS_FEEDBACK_MS);
@@ -54,6 +56,7 @@ export function AgentConfigForm({
         responseTemplateGroups: fd.getAll("responseTemplateGroups").map(String),
         contextGroups: fd.getAll("contextGroups").map(String),
         assetGroups: fd.getAll("assetGroups").map(String),
+        linkedDocs: fd.getAll("linkedDocs").map(String),
         handoffTopicGroups: fd.getAll("handoffTopicGroups").map(String),
         attachedConnectionIds: fd.getAll("attachedConnectionIds").map(String),
         autoAssignConversationLabels: fd.get("autoAssignConversationLabels") === "on",
@@ -116,6 +119,7 @@ export function AgentConfigForm({
             responseTemplateGroups={responseTemplateGroups}
             workspaceContextGroups={workspaceContextGroups}
             workspaceAssetGroups={workspaceAssetGroups}
+            workspaceLinkedDocs={workspaceLinkedDocs}
             handoffTopicGroups={handoffTopicGroups}
           />
           <AgentConfigFormAutoAssignLabelsField

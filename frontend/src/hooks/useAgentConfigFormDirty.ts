@@ -21,6 +21,7 @@ import {
   agentConfigFormSnapshotsEqual,
   agentConnectionSectionDirty,
   agentAssetGroupsDirty,
+  agentLinkedDocsDirty,
   agentHandoffTopicGroupsDirty,
   agentProfileBehaviorDirty,
   agentProfileNameDirty,
@@ -40,6 +41,7 @@ type Args = {
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
+  workspaceLinkedDocs: Array<{ id: string }>;
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
 };
 
@@ -49,6 +51,7 @@ const emptySections: AgentConfigFormSectionDirtyState = {
   connection: false,
   workspaceContext: false,
   assetGroups: false,
+  linkedDocs: false,
   responseTemplates: false,
   handoffTopics: false,
   tools: false,
@@ -64,6 +67,7 @@ export function useAgentConfigFormDirty({
   responseTemplateGroups,
   workspaceContextGroups,
   workspaceAssetGroups,
+  workspaceLinkedDocs,
   handoffTopicGroups,
 }: Args): {
   formRef: RefObject<HTMLFormElement | null>;
@@ -85,6 +89,7 @@ export function useAgentConfigFormDirty({
         responseTemplateGroups,
         workspaceContextGroups,
         workspaceAssetGroups,
+        workspaceLinkedDocs,
         handoffTopicGroups,
       }),
     [
@@ -95,6 +100,7 @@ export function useAgentConfigFormDirty({
       responseTemplateGroups,
       workspaceContextGroups,
       workspaceAssetGroups,
+      workspaceLinkedDocs,
       handoffTopicGroups,
     ],
   );
@@ -115,6 +121,7 @@ export function useAgentConfigFormDirty({
       connection: agentConnectionSectionDirty(baseline, current),
       workspaceContext: agentWorkspaceContextGroupsDirty(baseline, current),
       assetGroups: agentAssetGroupsDirty(baseline, current),
+      linkedDocs: agentLinkedDocsDirty(baseline, current),
       responseTemplates: agentResponseTemplateGroupsDirty(baseline, current),
       handoffTopics: agentHandoffTopicGroupsDirty(baseline, current),
       tools: agentToolsDirty(baseline, current),

@@ -129,6 +129,7 @@ export async function applyAgentKnowledgeImport(input: {
       handoff_topic_groups: agent.handoff_topic_groups,
       context_groups: contextGroupIds,
       asset_groups: agent.asset_groups,
+      linked_docs: agent.linked_docs ?? [],
       handoff_notify_user_ids: agent.handoff_notify_user_ids,
     });
 

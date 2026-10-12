@@ -85,17 +85,33 @@ export type AgentToolKey =
   | "load_skills"
   | "create_task"
   | "handoff_to_human"
-  | "apply_conversation_labels";
+  | "apply_conversation_labels"
+  | "execute_code";
 
 export type AgentAssetInstructionGroup = {
   name: string;
   assets: { fileName: string; description: string }[];
 };
 
+export type AgentCodeToolPromptEntry = {
+  toolKey: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+};
+
 export type AgentSystemPromptInput = {
   dryRun: boolean;
   enabledToolKeys: string[];
   customToolDescriptions: Record<string, string>;
+  /** Attached Tool Catalog tools — callable only via `execute_code` / `callTool`. */
+  codeTools: AgentCodeToolPromptEntry[];
+  /** Live linked docs — read via `execute_code` / `readLinkedDoc(docId)`. */
+  linkedDocs: Array<{
+    id: string;
+    fileName: string;
+    description: string;
+    source: string;
+  }>;
   workspaceContext: string;
   responseTemplates: string;
   handoffTopics: string;

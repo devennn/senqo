@@ -1393,7 +1393,7 @@ describe("PUT /agents/:id handoff topic groups", () => {
       response_template_groups: [],
       handoff_topic_groups: [],
       context_groups: [],
-      asset_groups: [],
+      asset_groups: [], linked_docs: [],
       handoff_notify_user_ids: [],
       auto_assign_conversation_labels: true,
     });

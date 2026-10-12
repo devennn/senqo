@@ -12,11 +12,13 @@ import { ContextGroupsPanel } from "@/pages/dashboard/components/context-groups-
 import { ResponseTemplatesPanel } from "@/pages/dashboard/components/response-templates-panel";
 import { HandoffTopicGroupsPanel } from "@/pages/dashboard/components/handoff-topic-groups-panel";
 import { AssetGroupsPanel } from "@/pages/dashboard/components/asset-groups-panel";
+import { LinkedDocsPanel } from "@/pages/dashboard/components/linked-docs-panel";
 
 function parseKnowledgeTab(tabParam: string | null): KnowledgeTab {
   if (tabParam === "templates") return "templates";
   if (tabParam === "handoff") return "handoff";
   if (tabParam === "assets") return "assets";
+  if (tabParam === "docs") return "docs";
   return "context";
 }
 
@@ -108,6 +110,10 @@ export default function KnowledgePage() {
             ) : tab === "assets" ? (
               <div className="mt-6">
                 <AssetGroupsPanel groups={data.workspaceAssetGroups} reload={reload} />
+              </div>
+            ) : tab === "docs" ? (
+              <div className="mt-6">
+                <LinkedDocsPanel />
               </div>
             ) : (
               <div className="mt-6">

@@ -13,6 +13,41 @@ describe("createCustomToolFailureTracker", () => {
     expect(tracker.summarize()).toBe("get_weather: TypeError: fetch failed");
   });
 
+  // Nested callTool failures inside execute_code must surface under the catalog key.
+  it("records nested execute_code toolResults failures under the catalog key", () => {
+    const tracker = createCustomToolFailureTracker(["get_weather"]);
+    tracker.observeToolResults([
+      {
+        toolName: "execute_code",
+        output: {
+          ok: true,
+          result: {},
+          toolResults: [
+            {
+              toolKey: "get_weather",
+              output: { ok: false, error: "TypeError: fetch failed" },
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(tracker.summarize()).toBe("get_weather: TypeError: fetch failed");
+  });
+
+  // Outer execute_code ok:false is tracked even when no nested results exist.
+  it("records an outer execute_code failure", () => {
+    const tracker = createCustomToolFailureTracker(["get_weather"]);
+    tracker.observeToolResults([
+      {
+        toolName: "execute_code",
+        output: { ok: false, error: "Compile failed", toolResults: [] },
+      },
+    ]);
+
+    expect(tracker.summarize()).toBe("execute_code: Compile failed");
+  });
+
   // A retried call that succeeds means the internal problem recovered; forcing a
   // handoff then would drop a valid answer the customer should receive.
   it("clears the failure when a later call to the same tool succeeds", () => {
@@ -22,6 +57,43 @@ describe("createCustomToolFailureTracker", () => {
     ]);
     tracker.observeToolResults([
       { toolName: "get_weather", output: { ok: true, temperature: 31 } },
+    ]);
+
+    expect(tracker.summarize()).toBeNull();
+  });
+
+  // Nested success clears a prior nested failure for that catalog key.
+  it("clears nested failures when a later execute_code succeeds that tool", () => {
+    const tracker = createCustomToolFailureTracker(["get_weather"]);
+    tracker.observeToolResults([
+      {
+        toolName: "execute_code",
+        output: {
+          ok: true,
+          result: {},
+          toolResults: [
+            {
+              toolKey: "get_weather",
+              output: { ok: false, error: "TypeError: fetch failed" },
+            },
+          ],
+        },
+      },
+    ]);
+    tracker.observeToolResults([
+      {
+        toolName: "execute_code",
+        output: {
+          ok: true,
+          result: { temperature: 31 },
+          toolResults: [
+            {
+              toolKey: "get_weather",
+              output: { ok: true, temperature: 31 },
+            },
+          ],
+        },
+      },
     ]);
 
     expect(tracker.summarize()).toBeNull();

@@ -104,6 +104,7 @@ export type AgentConfigRecord = {
   handoff_topic_groups: string[];
   context_groups: string[];
   asset_groups: string[];
+  linked_docs: string[];
   handoff_notify_user_ids: string[];
 };
 

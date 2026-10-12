@@ -286,6 +286,8 @@ function emptyAgentSystemPromptInput(
     dryRun,
     enabledToolKeys: [...DEFAULT_TOOL_KEYS],
     customToolDescriptions: {},
+    codeTools: [],
+    linkedDocs: [],
     workspaceContext: "",
     responseTemplates: "",
     handoffTopics: "",
@@ -401,6 +403,28 @@ export async function buildAgentInstructionsWithCatalog(
       tool.description || tool.display_name,
     ]),
   );
+  const codeTools = customTools.map((tool) => ({
+    toolKey: tool.tool_key,
+    description: tool.description || tool.display_name,
+    inputSchema:
+      tool.input_schema && typeof tool.input_schema === "object"
+        ? tool.input_schema
+        : {},
+  }));
+
+  const { listWorkspaceLinkedDocsByIds } = await import(
+    "../repositories/workspace-linked-docs.js"
+  );
+  const linkedDocRows = await listWorkspaceLinkedDocsByIds(
+    workspaceId,
+    activeConfig.linked_docs ?? [],
+  );
+  const linkedDocs = linkedDocRows.map((doc) => ({
+    id: doc.id,
+    fileName: doc.file_name,
+    description: doc.description,
+    source: doc.source,
+  }));
 
   const skills = await listSkillSummaries(workspaceId);
   const sourceCatalog = buildKnowledgeSourceCatalog({
@@ -415,6 +439,8 @@ export async function buildAgentInstructionsWithCatalog(
       dryRun,
       enabledToolKeys: resolveEnabledToolKeys(activeConfig.tools),
       customToolDescriptions,
+      codeTools,
+      linkedDocs,
       workspaceContext,
       responseTemplates,
       handoffTopics,

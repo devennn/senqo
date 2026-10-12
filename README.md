@@ -34,6 +34,7 @@ Open `.env` and fill it in. Do this before starting the stack (`docker compose �
 - Validate before deploy: `npm run validate:model-env`
 - `SMTP_*` — outbound email (invites, WhatsApp disconnect alerts); see `.env.example`
 - `S3_*` — see [Storage](#storage-cloudflare-r2) below
+- `COMPOSIO_API_KEY` — optional; required for Connect → Apps (Google Drive) and live Knowledge Docs Drive reads ([composio.dev](https://composio.dev))
 
 **First admin login:**
 

@@ -4,6 +4,7 @@ export const BUILTIN_AGENT_TOOL_KEYS = [
   "load_skills",
   "handoff_to_human",
   "apply_conversation_labels",
+  "execute_code",
 ] as const;
 
 export type BuiltinAgentToolKey = (typeof BUILTIN_AGENT_TOOL_KEYS)[number];

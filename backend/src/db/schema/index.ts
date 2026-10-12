@@ -272,6 +272,7 @@ export const agentConfigs = pgTable(
     handoffTopicGroups: jsonb("handoff_topic_groups").default([]),
     contextGroups: jsonb("context_groups").default([]),
     assetGroups: jsonb("asset_groups").default([]),
+    linkedDocs: jsonb("linked_docs").default([]),
     handoffNotifyUserIds: jsonb("handoff_notify_user_ids").default([]),
   },
   (t) => [
@@ -629,6 +630,69 @@ export const workspaceApiKeys = pgTable("workspace_api_keys", {
     .notNull()
     .defaultNow(),
 });
+
+export const workspaceAppConnections = pgTable(
+  "workspace_app_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    toolkit: text("toolkit").notNull(),
+    composioUserId: text("composio_user_id").notNull(),
+    composioConnectedAccountId: text("composio_connected_account_id").notNull(),
+    status: text("status").notNull().default("active"),
+    /** entire_drive | folder | file — app-enforced Knowledge Docs jurisdiction */
+    driveAccessMode: text("drive_access_mode").notNull().default("entire_drive"),
+    driveScopeId: text("drive_scope_id"),
+    driveScopeName: text("drive_scope_name"),
+    driveScopeMimeType: text("drive_scope_mime_type"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("workspace_app_connections_workspace_toolkit_uidx").on(
+      t.workspaceId,
+      t.toolkit,
+    ),
+  ],
+);
+
+export const workspaceLinkedDocs = pgTable(
+  "workspace_linked_docs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    description: text("description").notNull(),
+    driveFileId: text("drive_file_id"),
+    storagePath: text("storage_path"),
+    fileSizeBytes: integer("file_size_bytes").notNull().default(0),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_workspace_linked_docs_workspace_updated").on(
+      t.workspaceId,
+      t.updatedAt.desc(),
+    ),
+  ],
+);
 
 export const workspaceAssetGroups = pgTable("workspace_asset_groups", {
   id: uuid("id").primaryKey().defaultRandom(),
