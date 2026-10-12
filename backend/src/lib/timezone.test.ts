@@ -40,8 +40,9 @@ describe("formatZonedDateTimeFromIso", () => {
 
   // UTC fallback remains explicit for workspaces that have not changed the setting.
   it("renders UTC input with the UTC zone label", () => {
-    expect(formatZonedDateTimeFromIso("2026-09-25T05:15:00.000Z", "UTC")).toBe(
-      "Friday, September 25, 2026 at 5:15 AM (UTC, GMT+0)",
+    // ICU builds differ on the zero-offset label ("GMT+0" vs "GMT"), so accept both explicit forms.
+    expect(formatZonedDateTimeFromIso("2026-09-25T05:15:00.000Z", "UTC")).toMatch(
+      /^Friday, September 25, 2026 at 5:15 AM \(UTC, GMT(\+0)?\)$/,
     );
   });
 });
