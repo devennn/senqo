@@ -99,8 +99,8 @@ export function ConnectionDeleteStatus({ checking, preflight, onNavigate }: Prop
           ) : null}
         </TooltipTrigger>
         <TooltipContent className="max-w-64">
-          Checked live with the WhatsApp service just now. If the line is live and attached to an
-          agent, deleting it is blocked.
+          A live check with the WhatsApp service — shows whether this number is still connected to
+          the user's phone.
         </TooltipContent>
       </Tooltip>
       {blocked && preflight?.agent ? (

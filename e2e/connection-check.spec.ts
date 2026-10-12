@@ -223,7 +223,7 @@ test.describe("Connection check and guarded delete", () => {
     await expect(dialog.getByText(/This removes/)).toHaveCount(0);
     await page.getByLabel("About connection status").hover();
     await expect(page.getByRole("tooltip")).toContainText(
-      "Checked live with the WhatsApp service just now.",
+      "still connected to the user's phone",
     );
     await expect(dialog.getByRole("link", { name: "Open agent setup" })).toHaveAttribute(
       "href",
