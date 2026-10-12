@@ -66,6 +66,7 @@ describe("ConnectionDeleteDialog", () => {
     expect(await screen.findByText("Live")).toBeInTheDocument();
     expect(screen.getByTestId("connection-delete-agent")).toHaveTextContent("Support");
     expect(screen.getByText(/still live and attached to agent/i)).toBeInTheDocument();
+    expect(screen.queryByText(/This removes/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open agent setup" })).toHaveAttribute(
       "href",
       "/ws-1/agent?agentId=agent-1",
@@ -94,6 +95,7 @@ describe("ConnectionDeleteDialog", () => {
     renderDialog(onConfirm);
 
     await screen.findByText("Offline");
+    expect(screen.getByText(/This removes/)).toBeInTheDocument();
     const deleteButton = screen.getByRole("button", { name: "Delete" });
     expect(deleteButton).toBeEnabled();
     await user.click(deleteButton);

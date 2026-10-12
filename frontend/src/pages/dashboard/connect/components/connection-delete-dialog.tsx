@@ -83,11 +83,13 @@ export function ConnectionDeleteDialog({
       onOpenChange={onOpenChange}
       title="Delete connection?"
       description={
-        <>
-          This removes <span className="font-medium text-foreground">{displayName}</span> from your
-          workspace and signs out the linked WhatsApp session. Any scheduled tasks using it will be
-          cancelled. Scan a new QR to connect again.
-        </>
+        blocked ? undefined : (
+          <>
+            This removes <span className="font-medium text-foreground">{displayName}</span> from
+            your workspace and signs out the linked WhatsApp session. Any scheduled tasks using it
+            will be cancelled. Scan a new QR to connect again.
+          </>
+        )
       }
       confirmLabel="Delete"
       pendingConfirmLabel={checking ? "Checking…" : "Deleting…"}
