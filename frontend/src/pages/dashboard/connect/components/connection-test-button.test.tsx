@@ -18,8 +18,9 @@ describe("ConnectionTestButton", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Connection is live.");
   });
 
-  // Stale-card case: an offline result must tell the user what to do next (reconnect with a new QR).
-  it("shows the offline guidance when the check reports disconnected", async () => {
+  // Stale-card case: the card itself flips to Not Authorized with its own offline note, so the button
+  // must not repeat that message — the check just runs and finishes.
+  it("does not repeat the card's offline note when the check reports disconnected", async () => {
     const user = userEvent.setup();
     render(
       <ConnectionTestButton connectionId="conn-1" onCheck={vi.fn().mockResolvedValue("disconnected")} />,
@@ -27,9 +28,8 @@ describe("ConnectionTestButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Test connection" }));
 
-    expect(
-      await screen.findByText("This connection is offline. Reconnect with a new QR."),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/This connection is offline/)).not.toBeInTheDocument();
+    expect(screen.getByRole("status").textContent).toBe("");
   });
 
   // Error path: a failed check request must not crash the card — it reports the service as unreachable.

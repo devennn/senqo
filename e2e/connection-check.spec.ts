@@ -194,9 +194,11 @@ test.describe("Connection check and guarded delete", () => {
     await expect(page.getByText("Authorized")).toBeVisible();
     await page.getByRole("button", { name: "Test connection" }).click();
 
-    await expect(page.getByText("This connection is offline. Reconnect with a new QR.")).toBeVisible();
     await expect(page.getByText("Not Authorized")).toBeVisible();
     await expect(page.getByRole("button", { name: "Reconnect QR" })).toBeVisible();
+    // The card's own offline note explains the state — the button must not repeat it.
+    await expect(page.getByText(/This WhatsApp connection is offline/)).toBeVisible();
+    await expect(page.getByText(/This connection is offline\. Reconnect with a new QR\./)).toHaveCount(0);
   });
 
   // Critical: deleting a live line that an agent replies on is blocked — the dialog shows the fresh
