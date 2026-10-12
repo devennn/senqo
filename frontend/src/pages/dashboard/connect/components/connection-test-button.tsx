@@ -5,8 +5,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { TRANSIENT_SUCCESS_FEEDBACK_MS } from "@/lib/transient-feedback";
 import type { WhatsappConnectionCheckStatus } from "@/types/repositories";
 
-const FAILURE_MESSAGES: Record<Exclude<WhatsappConnectionCheckStatus, "connected">, string> = {
-  disconnected: "This connection is offline. Reconnect with a new QR.",
+/**
+ * Only results the card cannot express by itself get a message here. A confirmed-offline line
+ * flips the card to "Not Authorized" with its own note, so repeating that here would say the
+ * same thing twice.
+ */
+const FAILURE_MESSAGES: Partial<
+  Record<Exclude<WhatsappConnectionCheckStatus, "connected">, string>
+> = {
   pending_qr: "Waiting for a QR scan — use Reconnect QR.",
   unavailable: "Couldn't reach the WhatsApp service. Try again.",
 };
@@ -38,10 +44,10 @@ export function ConnectionTestButton({ connectionId, onCheck }: Props) {
     try {
       const status = await onCheck(connectionId);
       setResult(status);
-      if (status !== "connected") setMessage(FAILURE_MESSAGES[status]);
+      setMessage(status === "connected" ? null : FAILURE_MESSAGES[status] ?? null);
     } catch {
       setResult("unavailable");
-      setMessage(FAILURE_MESSAGES.unavailable);
+      setMessage(FAILURE_MESSAGES.unavailable ?? null);
     } finally {
       setTesting(false);
       dismissTimer.current = window.setTimeout(() => {

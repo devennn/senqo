@@ -137,8 +137,8 @@ export function ConnectionCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-2 pt-0">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2 text-base">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-base">
               {info.isHealthy ? (
                 <Wifi className="size-4 text-primary" />
               ) : (
