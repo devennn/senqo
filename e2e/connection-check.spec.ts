@@ -221,6 +221,10 @@ test.describe("Connection check and guarded delete", () => {
     await expect(page.getByTestId("connection-delete-agent")).toHaveText("Support");
     await expect(dialog.getByText(/still live and attached to agent/i)).toBeVisible();
     await expect(dialog.getByText(/This removes/)).toHaveCount(0);
+    await page.getByRole("button", { name: "About connection status" }).hover();
+    await expect(page.getByRole("tooltip")).toContainText(
+      "Checked live with the WhatsApp service just now.",
+    );
     await expect(dialog.getByRole("link", { name: "Open agent setup" })).toHaveAttribute(
       "href",
       `/${WORKSPACE_ID}/agent?agentId=${AGENT_ID}`,

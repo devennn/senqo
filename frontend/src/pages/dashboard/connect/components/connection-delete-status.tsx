@@ -1,6 +1,7 @@
-import { Bot, Loader2, QrCode, TriangleAlert, Wifi, WifiOff } from "lucide-react";
+import { Bot, Info, Loader2, QrCode, TriangleAlert, Wifi, WifiOff } from "lucide-react";
 import { Link } from "react-router-dom";
 import { buttonVariants } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useWorkspace } from "@/context/workspace";
 import type {
   WhatsappConnectionCheckStatus,
@@ -77,6 +78,19 @@ export function ConnectionDeleteStatus({ checking, preflight, onNavigate }: Prop
           <span className="font-medium text-foreground">
             {checking || !preflight ? "Checking…" : STATUS_LABELS[preflight.status]}
           </span>
+          <Tooltip>
+            <TooltipTrigger
+              type="button"
+              aria-label="About connection status"
+              className="ml-auto inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              <Info className="size-3.5" aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-64">
+              Checked live with the WhatsApp service just now. If the line is live and attached to
+              an agent, deleting it is blocked.
+            </TooltipContent>
+          </Tooltip>
         </p>
         {agentName ? (
           <p className="flex flex-wrap items-center gap-2">

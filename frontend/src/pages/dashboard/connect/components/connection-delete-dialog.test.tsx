@@ -82,6 +82,20 @@ describe("ConnectionDeleteDialog", () => {
     expect(screen.getByRole("button", { name: "Checking…" })).toBeDisabled();
   });
 
+  // The status section carries an explanation of what the fresh check means.
+  it("offers an explanation of the connection status section", async () => {
+    mockGet.mockResolvedValue({
+      status: "connected",
+      agent: null,
+      deletable: true,
+      blockedReason: null,
+    });
+    renderDialog(vi.fn());
+
+    await screen.findByText("Live");
+    expect(screen.getByRole("button", { name: "About connection status" })).toBeInTheDocument();
+  });
+
   // When the preflight allows deleting, Delete is enabled and confirms normally.
   it("enables delete when the preflight allows deleting", async () => {
     const user = userEvent.setup();
