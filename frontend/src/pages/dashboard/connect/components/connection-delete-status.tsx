@@ -67,41 +67,42 @@ export function ConnectionDeleteStatus({ checking, preflight, onNavigate }: Prop
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1.5 rounded-md border border-border bg-secondary/60 px-3 py-2 text-sm">
-        <p className="flex flex-wrap items-center gap-2">
-          {checking ? (
-            <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
-          ) : preflight ? (
-            <StatusIcon status={preflight.status} />
-          ) : null}
-          <span className="text-muted-foreground">Connection status:</span>
-          <span className="font-medium text-foreground">
-            {checking || !preflight ? "Checking…" : STATUS_LABELS[preflight.status]}
-          </span>
-          <Tooltip>
-            <TooltipTrigger
-              type="button"
-              aria-label="About connection status"
-              className="ml-auto inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-            >
-              <Info className="size-3.5" aria-hidden />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-64">
-              Checked live with the WhatsApp service just now. If the line is live and attached to
-              an agent, deleting it is blocked.
-            </TooltipContent>
-          </Tooltip>
-        </p>
-        {agentName ? (
+      <Tooltip>
+        <TooltipTrigger
+          render={<div />}
+          className="cursor-help space-y-1.5 rounded-md border border-border bg-secondary/60 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          tabIndex={0}
+          aria-label="About connection status"
+        >
           <p className="flex flex-wrap items-center gap-2">
-            <Bot className="size-4 text-muted-foreground" aria-hidden />
-            <span className="text-muted-foreground">Agent:</span>
-            <span className="font-medium text-foreground" data-testid="connection-delete-agent">
-              {agentName}
+            {checking ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+            ) : preflight ? (
+              <StatusIcon status={preflight.status} />
+            ) : null}
+            <span className="text-muted-foreground">Connection status:</span>
+            <span className="font-medium text-foreground">
+              {checking || !preflight ? "Checking…" : STATUS_LABELS[preflight.status]}
+            </span>
+            <span className="ml-auto text-muted-foreground" aria-hidden>
+              <Info className="size-3.5" />
             </span>
           </p>
-        ) : null}
-      </div>
+          {agentName ? (
+            <p className="flex flex-wrap items-center gap-2">
+              <Bot className="size-4 text-muted-foreground" aria-hidden />
+              <span className="text-muted-foreground">Agent:</span>
+              <span className="font-medium text-foreground" data-testid="connection-delete-agent">
+                {agentName}
+              </span>
+            </p>
+          ) : null}
+        </TooltipTrigger>
+        <TooltipContent className="max-w-64">
+          Checked live with the WhatsApp service just now. If the line is live and attached to an
+          agent, deleting it is blocked.
+        </TooltipContent>
+      </Tooltip>
       {blocked && preflight?.agent ? (
         <ConnectionDeleteBlockedNotice
           agentId={preflight.agent.id}

@@ -93,7 +93,7 @@ describe("ConnectionDeleteDialog", () => {
     renderDialog(vi.fn());
 
     await screen.findByText("Live");
-    expect(screen.getByRole("button", { name: "About connection status" })).toBeInTheDocument();
+    expect(screen.getByLabelText("About connection status")).toBeInTheDocument();
   });
 
   // When the preflight allows deleting, Delete is enabled and confirms normally.
