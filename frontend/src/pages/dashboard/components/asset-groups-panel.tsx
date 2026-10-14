@@ -73,7 +73,7 @@ export function AssetGroupsPanel({ groups, reload }: Props) {
                 <CardTitle className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate">No asset groups yet</span>
                   <InlineHelpHint className="size-7 shrink-0" label="Asset groups overview">
-                    <p>Use Add group, name the folder, then upload files with a short description of what each file is about. Attach groups on Profile.</p>
+                    <p>Use Add group, name the folder, then add sendable files or live docs with a short description of what each is about. Attach groups on Profile.</p>
                   </InlineHelpHint>
                 </CardTitle>
                 <p className="mt-2 text-[0.9rem] leading-relaxed text-muted-foreground">Use Add group to open the creation dialog.</p>

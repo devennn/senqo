@@ -69,9 +69,9 @@ export default function KnowledgePage() {
                   <h1 className="text-2xl font-extrabold tracking-tight">Knowledge</h1>
                   <InlineHelpHint label="About knowledge">
                     <p>
-                      Workspace facts, reply templates, handoff topics, and sendable files. Attach groups to an agent on
-                      Agent → Profile (Attached knowledge / Capability). Knowledge groups older than 90 days show a
-                      may-be-outdated hint.
+                      Workspace facts, reply templates, handoff topics, and files the agent can send or read
+                      live. Attach groups to an agent on Agent → Profile (Attached knowledge / Capability).
+                      Knowledge groups older than 90 days show a may-be-outdated hint.
                     </p>
                   </InlineHelpHint>
                 </div>

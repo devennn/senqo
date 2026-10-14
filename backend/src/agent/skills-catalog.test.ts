@@ -27,6 +27,7 @@ vi.mock("../repositories/workspace-context-groups.js", () => ({
 
 vi.mock("../repositories/workspace-asset-groups.js", () => ({
   listWorkspaceAssetsForInstructions: (...args: unknown[]) => mockListAssets(...args),
+  listWorkspaceDocAssetsForGroups: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../repositories/conversation-labels.js", () => ({

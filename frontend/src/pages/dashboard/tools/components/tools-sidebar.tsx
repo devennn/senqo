@@ -47,7 +47,7 @@ export function ToolsSidebar({ tools, selectedId, isNew, toToolsUrl }: Props) {
           </Link>
         </CardAction>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="flex flex-1 flex-col gap-2">
         {isNew ? (
           <div className="rounded-md border border-primary bg-primary/5 px-3 py-2 text-sm">
             <p className="font-medium">New tool</p>
@@ -76,6 +76,7 @@ export function ToolsSidebar({ tools, selectedId, isNew, toToolsUrl }: Props) {
                 pageSize={pageSize}
                 onPage={setPage}
                 compact
+                className="mt-auto"
               />
             ) : null}
           </>

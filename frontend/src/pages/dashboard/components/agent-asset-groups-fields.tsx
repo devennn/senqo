@@ -3,6 +3,7 @@ import { FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
+import { AgentAttachCheckboxList } from "@/pages/dashboard/components/agent-attach-checkbox-list";
 import type { AgentAssetGroupsFieldsProps } from "@/types/ui";
 
 export function AgentAssetGroupsFields({
@@ -23,7 +24,8 @@ export function AgentAssetGroupsFields({
           <InlineHelpHint label="About agent assets">
             <p>
               Files the agent can send on WhatsApp. Each file needs a specific &quot;what is this about&quot; description the AI
-              reads in its instructions; the agent decides when to send. Select groups here; edit files on Knowledge → Assets.
+              reads in its instructions; the agent decides when to send. Live docs in the same groups are
+              re-read by the agent at chat time. Select groups here; edit files and docs on Knowledge → Assets.
             </p>
           </InlineHelpHint>
         </div>
@@ -34,19 +36,15 @@ export function AgentAssetGroupsFields({
         ) : null}
       </div>
       {groups.length > 0 ? (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {groups.map((group) => (
-            <label key={group.id} className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-sm">
-              <input type="checkbox" name="assetGroups" value={group.id} defaultChecked={selectedIds.has(group.id)} />
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate font-medium">{group.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {group.asset_count} {group.asset_count === 1 ? "file" : "files"}
-                </span>
-              </span>
-            </label>
-          ))}
-        </div>
+        <AgentAttachCheckboxList
+          fieldName="assetGroups"
+          items={groups.map((group) => ({
+            id: group.id,
+            name: group.name,
+            hint: `${group.asset_count} ${group.asset_count === 1 ? "item" : "items"}`,
+          }))}
+          selectedIds={selectedIds}
+        />
       ) : (
         <p className="text-xs text-muted-foreground">
           None yet. Open the{" "}

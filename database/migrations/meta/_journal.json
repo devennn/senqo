@@ -176,6 +176,27 @@
       "when": 1780540924823,
       "tag": "0024_workspace_members_role_check",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1780540924824,
+      "tag": "0025_workspace_apps_and_linked_docs",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1780540924825,
+      "tag": "0026_drive_access_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1780540924826,
+      "tag": "0027_merge_docs_into_assets",
+      "breakpoints": true
     }
   ]
 }

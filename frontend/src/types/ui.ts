@@ -39,6 +39,31 @@ export type HandoffNotifyRecipientOption = {
   phone: string;
 };
 
+/** Why a selected notify user cannot receive handoff alerts right now. */
+export type HandoffNotifyUnavailableReason = "not_verified" | "not_member";
+
+/** Stored notify user without a usable verified handoff phone. */
+export type HandoffNotifyUnavailableOption = {
+  userId: string;
+  email: string | null;
+  reason: HandoffNotifyUnavailableReason;
+};
+
+/** Teammate info used to label notify selections (verified or not). */
+export type HandoffNotifyMemberLookup = {
+  email: string | null;
+};
+
+export type HandoffNotifyTeammateStatus = "loading" | "ready" | "error";
+
+export type HandoffNotifyRecipientsState = {
+  /** Teammates with at least one verified handoff phone, ready to select. */
+  recipients: HandoffNotifyRecipientOption[];
+  /** Every teammate by user id, so stored selections can be labeled. */
+  membersById: ReadonlyMap<string, HandoffNotifyMemberLookup>;
+  status: HandoffNotifyTeammateStatus;
+};
+
 export type AgentConfigFormProps = {
   agent: AgentConfigRecord;
   connections: AgentConfigConnectionOption[];

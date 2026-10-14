@@ -48,26 +48,38 @@ export function useAgents() {
     }
     try {
       const requestOptions = { workspaceId };
-      const [agentsRes, toolsRes, skillsRes, connectionsRes] = await Promise.all([
-        api.get<{
-          agents: AgentConfigRecord[];
-          agentIdsWithConnection: string[];
-          responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
-          handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
-          workspaceContextGroups?: WorkspaceContextGroupSummary[];
-          workspaceAssetGroups?: WorkspaceAssetGroupSummary[];
-        }>("/api/user/agents", requestOptions),
-        api.get<{ tools: WorkspaceCustomToolListItem[] }>("/api/user/custom-tools", requestOptions),
-        api.get<{ skills: WorkspaceSkillDefinitionRecord[] }>("/api/user/skills", requestOptions),
-        api.get<{ connections: WhatsappConnection[] }>("/api/user/connections", requestOptions),
-      ]);
+      const [agentsRes, toolsRes, skillsRes, connectionsRes] =
+        await Promise.all([
+          api.get<{
+            agents: AgentConfigRecord[];
+            agentIdsWithConnection: string[];
+            responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+            handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
+            workspaceContextGroups?: WorkspaceContextGroupSummary[];
+            workspaceAssetGroups?: WorkspaceAssetGroupSummary[];
+          }>("/api/user/agents", requestOptions),
+          api.get<{ tools: WorkspaceCustomToolListItem[] }>(
+            "/api/user/custom-tools",
+            requestOptions,
+          ),
+          api.get<{ skills: WorkspaceSkillDefinitionRecord[] }>(
+            "/api/user/skills",
+            requestOptions,
+          ),
+          api.get<{ connections: WhatsappConnection[] }>(
+            "/api/user/connections",
+            requestOptions,
+          ),
+        ]);
       setData({
         agents: agentsRes.agents.map((a): AgentConfigRecord => ({
           ...a,
           response_template_groups: Array.isArray(a.response_template_groups)
             ? [...a.response_template_groups]
             : [],
-          handoff_topic_groups: Array.isArray(a.handoff_topic_groups) ? [...a.handoff_topic_groups] : [],
+          handoff_topic_groups: Array.isArray(a.handoff_topic_groups)
+            ? [...a.handoff_topic_groups]
+            : [],
           context_groups: Array.isArray(a.context_groups) ? [...a.context_groups] : [],
           asset_groups: Array.isArray(a.asset_groups) ? [...a.asset_groups] : [],
           handoff_notify_user_ids: Array.isArray(a.handoff_notify_user_ids)

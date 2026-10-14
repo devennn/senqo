@@ -221,11 +221,19 @@ vi.mock("../repositories/workspace-custom-tools.js", () => ({
 
 vi.mock("../repositories/workspace-asset-groups.js", () => ({
   ASSET_GROUP_NAME_MAX_LEN: 80,
+  DOC_UPLOAD_MAX_BYTES: 20 * 1024 * 1024,
   createAgentAssetInGroup: vi.fn(),
+  createAgentDriveDocInGroup: vi.fn(),
   createWorkspaceAssetGroup: vi.fn(),
   deleteAgentAssetFromGroup: vi.fn(),
   deleteWorkspaceAssetGroup: vi.fn(),
+  getAgentAssetInGroup: vi.fn(),
   getWorkspaceAssetGroupDetail: vi.fn(),
+  isAllowedDocUploadFileName: (fileName: string) =>
+    [".pdf", ".csv", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".md"].some((ext) =>
+      fileName.toLowerCase().endsWith(ext),
+    ),
+  isFolderMimeType: (mime: string) => mime === "application/vnd.google-apps.folder",
   listWorkspaceAssetGroupSummaries: vi.fn().mockResolvedValue([]),
   updateAgentAssetDescription: vi.fn(),
   updateWorkspaceAssetGroupName: vi.fn(),

@@ -3,6 +3,7 @@ import { Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
+import { AgentAttachCheckboxList } from "@/pages/dashboard/components/agent-attach-checkbox-list";
 import type { AgentHandoffTopicGroupsFieldsProps } from "@/types/ui";
 
 export function AgentHandoffTopicGroupsFields({
@@ -34,28 +35,15 @@ export function AgentHandoffTopicGroupsFields({
         ) : null}
       </div>
       {groups.length > 0 ? (
-        <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-          {groups.map((group) => (
-            <label
-              key={group.id}
-              className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-border/70 px-3 py-2 text-sm"
-            >
-              <input
-                type="checkbox"
-                className="shrink-0"
-                name="handoffTopicGroups"
-                value={group.id}
-                defaultChecked={selectedIds.has(group.id)}
-              />
-              <span className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                <span className="truncate font-medium">{group.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {group.entry_count} {group.entry_count === 1 ? "topic" : "topics"}
-                </span>
-              </span>
-            </label>
-          ))}
-        </div>
+        <AgentAttachCheckboxList
+          fieldName="handoffTopicGroups"
+          items={groups.map((group) => ({
+            id: group.id,
+            name: group.name,
+            hint: `${group.entry_count} ${group.entry_count === 1 ? "topic" : "topics"}`,
+          }))}
+          selectedIds={selectedIds}
+        />
       ) : (
         <p className="text-xs text-muted-foreground">
           None yet. Open the{" "}

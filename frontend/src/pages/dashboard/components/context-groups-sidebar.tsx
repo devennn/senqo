@@ -63,7 +63,7 @@ export function ContextGroupsSidebar({ groups, selectedGroupId, onAddGroup, grou
         </div>
         <CardDescription>Select a group to view or edit.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="flex flex-1 flex-col gap-2">
         {groups.length > 0 ? (
           <>
             {listGroups.map((group) => (
@@ -93,6 +93,7 @@ export function ContextGroupsSidebar({ groups, selectedGroupId, onAddGroup, grou
                 pageSize={pageSize}
                 onPage={setPage}
                 compact
+                className="mt-auto"
               />
             ) : null}
           </>

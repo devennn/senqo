@@ -630,6 +630,37 @@ export const workspaceApiKeys = pgTable("workspace_api_keys", {
     .defaultNow(),
 });
 
+export const workspaceAppConnections = pgTable(
+  "workspace_app_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    toolkit: text("toolkit").notNull(),
+    composioUserId: text("composio_user_id").notNull(),
+    composioConnectedAccountId: text("composio_connected_account_id").notNull(),
+    status: text("status").notNull().default("active"),
+    /** entire_drive | folder | file — app-enforced Knowledge Docs jurisdiction */
+    driveAccessMode: text("drive_access_mode").notNull().default("entire_drive"),
+    driveScopeId: text("drive_scope_id"),
+    driveScopeName: text("drive_scope_name"),
+    driveScopeMimeType: text("drive_scope_mime_type"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("workspace_app_connections_workspace_toolkit_uidx").on(
+      t.workspaceId,
+      t.toolkit,
+    ),
+  ],
+);
+
 export const workspaceAssetGroups = pgTable("workspace_asset_groups", {
   id: uuid("id").primaryKey().defaultRandom(),
   workspaceId: uuid("workspace_id")
@@ -649,8 +680,13 @@ export const agentAssets = pgTable("agent_assets", {
   groupId: uuid("group_id")
     .notNull()
     .references(() => workspaceAssetGroups.id, { onDelete: "cascade" }),
+  /** file — sendable on WhatsApp; doc — live file the agent re-reads via readLinkedDoc */
+  kind: text("kind").notNull().default("file"),
+  /** upload | google_drive (docs can be either; sendable files are always uploads) */
+  source: text("source").notNull().default("upload"),
   fileName: text("file_name").notNull(),
-  storagePath: text("storage_path").notNull(),
+  storagePath: text("storage_path"),
+  driveFileId: text("drive_file_id"),
   mimeType: text("mime_type").notNull(),
   description: text("description").notNull().default(""),
   fileSizeBytes: integer("file_size_bytes").notNull().default(0),

@@ -62,7 +62,7 @@ export function AssetGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupH
         </div>
         <CardDescription>Select a group to view or edit files.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="flex flex-1 flex-col gap-2">
         {groups.length > 0 ? (
           <>
             {listGroups.map((group) => (
@@ -77,7 +77,7 @@ export function AssetGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupH
               >
                 <p className="min-w-0 truncate font-medium">{group.name}</p>
                 <p className="shrink-0 text-xs">
-                  {group.asset_count} {group.asset_count === 1 ? "file" : "files"}
+                  {group.asset_count} {group.asset_count === 1 ? "item" : "items"}
                 </p>
               </Link>
             ))}
@@ -88,6 +88,7 @@ export function AssetGroupsSidebar({ groups, selectedGroupId, onAddGroup, groupH
                 pageSize={pageSize}
                 onPage={setPage}
                 compact
+                className="mt-auto"
               />
             ) : null}
           </>

@@ -145,16 +145,24 @@ beforeEach(() => {
 });
 
 describe("runAgentSession custom tool failures", () => {
-  // The reported leak: a custom tool fails, the model still drafts an apology.
-  // The runtime must drop that draft and hand off instead of sending it.
-  it("suppresses the customer reply and hands off when a custom tool is still failing", async () => {
+  // Nested callTool failure inside execute_code must suppress the draft reply.
+  it("suppresses the customer reply and hands off when a nested code tool is still failing", async () => {
     queueRun(
       [
         [
           {
-            toolName: "get_weather",
+            toolName: "execute_code",
             toolCallId: "call-1",
-            output: { ok: false, error: "TypeError: fetch failed" },
+            output: {
+              ok: true,
+              result: { note: "failed" },
+              toolResults: [
+                {
+                  toolKey: "get_weather",
+                  output: { ok: false, error: "TypeError: fetch failed" },
+                },
+              ],
+            },
           },
         ],
       ],
@@ -181,23 +189,40 @@ describe("runAgentSession custom tool failures", () => {
     );
   });
 
-  // A retry within the same run that succeeds means the internal problem
-  // recovered; the valid answer must be sent and no handoff should happen.
-  it("sends the reply when the custom tool succeeds on a later step", async () => {
+  // A later execute_code that succeeds nested callTool clears the failure.
+  it("sends the reply when a nested code tool succeeds on a later step", async () => {
     queueRun(
       [
         [
           {
-            toolName: "get_weather",
+            toolName: "execute_code",
             toolCallId: "call-1",
-            output: { ok: false, error: "TypeError: fetch failed" },
+            output: {
+              ok: true,
+              result: {},
+              toolResults: [
+                {
+                  toolKey: "get_weather",
+                  output: { ok: false, error: "TypeError: fetch failed" },
+                },
+              ],
+            },
           },
         ],
         [
           {
-            toolName: "get_weather",
+            toolName: "execute_code",
             toolCallId: "call-2",
-            output: { ok: true, temperature: 31 },
+            output: {
+              ok: true,
+              result: { temperature: 31 },
+              toolResults: [
+                {
+                  toolKey: "get_weather",
+                  output: { ok: true, temperature: 31 },
+                },
+              ],
+            },
           },
         ],
       ],
@@ -213,14 +238,18 @@ describe("runAgentSession custom tool failures", () => {
   });
 
   // Dry runs (evals, previews) must never change conversation handling.
-  it("does not hand off on a custom tool failure during a dry run", async () => {
+  it("does not hand off on a nested code tool failure during a dry run", async () => {
     queueRun(
       [
         [
           {
-            toolName: "get_weather",
+            toolName: "execute_code",
             toolCallId: "call-1",
-            output: { ok: false, error: "TypeError: fetch failed" },
+            output: {
+              ok: false,
+              error: "Compile failed",
+              toolResults: [],
+            },
           },
         ],
       ],

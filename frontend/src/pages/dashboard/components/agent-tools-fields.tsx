@@ -3,6 +3,7 @@ import { useWorkspace } from "@/context/workspace";
 import { Wrench, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { AgentAttachCheckboxList } from "@/pages/dashboard/components/agent-attach-checkbox-list";
 import type { AgentToolsFieldsProps } from "@/types/ui";
 
 export function AgentToolsFields({
@@ -30,15 +31,13 @@ export function AgentToolsFields({
             </Button>
           ) : null}
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {tools.map((tool) => (
-            <label key={tool.id} className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-sm">
-              <input type="checkbox" name="tools" value={tool.tool_key} defaultChecked={selectedTools.has(tool.tool_key)} />
-              <span>{tool.display_name}</span>
-            </label>
-          ))}
-        </div>
-        {tools.length === 0 ? (
+        {tools.length > 0 ? (
+          <AgentAttachCheckboxList
+            fieldName="tools"
+            items={tools.map((tool) => ({ id: tool.tool_key, name: tool.display_name }))}
+            selectedIds={selectedTools}
+          />
+        ) : (
           <p className="text-xs text-muted-foreground">
             No custom tools yet.{" "}
             <Link to={toolsTabHref} className="font-medium text-primary underline-offset-4 hover:underline">
@@ -46,7 +45,7 @@ export function AgentToolsFields({
             </Link>{" "}
             to create one.
           </p>
-        ) : null}
+        )}
       </fieldset>
       <fieldset className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -59,22 +58,21 @@ export function AgentToolsFields({
             </Button>
           ) : null}
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {skills.length > 0 ? skills.map((skill) => (
-            <label key={skill.id} className="flex items-center gap-2 rounded-md border border-border/70 px-3 py-2 text-sm">
-              <input type="checkbox" name="skills" value={skill.skill_key} defaultChecked={selectedSkills.has(skill.skill_key)} />
-              <span>{skill.display_name}</span>
-            </label>
-          )) : (
-            <p className="text-xs text-muted-foreground">
-              No skills in your workspace yet.{" "}
-              <Link to={`${wsPath("/agent")}?tab=skills`} className="font-medium text-primary underline-offset-4 hover:underline">
-                Add skills
-              </Link>{" "}
-              under Agent setup.
-            </p>
-          )}
-        </div>
+        {skills.length > 0 ? (
+          <AgentAttachCheckboxList
+            fieldName="skills"
+            items={skills.map((skill) => ({ id: skill.skill_key, name: skill.display_name }))}
+            selectedIds={selectedSkills}
+          />
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No skills in your workspace yet.{" "}
+            <Link to={`${wsPath("/agent")}?tab=skills`} className="font-medium text-primary underline-offset-4 hover:underline">
+              Add skills
+            </Link>{" "}
+            under Agent setup.
+          </p>
+        )}
       </fieldset>
     </>
   );

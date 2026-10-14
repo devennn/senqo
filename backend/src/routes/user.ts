@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/auth.js";
 import type { AuthVariables } from "../middleware/auth.js";
 import { workspaceMiddleware } from "../middleware/workspace.js";
 import type { WorkspaceVariables } from "../middleware/workspace.js";
+import userAppsRoute from "./user-apps.js";
 import { findUserById, updateUserPassword } from "../repositories/auth-users.js";
 import { verifyPassword, hashPassword } from "../lib/auth-users.js";
 import { parseListPageParams } from "../lib/pagination.js";
@@ -17,16 +18,36 @@ import {
 } from "../repositories/agent.js";
 import {
   ASSET_GROUP_NAME_MAX_LEN,
+  DOC_UPLOAD_MAX_BYTES,
   createAgentAssetInGroup,
+  createAgentDriveDocInGroup,
   createWorkspaceAssetGroup,
   deleteAgentAssetFromGroup,
   deleteWorkspaceAssetGroup,
+  getAgentAssetInGroup,
   getWorkspaceAssetGroupDetail,
+  isAllowedDocUploadFileName,
+  isFolderMimeType,
   listWorkspaceAssetGroupSummaries,
   updateAgentAssetDescription,
   updateWorkspaceAssetGroupName,
   validateAssetGroupIdsForWorkspace,
 } from "../repositories/workspace-asset-groups.js";
+import { getWorkspaceAppConnection } from "../repositories/workspace-app-connections.js";
+import {
+  downloadGoogleDriveFileText,
+  GOOGLEDRIVE_TOOLKIT,
+} from "../services/composio.js";
+import { isDriveFileInAccessScope } from "../services/drive-access-scope.js";
+import {
+  extractTextPreviewForSummary,
+  summarizeLinkedDocContent,
+} from "../services/linked-docs-summarize.js";
+import { storageDownload } from "../lib/storage.js";
+import {
+  validateWorkspaceAssetUpload,
+  WORKSPACE_ASSET_MAX_BYTES,
+} from "../lib/workspace-asset-limits.js";
 import { getWorkspaceStorageUsage } from "../repositories/workspace-storage.js";
 import { resolveKnowledgeRefLinks } from "../services/knowledge-ref-links.js";
 import {
@@ -532,11 +553,11 @@ app.put("/agents/:id", async (c) => {
     for (const userId of uniqueIds) {
       const teammate = await isWorkspaceTeammate(workspaceId, userId);
       if (!teammate) {
-        return c.json({ error: "invalid_handoff_notify_user" }, 400);
+        return c.json({ error: "invalid_handoff_notify_user", userId }, 400);
       }
       const verified = await userHasVerifiedHandoffPhone(workspaceId, userId);
       if (!verified) {
-        return c.json({ error: "handoff_notify_user_unverified" }, 400);
+        return c.json({ error: "handoff_notify_user_unverified", userId }, 400);
       }
     }
     handoffNotifyUserIds = uniqueIds;
@@ -1210,12 +1231,14 @@ app.post("/workspace-asset-groups/:id/assets", async (c) => {
   const formData = await c.req.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) return c.json({ error: "file_required" }, 400);
+  const kind = String(formData.get("kind") ?? "file") === "doc" ? "doc" : "file";
   const description = String(formData.get("description") ?? "").trim();
   const data = await file.arrayBuffer();
   const result = await createAgentAssetInGroup({
     workspaceId,
     groupId,
-    fileName: file.name || "asset",
+    kind,
+    fileName: file.name || (kind === "doc" ? "doc" : "asset"),
     mimeType: file.type || "application/octet-stream",
     description,
     data,
@@ -1230,6 +1253,222 @@ app.post("/workspace-asset-groups/:id/assets", async (c) => {
     return c.json({ error: "asset_upload_failed", message: result.message }, status);
   }
   return c.json({ asset: result.asset });
+});
+
+const createDriveDocSchema = z
+  .object({
+    source: z.literal("google_drive"),
+    driveFileId: z.string().min(1),
+    fileName: z.string().min(1),
+    mimeType: z.string().min(1),
+    description: z.string().min(1),
+  })
+  .strict();
+
+app.post("/workspace-asset-groups/:id/assets/drive", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const body = createDriveDocSchema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "invalid_payload" }, 400);
+  if (isFolderMimeType(body.data.mimeType)) {
+    return c.json({ error: "folder_not_allowed" }, 400);
+  }
+  const connection = await getWorkspaceAppConnection(workspaceId, GOOGLEDRIVE_TOOLKIT);
+  if (!connection || connection.status !== "active") {
+    return c.json({ error: "drive_not_connected" }, 400);
+  }
+  const allowed = await isDriveFileInAccessScope({
+    workspaceId,
+    connection,
+    fileId: body.data.driveFileId,
+  });
+  if (!allowed) {
+    return c.json({ error: "outside_drive_access" }, 403);
+  }
+  const result = await createAgentDriveDocInGroup({
+    workspaceId,
+    groupId,
+    driveFileId: body.data.driveFileId,
+    fileName: body.data.fileName,
+    mimeType: body.data.mimeType,
+    description: body.data.description,
+  });
+  if (!result.ok) {
+    return c.json({ error: "doc_create_failed", message: result.message }, 400);
+  }
+  return c.json({ asset: result.asset });
+});
+
+/** Text excerpt for AI summaries: uploads use bytes, Drive docs use the live download. */
+async function summarizeFileForDescription(input: {
+  fileName: string;
+  mimeType: string;
+  bytes?: Uint8Array | null;
+  text?: string | null;
+}): Promise<{ ok: true; description: string } | { ok: false; message: string }> {
+  const excerpt = extractTextPreviewForSummary(input);
+  const summarized = await summarizeLinkedDocContent({
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    excerpt,
+  });
+  if (!summarized.ok) {
+    return { ok: false, message: summarized.message };
+  }
+  return { ok: true, description: summarized.description };
+}
+
+async function driveFileTextExcerpt(input: {
+  workspaceId: string;
+  driveFileId: string;
+  fileName: string;
+  mimeType: string;
+}): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const connection = await getWorkspaceAppConnection(input.workspaceId, GOOGLEDRIVE_TOOLKIT);
+  if (!connection || connection.status !== "active") {
+    return { ok: false, error: "drive_not_connected" };
+  }
+  const allowed = await isDriveFileInAccessScope({
+    workspaceId: input.workspaceId,
+    connection,
+    fileId: input.driveFileId,
+  });
+  if (!allowed) {
+    return { ok: false, error: "outside_drive_access" };
+  }
+  const downloaded = await downloadGoogleDriveFileText({
+    workspaceId: input.workspaceId,
+    connectedAccountId: connection.composio_connected_account_id,
+    fileId: input.driveFileId,
+    mimeType: input.mimeType,
+  });
+  if (!downloaded.ok) {
+    return { ok: false, error: downloaded.error };
+  }
+  return { ok: true, text: downloaded.text };
+}
+
+app.post("/workspace-asset-groups/:id/assets/summarize", async (c) => {
+  const form = await c.req.formData();
+  const file = form.get("file");
+  if (!(file instanceof File)) return c.json({ error: "file_required" }, 400);
+  if (file.size > WORKSPACE_ASSET_MAX_BYTES) {
+    return c.json({ error: "file_too_large" }, 400);
+  }
+  const mimeType = file.type || "application/octet-stream";
+  if (isFolderMimeType(mimeType)) {
+    return c.json({ error: "folder_not_allowed" }, 400);
+  }
+  const allowedDoc = isAllowedDocUploadFileName(file.name);
+  const allowedAsset = validateWorkspaceAssetUpload({
+    fileName: file.name,
+    mimeType,
+    byteLength: file.size,
+  }).ok;
+  if (!allowedDoc && !allowedAsset) {
+    return c.json({ error: "unsupported_file_type" }, 400);
+  }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const summarized = await summarizeFileForDescription({
+    fileName: file.name,
+    mimeType,
+    bytes,
+  });
+  if (!summarized.ok) {
+    return c.json({ error: "summarize_failed", message: summarized.message }, 400);
+  }
+  return c.json({ description: summarized.description });
+});
+
+const summarizeDriveAssetSchema = z
+  .object({
+    source: z.literal("google_drive"),
+    driveFileId: z.string().min(1),
+    fileName: z.string().min(1),
+    mimeType: z.string().min(1),
+  })
+  .strict();
+
+app.post("/workspace-asset-groups/:id/assets/summarize-drive", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const body = summarizeDriveAssetSchema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "invalid_payload" }, 400);
+  if (isFolderMimeType(body.data.mimeType)) {
+    return c.json({ error: "folder_not_allowed" }, 400);
+  }
+  const driveText = await driveFileTextExcerpt({
+    workspaceId,
+    driveFileId: body.data.driveFileId,
+    fileName: body.data.fileName,
+    mimeType: body.data.mimeType,
+  });
+  const summarized = await summarizeFileForDescription({
+    fileName: body.data.fileName,
+    mimeType: body.data.mimeType,
+    text: driveText.ok
+      ? driveText.text
+      : `[Drive download unavailable: ${driveText.error}]`,
+  });
+  if (!summarized.ok) {
+    return c.json({ error: "summarize_failed", message: summarized.message }, 400);
+  }
+  return c.json({ description: summarized.description });
+});
+
+app.post("/workspace-asset-groups/:id/assets/:assetId/summarize", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    persistDescription?: boolean;
+  };
+  const asset = await getAgentAssetInGroup(workspaceId, groupId, c.req.param("assetId"));
+  if (!asset) {
+    return c.json({ error: "not_found" }, 404);
+  }
+
+  let summarized: { ok: true; description: string } | { ok: false; message: string };
+  if (asset.source === "google_drive" && asset.drive_file_id) {
+    const driveText = await driveFileTextExcerpt({
+      workspaceId,
+      driveFileId: asset.drive_file_id,
+      fileName: asset.file_name,
+      mimeType: asset.mime_type,
+    });
+    summarized = await summarizeFileForDescription({
+      fileName: asset.file_name,
+      mimeType: asset.mime_type,
+      text: driveText.ok
+        ? driveText.text
+        : `[Drive download unavailable: ${driveText.error}]`,
+    });
+  } else {
+    if (!asset.storage_path) {
+      return c.json({ error: "storage_path_missing" }, 400);
+    }
+    const bucket = asset.kind === "doc" ? "linked-docs" : "agent-assets";
+    const bytes = await storageDownload(bucket, asset.storage_path);
+    summarized = await summarizeFileForDescription({
+      fileName: asset.file_name,
+      mimeType: asset.mime_type,
+      bytes,
+    });
+  }
+
+  if (!summarized.ok) {
+    return c.json({ error: "summarize_failed", message: summarized.message }, 400);
+  }
+  if (body.persistDescription === true) {
+    const updated = await updateAgentAssetDescription({
+      workspaceId,
+      groupId,
+      assetId: asset.id,
+      description: summarized.description,
+    });
+    if (!updated.ok) {
+      return c.json({ error: "asset_update_failed", message: updated.message }, 400);
+    }
+  }
+  return c.json({ description: summarized.description });
 });
 
 const updateAgentAssetSchema = z.object({
@@ -2757,5 +2996,7 @@ app.post("/auth/ensure-profile", async (c) => {
   }
   return c.json({ ok: true });
 });
+
+app.route("/apps", userAppsRoute);
 
 export default app;

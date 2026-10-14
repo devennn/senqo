@@ -211,11 +211,19 @@ vi.mock("../repositories/workspace-custom-tools.js", () => ({
 
 vi.mock("../repositories/workspace-asset-groups.js", () => ({
   ASSET_GROUP_NAME_MAX_LEN: 80,
+  DOC_UPLOAD_MAX_BYTES: 20 * 1024 * 1024,
   createAgentAssetInGroup: vi.fn(),
+  createAgentDriveDocInGroup: vi.fn(),
   createWorkspaceAssetGroup: vi.fn(),
   deleteAgentAssetFromGroup: vi.fn(),
   deleteWorkspaceAssetGroup: vi.fn(),
+  getAgentAssetInGroup: vi.fn(),
   getWorkspaceAssetGroupDetail: vi.fn(),
+  isAllowedDocUploadFileName: (fileName: string) =>
+    [".pdf", ".csv", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".md"].some((ext) =>
+      fileName.toLowerCase().endsWith(ext),
+    ),
+  isFolderMimeType: (mime: string) => mime === "application/vnd.google-apps.folder",
   listWorkspaceAssetGroupSummaries: vi.fn().mockResolvedValue([]),
   updateAgentAssetDescription: vi.fn(),
   updateWorkspaceAssetGroupName: vi.fn(),
@@ -336,6 +344,31 @@ vi.mock("../agent-evals/index.js", () => ({
   runEvalCase: vi.fn(),
 }));
 
+vi.mock("../services/composio.js", () => ({
+  GOOGLEDRIVE_TOOLKIT: "googledrive",
+  downloadGoogleDriveFileText: vi.fn(),
+}));
+
+vi.mock("../services/drive-access-scope.js", () => ({
+  isDriveFileInAccessScope: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("../repositories/workspace-app-connections.js", () => ({
+  getWorkspaceAppConnection: vi.fn(),
+}));
+
+vi.mock("../lib/storage.js", () => ({
+  storageDownload: vi.fn(),
+}));
+
+vi.mock("../services/linked-docs-summarize.js", () => ({
+  extractTextPreviewForSummary: vi.fn(
+    ({ text, fileName }: { text?: string; fileName?: string }) =>
+      text ?? `preview:${fileName ?? "file"}`,
+  ),
+  summarizeLinkedDocContent: vi.fn(),
+}));
+
 vi.mock("../services/eval-run.js", () => ({
   runAndPersistEvalCase: vi.fn(),
 }));
@@ -366,7 +399,7 @@ vi.mock("../repositories/evals.js", () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { verifyToken } from "../lib/auth-jwt.js";
-import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser, isWorkspaceOwner, getWorkspaceMemberRole, updateWorkspaceSettingsAsOwner } from "../repositories/workspaces.js";
+import { validateWorkspaceMembership, listUserWorkspaces, createWorkspaceForUser, isWorkspaceOwner, isWorkspaceTeammate, getWorkspaceMemberRole, updateWorkspaceSettingsAsOwner } from "../repositories/workspaces.js";
 import { listConversationLabels, createConversationLabel, deleteConversationLabel } from "../repositories/conversation-labels.js";
 import { listContactsPage } from "../repositories/contacts.js";
 import { listConversations, getConversationWithContact, updateConversationHandlingMode } from "../repositories/conversations.js";
@@ -376,6 +409,7 @@ import { listConnections, listRecentConnectionEvents, createConversationMessage,
 import { listWorkspaceSecrets, createWorkspaceSecret, deleteWorkspaceSecret } from "../repositories/workspace-secrets.js";
 import { listApiKeys, createApiKey, deleteApiKey } from "../repositories/api-keys.js";
 import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentConfig } from "../repositories/agent.js";
+import { userHasVerifiedHandoffPhone } from "../repositories/handoff-phones.js";
 import { validateHandoffTopicGroupIdsForWorkspace } from "../repositories/handoff-topic-groups.js";
 import { getAgentPerformanceReport } from "../repositories/reports.js";
 import {
@@ -397,6 +431,15 @@ import { getProfileForSettings, updateProfile } from "../repositories/profiles.j
 import { getWorkspaceRow } from "../repositories/workspaces.js";
 import { generateApiKeyMaterial } from "../lib/api-keys.js";
 import { resolveKnowledgeRefLinks } from "../services/knowledge-ref-links.js";
+import {
+  createAgentDriveDocInGroup,
+  getAgentAssetInGroup,
+  updateAgentAssetDescription,
+} from "../repositories/workspace-asset-groups.js";
+import { getWorkspaceAppConnection } from "../repositories/workspace-app-connections.js";
+import { downloadGoogleDriveFileText } from "../services/composio.js";
+import { summarizeLinkedDocContent } from "../services/linked-docs-summarize.js";
+import { storageDownload } from "../lib/storage.js";
 
 const verifyTokenMock = vi.mocked(verifyToken);
 const validateWorkspaceMembershipMock = vi.mocked(validateWorkspaceMembership);
@@ -433,6 +476,8 @@ const createAgentConfigMock = vi.mocked(createAgentConfig);
 const getAgentConfigByIdMock = vi.mocked(getAgentConfigById);
 const updateAgentConfigMock = vi.mocked(updateAgentConfig);
 const validateHandoffTopicGroupIdsMock = vi.mocked(validateHandoffTopicGroupIdsForWorkspace);
+const isWorkspaceTeammateMock = vi.mocked(isWorkspaceTeammate);
+const userHasVerifiedHandoffPhoneMock = vi.mocked(userHasVerifiedHandoffPhone);
 const getAgentPerformanceReportMock = vi.mocked(getAgentPerformanceReport);
 const createConversationReportMock = vi.mocked(createConversationReport);
 const listConversationReportsForConversationMock = vi.mocked(
@@ -1610,6 +1655,88 @@ describe("PUT /agents/:id handoff topic groups", () => {
   });
 });
 
+describe("PUT /agents/:id handoff notify users", () => {
+  const AGENT_ID = "11111111-1111-4111-8111-111111111111";
+  const NOTIFY_USER_ID = "55555555-5555-4555-8555-555555555555";
+
+  function mockExistingAgent() {
+    getAgentConfigByIdMock.mockResolvedValue({
+      id: AGENT_ID,
+      profile_name: "Bot",
+      behavior: "",
+      tools: [],
+      skills: [],
+      response_template_groups: [],
+      handoff_topic_groups: [],
+      context_groups: [],
+      asset_groups: [],
+      handoff_notify_user_ids: [],
+      auto_assign_conversation_labels: true,
+    });
+  }
+
+  function requestNotifyUpdate() {
+    return app.request(`/agents/${AGENT_ID}`, {
+      method: "PUT",
+      headers: AUTH,
+      body: JSON.stringify({
+        profileName: "Bot",
+        behavior: "",
+        tools: [],
+        skills: [],
+        handoffNotifyUserIds: [NOTIFY_USER_ID],
+      }),
+    });
+  }
+
+  // A notify user without a verified phone rejects the save AND names them, so the
+  // dialog can point at the teammate instead of a bare error code (the original bug).
+  it("returns 400 handoff_notify_user_unverified with the userId", async () => {
+    mockExistingAgent();
+    isWorkspaceTeammateMock.mockResolvedValue(true);
+    userHasVerifiedHandoffPhoneMock.mockResolvedValue(false);
+
+    const res = await requestNotifyUpdate();
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("handoff_notify_user_unverified");
+    expect(body.userId).toBe(NOTIFY_USER_ID);
+    expect(updateAgentConfigMock).not.toHaveBeenCalled();
+  });
+
+  // Verified notify users persist so handoff alerts can be delivered.
+  it("persists verified handoffNotifyUserIds on agent update", async () => {
+    mockExistingAgent();
+    isWorkspaceTeammateMock.mockResolvedValue(true);
+    userHasVerifiedHandoffPhoneMock.mockResolvedValue(true);
+    updateAgentConfigMock.mockResolvedValue({ ok: true });
+
+    const res = await requestNotifyUpdate();
+
+    expect(res.status).toBe(200);
+    expect(userHasVerifiedHandoffPhoneMock).toHaveBeenCalledWith("ws-1", NOTIFY_USER_ID);
+    expect(updateAgentConfigMock).toHaveBeenCalledWith(
+      expect.objectContaining({ handoff_notify_user_ids: [NOTIFY_USER_ID] }),
+    );
+  });
+
+  // A user who is not a workspace teammate cannot become a notify target.
+  it("returns 400 invalid_handoff_notify_user with the userId for a non-teammate", async () => {
+    mockExistingAgent();
+    isWorkspaceTeammateMock.mockResolvedValue(false);
+
+    const res = await requestNotifyUpdate();
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid_handoff_notify_user");
+    expect(body.userId).toBe(NOTIFY_USER_ID);
+    expect(userHasVerifiedHandoffPhoneMock).not.toHaveBeenCalled();
+    expect(updateAgentConfigMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("PATCH /conversations/:id/handling-mode", () => {
   // Manual toggle to human must succeed and only schedule notify (best-effort).
   it("switches to human and schedules notify without awaiting delivery", async () => {
@@ -1802,6 +1929,246 @@ describe("POST /knowledge-ref-links", () => {
           href: "/knowledge?tab=context&contextGroupId=ctx-g1&contextEntryId=ctx-e1",
         },
       ],
+    });
+  });
+});
+
+describe("POST /workspace-asset-groups/:id/assets/drive", () => {
+  const GROUP_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+  // Folder mime is rejected before any Drive access checks run.
+  it("rejects folder mime for the drive doc source", async () => {
+    const res = await app.request(`/workspace-asset-groups/${GROUP_ID}/assets/drive`, {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({
+        source: "google_drive",
+        driveFileId: "folder-1",
+        fileName: "Folder",
+        mimeType: "application/vnd.google-apps.folder",
+        description: "A folder",
+      }),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "folder_not_allowed" });
+    expect(vi.mocked(createAgentDriveDocInGroup)).not.toHaveBeenCalled();
+  });
+
+  // Live Drive docs join asset groups once Drive is connected and the file is in scope.
+  it("adds a live drive doc when the file is inside Drive access", async () => {
+    vi.mocked(getWorkspaceAppConnection).mockResolvedValueOnce({
+      id: "c1",
+      workspace_id: "ws-1",
+      toolkit: "googledrive",
+      composio_user_id: "workspace_ws-1",
+      composio_connected_account_id: "ca-1",
+      status: "active",
+      drive_access_mode: "entire_drive",
+      drive_scope_id: null,
+      drive_scope_name: null,
+      drive_scope_mime_type: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    vi.mocked(createAgentDriveDocInGroup).mockResolvedValueOnce({
+      ok: true,
+      message: "Live doc added",
+      asset: { id: "asset-1" } as never,
+    });
+
+    const res = await app.request(`/workspace-asset-groups/${GROUP_ID}/assets/drive`, {
+      method: "POST",
+      headers: AUTH,
+      body: JSON.stringify({
+        source: "google_drive",
+        driveFileId: "file-1",
+        fileName: "inv.csv",
+        mimeType: "text/csv",
+        description: "Inventory",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ asset: { id: "asset-1" } });
+    expect(createAgentDriveDocInGroup).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      groupId: GROUP_ID,
+      driveFileId: "file-1",
+      fileName: "inv.csv",
+      mimeType: "text/csv",
+      description: "Inventory",
+    });
+  });
+});
+
+describe("POST /workspace-asset-groups/:id/assets/:assetId/summarize", () => {
+  const GROUP_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+  // Missing assets cannot be summarized.
+  it("returns 404 when the asset does not exist", async () => {
+    vi.mocked(getAgentAssetInGroup).mockResolvedValueOnce(null);
+    const res = await app.request(
+      `/workspace-asset-groups/${GROUP_ID}/assets/asset-missing/summarize`,
+      { method: "POST", headers: AUTH },
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+  });
+
+  // Drive doc assets regenerate their description from live Drive content.
+  it("regenerates a description for a drive doc asset", async () => {
+    vi.mocked(getAgentAssetInGroup).mockResolvedValueOnce({
+      id: "asset-1",
+      workspace_id: "ws-1",
+      group_id: GROUP_ID,
+      kind: "doc",
+      source: "google_drive",
+      file_name: "stock.csv",
+      storage_path: null,
+      drive_file_id: "drive-1",
+      mime_type: "text/csv",
+      description: "old",
+      file_size_bytes: 0,
+      sort_order: 0,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    vi.mocked(getWorkspaceAppConnection).mockResolvedValueOnce({
+      id: "c1",
+      workspace_id: "ws-1",
+      toolkit: "googledrive",
+      composio_user_id: "workspace_ws-1",
+      composio_connected_account_id: "ca-1",
+      status: "active",
+      drive_access_mode: "entire_drive",
+      drive_scope_id: null,
+      drive_scope_name: null,
+      drive_scope_mime_type: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    vi.mocked(downloadGoogleDriveFileText).mockResolvedValueOnce({
+      ok: true,
+      text: "sku,qty\nA,10",
+    });
+    vi.mocked(summarizeLinkedDocContent).mockResolvedValueOnce({
+      ok: true,
+      description: "Live stock sheet — use for inventory Q&A.",
+    });
+
+    const res = await app.request(
+      `/workspace-asset-groups/${GROUP_ID}/assets/asset-1/summarize`,
+      { method: "POST", headers: AUTH },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      description: "Live stock sheet — use for inventory Q&A.",
+    });
+    expect(downloadGoogleDriveFileText).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      connectedAccountId: "ca-1",
+      fileId: "drive-1",
+      mimeType: "text/csv",
+    });
+  });
+
+  // Uploaded doc assets are read from the linked-docs bucket, not the sendable-assets bucket.
+  it("regenerates a description for an uploaded doc from the doc bucket", async () => {
+    vi.mocked(getAgentAssetInGroup).mockResolvedValueOnce({
+      id: "asset-2",
+      workspace_id: "ws-1",
+      group_id: GROUP_ID,
+      kind: "doc",
+      source: "upload",
+      file_name: "notes.csv",
+      storage_path: "ws-1/notes.csv",
+      drive_file_id: null,
+      mime_type: "text/csv",
+      description: "old",
+      file_size_bytes: 5,
+      sort_order: 0,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    vi.mocked(storageDownload).mockResolvedValueOnce(
+      new TextEncoder().encode("sku,qty\nA,10"),
+    );
+    vi.mocked(summarizeLinkedDocContent).mockResolvedValueOnce({
+      ok: true,
+      description: "Inventory CSV.",
+    });
+
+    const res = await app.request(
+      `/workspace-asset-groups/${GROUP_ID}/assets/asset-2/summarize`,
+      { method: "POST", headers: AUTH },
+    );
+
+    expect(res.status).toBe(200);
+    expect(storageDownload).toHaveBeenCalledWith("linked-docs", "ws-1/notes.csv");
+  });
+
+  // Bulk re-runs persist the fresh summary in the same request instead of a follow-up PATCH.
+  it("persists the description when persistDescription is true", async () => {
+    vi.mocked(getAgentAssetInGroup).mockResolvedValueOnce({
+      id: "asset-1",
+      workspace_id: "ws-1",
+      group_id: GROUP_ID,
+      kind: "doc",
+      source: "google_drive",
+      file_name: "stock.csv",
+      storage_path: null,
+      drive_file_id: "drive-1",
+      mime_type: "text/csv",
+      description: "old",
+      file_size_bytes: 0,
+      sort_order: 0,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    vi.mocked(getWorkspaceAppConnection).mockResolvedValueOnce({
+      id: "c1",
+      workspace_id: "ws-1",
+      toolkit: "googledrive",
+      composio_user_id: "workspace_ws-1",
+      composio_connected_account_id: "ca-1",
+      status: "active",
+      drive_access_mode: "entire_drive",
+      drive_scope_id: null,
+      drive_scope_name: null,
+      drive_scope_mime_type: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    });
+    vi.mocked(downloadGoogleDriveFileText).mockResolvedValueOnce({
+      ok: true,
+      text: "sku,qty\nA,10",
+    });
+    vi.mocked(summarizeLinkedDocContent).mockResolvedValueOnce({
+      ok: true,
+      description: "Fresh summary",
+    });
+    vi.mocked(updateAgentAssetDescription).mockResolvedValueOnce({
+      ok: true,
+      message: "Description saved",
+    });
+
+    const res = await app.request(
+      `/workspace-asset-groups/${GROUP_ID}/assets/asset-1/summarize`,
+      {
+        method: "POST",
+        headers: AUTH,
+        body: JSON.stringify({ persistDescription: true }),
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ description: "Fresh summary" });
+    expect(updateAgentAssetDescription).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      groupId: GROUP_ID,
+      assetId: "asset-1",
+      description: "Fresh summary",
     });
   });
 });

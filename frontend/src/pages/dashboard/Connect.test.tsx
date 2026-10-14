@@ -31,6 +31,10 @@ vi.mock("@/pages/dashboard/connect/components/connection-unavailable-notice", ()
   ConnectionUnavailableNotice: () => <div>Connections unavailable</div>,
 }));
 
+vi.mock("@/pages/dashboard/connect/components/apps-panel", () => ({
+  AppsPanel: () => <div>Apps panel</div>,
+}));
+
 vi.mock("@/components/ui/spinner", () => ({
   PageLoader: ({ label }: { label: string }) => <div>{label}</div>,
 }));
@@ -75,10 +79,13 @@ describe("Connect WhatsApp page", () => {
     mockUseConnections.mockReturnValue(defaultHookState());
   });
 
-  // Heading renders — confirms correct page.
-  it("renders Connect WhatsApp heading", () => {
+  // Heading and full-width section tabs match Knowledge layout.
+  it("renders Connect heading and WhatsApp/Apps tabs", () => {
     renderPage();
-    expect(screen.getByRole("heading", { name: "Connect WhatsApp" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Connect sections" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "WhatsApp" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Apps" })).toBeInTheDocument();
   });
 
   // Loader shows while connections are loading.

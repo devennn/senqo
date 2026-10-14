@@ -8,8 +8,11 @@ const ASSET: AgentAssetRecord = {
   id: "asset-1",
   workspace_id: "ws-1",
   group_id: "group-1",
+  kind: "file",
+  source: "upload",
   file_name: "menu.pdf",
   storage_path: "path/menu.pdf",
+  drive_file_id: null,
   mime_type: "application/pdf",
   description: "",
   file_size_bytes: 1024,
@@ -17,6 +20,19 @@ const ASSET: AgentAssetRecord = {
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z",
   preview_url: null,
+};
+
+const DOC_ASSET: AgentAssetRecord = {
+  ...ASSET,
+  id: "asset-doc",
+  kind: "doc",
+  source: "google_drive",
+  file_name: "stock.csv",
+  storage_path: null,
+  drive_file_id: "drive-1",
+  mime_type: "text/csv",
+  description: "old",
+  open_url: "https://docs.google.com/spreadsheets/d/drive-1/edit",
 };
 
 const onDelete = vi.fn();
@@ -44,7 +60,7 @@ describe("AgentAssetRow removal", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/menu\.pdf.*removed from this agent/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/menu\.pdf.*removed from this group/i)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
     expect(onDelete).toHaveBeenCalledWith("asset-1");
@@ -62,5 +78,37 @@ describe("AgentAssetRow removal", () => {
 
     expect(onDelete).not.toHaveBeenCalled();
     expect(screen.getByText("menu.pdf")).toBeInTheDocument();
+  });
+
+  // Live docs render the kind badge with an open link, and Regenerate fills the description draft
+  // with the AI rewrite so the operator can review before saving.
+  it("AgentAssetRow → shows live doc details and regenerates the description", async () => {
+    const user = userEvent.setup();
+    const onSummarize = vi
+      .fn()
+      .mockResolvedValue("Live stock sheet — use for inventory Q&A.");
+    render(
+      <AgentAssetRow
+        asset={DOC_ASSET}
+        onSaveDescription={onSaveDescription}
+        onSummarize={onSummarize}
+        onDelete={onDelete}
+      />,
+    );
+
+    expect(screen.getByText("Live doc")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open/i })).toHaveAttribute(
+      "href",
+      "https://docs.google.com/spreadsheets/d/drive-1/edit",
+    );
+    expect(screen.getByRole("button", { name: /regenerate/i })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: /regenerate/i }));
+
+    expect(onSummarize).toHaveBeenCalledWith("asset-doc");
+    expect(screen.getByRole("textbox", { name: /what is this about/i })).toHaveValue(
+      "Live stock sheet — use for inventory Q&A.",
+    );
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 });
