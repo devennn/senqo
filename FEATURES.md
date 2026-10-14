@@ -29,7 +29,7 @@
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model
 - Failed AI runs — when an internal AI error occurs (a thrown run, or `execute_code` / a nested catalog tool that still returns `ok: false` — a later successful retry does not count), the customer gets no reply: the runtime drops the draft reply, the chat switches to human handling, the thread shows an operator-only AI error event (customers never see it), and team members ticked for AI error alerts on Settings → Team are notified (default: nobody)
 - Business time — every agent run receives the workspace timezone and current business-local time; relative dates ("tonight", "tomorrow") and time-specific requests are reasoned in that timezone, and the agent must check opening hours or availability from workspace knowledge before confirming any time; it offers alternatives or hands off instead of guessing
-- Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`. At agent runtime they are not discrete ToolLoop tools: the model calls builtin `execute_code` and invokes attached catalog tools via `callTool(toolKey, input)` inside one script (code mode for multi-step API work); the same sandbox exposes `readLinkedDoc` and allowlisted `composioExecute` for live Knowledge Docs / Google Drive
+- Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`. At agent runtime they are not discrete ToolLoop tools: the model calls builtin `execute_code` and invokes attached catalog tools via `callTool(toolKey, input)` inside one script (code mode for multi-step API work); the same sandbox exposes `readLinkedDoc` and allowlisted `composioExecute` for live docs (Knowledge → Assets) / Google Drive
 - AI tool draft — on Create tool, Generate with AI (Execute code row) drafts name, description, required env, and execute code from pasted API examples or instructions; review before save
 - Workspace secrets — Settings → Secrets stores encrypted env values as `ctx.env` at tool runtime
 - Built-in tools — platform tools (schedule tasks, handoff, labels, load skills, execute_code) always on; WhatsApp replies come from structured `messages` (up to 3 bubbles) sent by the runtime after the agent run
@@ -38,17 +38,17 @@
 
 ## Knowledge base
 
-- Knowledge page — top-level nav for authoring Context, Response templates, Human handoff, Assets, and Docs (Agent keeps Profile and Skill/Tool catalogs)
-- Import docs — Knowledge page action: pick an agent, upload PDF/CSV/Markdown (up to 20 MB per file, 5 files), AI drafts context/skills/templates in one background job at a time, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs to continue (one-shot draft path; separate from live Docs)
-- Docs (live links) — Knowledge → Docs: add one file at a time (upload or Google Drive); after pick, AI drafts a short agent-facing description (what’s in the file + what the agent can do with it; editable; Regenerate on edit); agent re-reads current content at chat time via `execute_code` (`readLinkedDoc` / allowlisted Composio Drive tools), so spreadsheets stay fresh — Google Sheets are exported as full workbooks (every tab), not first-sheet CSV only
+- Knowledge page — top-level nav for authoring Context, Response templates, Human handoff, and Assets (Agent keeps Profile and Skill/Tool catalogs)
+- Import docs — Knowledge page action: pick an agent, upload PDF/CSV/Markdown (up to 20 MB per file, 5 files), AI drafts context/skills/templates in one background job at a time, review when ready (accept/discard per group or item, add one-by-one or all accepted), then attach to that agent; reopen Import docs to continue (one-shot draft path; separate from live docs)
+- Asset groups — Knowledge → Assets groups hold sendable files and live docs (images, video, audio, documents; up to 20 MB per item, 40 items per group). Add asset offers Upload (Sendable file or Live doc) or Google Drive live link; AI drafts the “what is this about” description after the pick (editable). Regenerate on a row rewrites one item for review; Re-run summaries rewrites and saves every item in the group (manual edits overwritten). Attach groups per agent on Profile → Capability
+- Live docs — a Live doc inside an asset group (upload or Google Drive) is re-read at chat time via `execute_code` (`readLinkedDoc` / allowlisted Composio Drive tools), so spreadsheets stay fresh — Google Sheets are exported as full workbooks (every tab), not first-sheet CSV only; Drive picks must sit inside the Connect access boundary (folders rejected); the agent never sends a live doc on WhatsApp
 - Workspace context — structured factual snippets organized into groups (Knowledge → Context); list rows show entry count vs group limit; the editor shows last updated and which agents attach the group; groups older than 90 days show a may-be-outdated hint
 - Response templates — canned Q&A pairs used as authoritative replies (Knowledge → Response templates); list rows show entry count vs group limit; editor shows last-updated / used-by / outdated hints
 - Handoff topics — escalation definitions for when to transfer to a human (create/edit groups on Knowledge → Human handoff; attach groups to an agent on Profile → Attached knowledge → Topics that need a human so they are included in the agent prompt with entry ids for `handoff_to_human`; from a group, Handoff settings can also attach agents and choose notify people); list rows show topic count vs group limit; editor shows last-updated / used-by / outdated hints
-- Handoff notify people — via the Handoff settings dialog on a topic group, pick one or more teammates with verified handoff phones for the selected agents; each gets an alert from the conversation’s WhatsApp line when they registered on that same line
+- Handoff notify people — via the Handoff settings dialog on a topic group, pick one or more teammates with verified handoff phones for the selected agents; each gets an alert from the conversation’s WhatsApp line when they registered on that same line; saved notify people whose phone is no longer verified are flagged in the dialog and must be unchecked before saving
 - Skills — markdown playbooks for specialized workflows (Agent → Skill Catalog)
-- Asset groups — sendable files (images, video, audio, documents; up to 20 MB per file) the agent reasons about (Knowledge → Assets; attach on Profile → Capability)
 - Auto-assign labels — agent can classify conversations with workspace labels
-- Agent attach — Profile → Attached knowledge selects context/template/handoff groups; Profile → Capability selects assets, linked docs, tools, and skills
+- Agent attach — Profile → Attached knowledge selects context/template/handoff groups; Profile → Capability selects asset groups (sendable files + live docs), tools, and skills
 
 ## Contacts (CRM)
 
@@ -72,8 +72,8 @@
 ## Connect Apps
 
 - Apps tab — Connect → Apps (alongside WhatsApp); Google Drive via Composio OAuth (`COMPOSIO_API_KEY`); one Drive account per workspace (`workspace_<id>`)
-- Drive access boundary — after connect, setup chooses Entire Drive, a folder, or one file; Knowledge → Docs listing/linking (and agent reads) stay inside that jurisdiction (app-enforced; OAuth itself is still account-level)
-- Drive for Docs — Knowledge → Docs can pick Drive files only within Connect access (folders rejected as docs); agent reads via Composio inside code mode (read-only tool allowlist)
+- Drive access boundary — after connect, setup chooses Entire Drive, a folder, or one file; Knowledge → Assets live-doc listing/linking (and agent reads) stay inside that jurisdiction (app-enforced; OAuth itself is still account-level)
+- Drive for live docs — Knowledge → Assets can pick Drive files only within Connect access (folders rejected as docs); agent reads via Composio inside code mode (read-only tool allowlist)
 
 ## Scheduled tasks
 

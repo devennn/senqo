@@ -79,7 +79,6 @@ export type AgentConfigRecord = {
   handoff_topic_groups: string[];
   context_groups: string[];
   asset_groups: string[];
-  linked_docs: string[];
   handoff_notify_user_ids: string[];
 };
 
@@ -100,12 +99,21 @@ export type WorkspaceAssetGroupSummary = {
   asset_count: number;
 };
 
+/** file — sendable on WhatsApp; doc — live file the agent re-reads via readLinkedDoc */
+export type AgentAssetKind = "file" | "doc";
+
+/** upload | google_drive (docs can be either; sendable files are always uploads) */
+export type AgentAssetSource = "upload" | "google_drive";
+
 export type AgentAssetRecord = {
   id: string;
   workspace_id: string;
   group_id: string;
+  kind: AgentAssetKind;
+  source: AgentAssetSource;
   file_name: string;
-  storage_path: string;
+  storage_path: string | null;
+  drive_file_id: string | null;
   mime_type: string;
   description: string;
   file_size_bytes: number;
@@ -113,6 +121,7 @@ export type AgentAssetRecord = {
   created_at: string;
   updated_at: string;
   preview_url?: string | null;
+  open_url?: string | null;
 };
 
 export type WorkspaceAssetGroupWithAssets = {

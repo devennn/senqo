@@ -20,12 +20,6 @@ export type AgentPageData = {
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
-  workspaceLinkedDocs: Array<{
-    id: string;
-    file_name: string;
-    description: string;
-    source: string;
-  }>;
   tools: WorkspaceCustomToolListItem[];
   skills: WorkspaceSkillDefinitionRecord[];
   connections: WhatsappConnection[];
@@ -41,7 +35,6 @@ export function useAgents() {
     handoffTopicGroups: [],
     workspaceContextGroups: [],
     workspaceAssetGroups: [],
-    workspaceLinkedDocs: [],
     tools: [],
     skills: [],
     connections: [],
@@ -55,7 +48,7 @@ export function useAgents() {
     }
     try {
       const requestOptions = { workspaceId };
-      const [agentsRes, toolsRes, skillsRes, connectionsRes, linkedDocsRes] =
+      const [agentsRes, toolsRes, skillsRes, connectionsRes] =
         await Promise.all([
           api.get<{
             agents: AgentConfigRecord[];
@@ -77,14 +70,6 @@ export function useAgents() {
             "/api/user/connections",
             requestOptions,
           ),
-          api.get<{
-            docs: Array<{
-              id: string;
-              file_name: string;
-              description: string;
-              source: string;
-            }>;
-          }>("/api/user/apps/linked-docs", requestOptions),
         ]);
       setData({
         agents: agentsRes.agents.map((a): AgentConfigRecord => ({
@@ -97,7 +82,6 @@ export function useAgents() {
             : [],
           context_groups: Array.isArray(a.context_groups) ? [...a.context_groups] : [],
           asset_groups: Array.isArray(a.asset_groups) ? [...a.asset_groups] : [],
-          linked_docs: Array.isArray(a.linked_docs) ? [...a.linked_docs] : [],
           handoff_notify_user_ids: Array.isArray(a.handoff_notify_user_ids)
             ? a.handoff_notify_user_ids.map(String)
             : [],
@@ -107,9 +91,6 @@ export function useAgents() {
         handoffTopicGroups: agentsRes.handoffTopicGroups ?? [],
         workspaceContextGroups: agentsRes.workspaceContextGroups ?? [],
         workspaceAssetGroups: agentsRes.workspaceAssetGroups ?? [],
-        workspaceLinkedDocs: Array.isArray(linkedDocsRes.docs)
-          ? linkedDocsRes.docs
-          : [],
         tools: toolsRes.tools,
         skills: skillsRes.skills,
         connections: connectionsRes.connections,
@@ -182,7 +163,6 @@ export function useAgents() {
         contextGroups: Array.isArray(agent.context_groups) ? agent.context_groups : [],
         handoffTopicGroups: Array.isArray(agent.handoff_topic_groups) ? agent.handoff_topic_groups : [],
         assetGroups: Array.isArray(agent.asset_groups) ? agent.asset_groups : [],
-        linkedDocs: Array.isArray(agent.linked_docs) ? agent.linked_docs : [],
         attachedConnectionIds,
         autoAssignConversationLabels: agent.auto_assign_conversation_labels !== false,
       });

@@ -1,9 +1,9 @@
 import { storageDownload } from "../lib/storage.js";
 import { getWorkspaceAppConnection } from "../repositories/workspace-app-connections.js";
 import {
-  getWorkspaceLinkedDocById,
-  type WorkspaceLinkedDocRecord,
-} from "../repositories/workspace-linked-docs.js";
+  getAgentDocAssetById,
+} from "../repositories/workspace-asset-groups.js";
+import type { AgentAssetRecord } from "../types/repositories.js";
 import {
   downloadGoogleDriveFileText,
   GOOGLEDRIVE_TOOLKIT,
@@ -24,7 +24,7 @@ export type ReadLinkedDocResult =
   | { ok: false; error: string };
 
 async function textFromUpload(
-  doc: WorkspaceLinkedDocRecord,
+  doc: AgentAssetRecord,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   if (!doc.storage_path) {
     return { ok: false, error: "Upload path missing" };
@@ -62,7 +62,7 @@ export async function readLinkedDocContent(input: {
   if (input.allowedDocIds && !input.allowedDocIds.has(input.docId)) {
     return { ok: false, error: "Doc is not attached to this agent" };
   }
-  const doc = await getWorkspaceLinkedDocById(input.workspaceId, input.docId);
+  const doc = await getAgentDocAssetById(input.workspaceId, input.docId);
   if (!doc) {
     return { ok: false, error: "Doc not found" };
   }

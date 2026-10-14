@@ -72,8 +72,8 @@ export function AppsPanel() {
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base">Google Drive</CardTitle>
             <p className="text-sm text-muted-foreground">
-              One account per workspace. Optionally limit Knowledge Docs to a
-              folder or single file.
+              One account per workspace. Optionally limit live docs
+              (Knowledge → Assets) to a folder or single file.
             </p>
           </div>
         </CardHeader>

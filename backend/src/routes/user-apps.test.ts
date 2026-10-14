@@ -35,16 +35,6 @@ vi.mock("../services/drive-access-scope.js", () => ({
   listDriveItemsForConnection: vi.fn(),
 }));
 
-vi.mock("../repositories/workspace-linked-docs.js", () => ({
-  listWorkspaceLinkedDocs: vi.fn(),
-  createWorkspaceLinkedDoc: vi.fn(),
-  updateWorkspaceLinkedDoc: vi.fn(),
-  deleteWorkspaceLinkedDoc: vi.fn(),
-  getWorkspaceLinkedDocById: vi.fn(),
-  isFolderMimeType: (mime: string) =>
-    mime === "application/vnd.google-apps.folder",
-}));
-
 vi.mock("../services/composio.js", () => ({
   GOOGLEDRIVE_TOOLKIT: "googledrive",
   isComposioConfigured: vi.fn(() => true),
@@ -55,36 +45,16 @@ vi.mock("../services/composio.js", () => ({
   downloadGoogleDriveFileText: vi.fn(),
 }));
 
-vi.mock("../lib/storage.js", () => ({
-  storageUpload: vi.fn(),
-  storageRemove: vi.fn(),
-  storageDownload: vi.fn(),
-}));
-
-vi.mock("../services/linked-docs-summarize.js", () => ({
-  extractTextPreviewForSummary: vi.fn(({ text, fileName }: { text?: string; fileName: string }) =>
-    text ?? `preview:${fileName}`,
-  ),
-  summarizeLinkedDocContent: vi.fn(),
-}));
-
 import userAppsRoute from "./user-apps.js";
 import {
   disconnectWorkspaceAppConnection,
-  getWorkspaceAppConnection,
   listWorkspaceAppConnections,
   upsertWorkspaceAppConnection,
 } from "../repositories/workspace-app-connections.js";
 import {
-  createWorkspaceLinkedDoc,
-  getWorkspaceLinkedDocById,
-} from "../repositories/workspace-linked-docs.js";
-import {
-  downloadGoogleDriveFileText,
   listActiveGoogleDriveAccountId,
   startGoogleDriveConnect,
 } from "../services/composio.js";
-import { summarizeLinkedDocContent } from "../services/linked-docs-summarize.js";
 
 function appWithAuth() {
   const app = new Hono();
@@ -197,148 +167,6 @@ describe("POST /apps/googledrive/connect", () => {
       workspaceId: "ws-1",
       callbackUrl:
         "http://localhost:5173/ws-1/connect?tab=apps&connected=googledrive",
-    });
-  });
-});
-
-describe("POST /apps/linked-docs", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  // Drive create requires description and rejects folder mime at the route.
-  it("rejects folder mime for google_drive source", async () => {
-    const res = await appWithAuth().request("/apps/linked-docs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "google_drive",
-        driveFileId: "folder-1",
-        fileName: "Folder",
-        mimeType: "application/vnd.google-apps.folder",
-        description: "A folder",
-      }),
-    });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "folder_not_allowed" });
-    expect(createWorkspaceLinkedDoc).not.toHaveBeenCalled();
-  });
-
-  // Empty description fails validation before create.
-  it("rejects google_drive payload without description", async () => {
-    const res = await appWithAuth().request("/apps/linked-docs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "google_drive",
-        driveFileId: "file-1",
-        fileName: "inv.csv",
-        mimeType: "text/csv",
-        description: "",
-      }),
-    });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "invalid_payload" });
-  });
-});
-
-describe("POST /apps/linked-docs/summarize", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  // Drive summarize downloads content then returns an agent-facing description.
-  it("returns AI description for a Drive file", async () => {
-    vi.mocked(getWorkspaceAppConnection).mockResolvedValueOnce({
-      id: "c1",
-      workspace_id: "ws-1",
-      toolkit: "googledrive",
-      composio_user_id: "workspace_ws-1",
-      composio_connected_account_id: "ca-1",
-      status: "active",
-      drive_access_mode: "entire_drive",
-      drive_scope_id: null,
-      drive_scope_name: null,
-      drive_scope_mime_type: null,
-      created_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
-    });
-    vi.mocked(downloadGoogleDriveFileText).mockResolvedValueOnce({
-      ok: true,
-      text: "sku,qty\nA,10",
-    });
-    vi.mocked(summarizeLinkedDocContent).mockResolvedValueOnce({
-      ok: true,
-      description: "Inventory CSV — answer stock levels via readLinkedDoc.",
-    });
-
-    const res = await appWithAuth().request("/apps/linked-docs/summarize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source: "google_drive",
-        driveFileId: "drive-1",
-        fileName: "stock.csv",
-        mimeType: "text/csv",
-      }),
-    });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      description: "Inventory CSV — answer stock levels via readLinkedDoc.",
-    });
-  });
-});
-
-describe("POST /apps/linked-docs/:id/summarize", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  // Existing Drive docs can regenerate description from live content.
-  it("summarizes an existing google_drive linked doc", async () => {
-    vi.mocked(getWorkspaceLinkedDocById).mockResolvedValueOnce({
-      id: "doc-1",
-      workspace_id: "ws-1",
-      source: "google_drive",
-      file_name: "stock.csv",
-      mime_type: "text/csv",
-      description: "old",
-      drive_file_id: "drive-1",
-      storage_path: null,
-      file_size_bytes: 0,
-      created_by_user_id: null,
-      created_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
-    });
-    vi.mocked(getWorkspaceAppConnection).mockResolvedValueOnce({
-      id: "c1",
-      workspace_id: "ws-1",
-      toolkit: "googledrive",
-      composio_user_id: "workspace_ws-1",
-      composio_connected_account_id: "ca-1",
-      status: "active",
-      drive_access_mode: "entire_drive",
-      drive_scope_id: null,
-      drive_scope_name: null,
-      drive_scope_mime_type: null,
-      created_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
-    });
-    vi.mocked(downloadGoogleDriveFileText).mockResolvedValueOnce({
-      ok: true,
-      text: "sku,qty\nA,10",
-    });
-    vi.mocked(summarizeLinkedDocContent).mockResolvedValueOnce({
-      ok: true,
-      description: "Live stock sheet — use for inventory Q&A.",
-    });
-
-    const res = await appWithAuth().request("/apps/linked-docs/doc-1/summarize", {
-      method: "POST",
-    });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      description: "Live stock sheet — use for inventory Q&A.",
     });
   });
 });

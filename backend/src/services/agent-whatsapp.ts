@@ -87,6 +87,9 @@ export async function sendAgentWhatsappMessage(input: {
       if (!asset) {
         return { ok: false, error: `Asset not found: ${assetFileName}` };
       }
+      if (!asset.storage_path) {
+        return { ok: false, error: "Asset file is missing storage." };
+      }
 
       const bytes = await downloadAgentAssetBytes(asset.storage_path);
       if (!bytes) {

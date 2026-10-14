@@ -87,7 +87,7 @@ describe("updateAgentConfig", () => {
     mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     const result = await updateAgentConfig({
       id: "a1", workspace_id: "ws-1", profile_name: "Updated", behavior: "be nice", tools: [], skills: [],
-      auto_assign_conversation_labels: true, response_template_groups: [], handoff_topic_groups: [], context_groups: [], asset_groups: [], linked_docs: [],
+      auto_assign_conversation_labels: true, response_template_groups: [], handoff_topic_groups: [], context_groups: [], asset_groups: [],
       handoff_notify_user_ids: [],
     });
     expect(result.ok).toBe(true);
@@ -98,7 +98,7 @@ describe("updateAgentConfig", () => {
     mockSet.mockReturnValue({ where: vi.fn().mockRejectedValue(new Error("fail")) });
     const result = await updateAgentConfig({
       id: "a1", workspace_id: "ws-1", profile_name: "X", behavior: "", tools: [], skills: [],
-      auto_assign_conversation_labels: false, response_template_groups: [], handoff_topic_groups: [], context_groups: [], asset_groups: [], linked_docs: [],
+      auto_assign_conversation_labels: false, response_template_groups: [], handoff_topic_groups: [], context_groups: [], asset_groups: [],
       handoff_notify_user_ids: [],
     });
     expect(result.ok).toBe(false);

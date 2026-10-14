@@ -52,7 +52,7 @@ const AGENT_ROW = {
   handoff_topic_groups: [],
   handoff_notify_user_ids: [],
   context_groups: ["ctx-existing"],
-  asset_groups: [], linked_docs: [],
+  asset_groups: [],
 };
 
 beforeEach(() => {

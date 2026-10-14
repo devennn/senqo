@@ -25,11 +25,6 @@ function parseAssetGroupIds(raw: unknown): string[] {
   return raw.map((x) => String(x)).filter(Boolean);
 }
 
-function parseLinkedDocIds(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((x) => String(x)).filter(Boolean);
-}
-
 function parseHandoffNotifyUserIds(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return [...new Set(raw.map((x) => String(x).trim()).filter(Boolean))];
@@ -48,7 +43,6 @@ type AgentConfigRow = {
   handoffTopicGroups: unknown;
   contextGroups: unknown;
   assetGroups: unknown;
-  linkedDocs: unknown;
   handoffNotifyUserIds: unknown;
 };
 
@@ -68,7 +62,6 @@ function mapAgentConfigRow(row: AgentConfigRow): AgentConfigRecord {
     handoff_topic_groups: parseHandoffTopicGroupIds(row.handoffTopicGroups),
     context_groups: parseContextGroupIds(row.contextGroups),
     asset_groups: parseAssetGroupIds(row.assetGroups),
-    linked_docs: parseLinkedDocIds(row.linkedDocs),
     handoff_notify_user_ids: parseHandoffNotifyUserIds(row.handoffNotifyUserIds),
   };
 }
@@ -89,7 +82,6 @@ export async function listAgentConfigs(workspaceId: string): Promise<AgentConfig
         handoffTopicGroups: agentConfigs.handoffTopicGroups,
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
-        linkedDocs: agentConfigs.linkedDocs,
         handoffNotifyUserIds: agentConfigs.handoffNotifyUserIds,
       })
       .from(agentConfigs)
@@ -128,7 +120,6 @@ export async function getAgentConfigById(
         handoffTopicGroups: agentConfigs.handoffTopicGroups,
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
-        linkedDocs: agentConfigs.linkedDocs,
         handoffNotifyUserIds: agentConfigs.handoffNotifyUserIds,
       })
       .from(agentConfigs)
@@ -187,7 +178,6 @@ export async function updateAgentConfig(payload: {
   handoff_topic_groups: string[];
   context_groups: string[];
   asset_groups: string[];
-  linked_docs: string[];
   handoff_notify_user_ids: string[];
 }): Promise<{ ok: boolean; message: string }> {
   try {
@@ -203,7 +193,6 @@ export async function updateAgentConfig(payload: {
         handoffTopicGroups: payload.handoff_topic_groups,
         contextGroups: payload.context_groups,
         assetGroups: payload.asset_groups,
-        linkedDocs: payload.linked_docs,
         handoffNotifyUserIds: payload.handoff_notify_user_ids,
       })
       .where(

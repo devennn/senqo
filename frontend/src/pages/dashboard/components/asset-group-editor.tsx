@@ -95,8 +95,9 @@ export function AssetGroupEditor({ groupId, onSaved }: { groupId: string; onSave
           helpLabel="Workspace asset groups"
           helpContent={
             <p>
-              Click the title to rename. Each file includes what it is about; the agent decides when to send on
-              WhatsApp. Attach groups per agent on Profile.
+              Click the title to rename. Each item includes what it is about. Sendable files go out on
+              WhatsApp; live docs are re-read by the agent at chat time. Attach groups per agent on
+              Profile.
             </p>
           }
           loading={loading}
@@ -121,7 +122,7 @@ export function AssetGroupEditor({ groupId, onSaved }: { groupId: string; onSave
         />
         {!loading && !loadError ? (
           <CardDescription>
-            {assets.length}/{ASSETS_MAX_PER_GROUP} files
+            {assets.length}/{ASSETS_MAX_PER_GROUP} items
           </CardDescription>
         ) : null}
         <CardAction className="-mt-0.5 shrink-0 sm:justify-self-end">
@@ -140,7 +141,7 @@ export function AssetGroupEditor({ groupId, onSaved }: { groupId: string; onSave
         open={deleteGroupDialogOpen}
         onOpenChange={setDeleteGroupDialogOpen}
         title="Delete this group?"
-        description="It removes all files and detaches from every agent."
+        description="It removes all items and detaches from every agent."
         confirmLabel="Delete group"
         pendingConfirmLabel="Deleting…"
         isConfirming={deletingGroup}

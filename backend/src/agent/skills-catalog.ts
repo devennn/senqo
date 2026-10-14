@@ -412,12 +412,12 @@ export async function buildAgentInstructionsWithCatalog(
         : {},
   }));
 
-  const { listWorkspaceLinkedDocsByIds } = await import(
-    "../repositories/workspace-linked-docs.js"
+  const { listWorkspaceDocAssetsForGroups } = await import(
+    "../repositories/workspace-asset-groups.js"
   );
-  const linkedDocRows = await listWorkspaceLinkedDocsByIds(
+  const linkedDocRows = await listWorkspaceDocAssetsForGroups(
     workspaceId,
-    activeConfig.linked_docs ?? [],
+    activeConfig.asset_groups ?? [],
   );
   const linkedDocs = linkedDocRows.map((doc) => ({
     id: doc.id,

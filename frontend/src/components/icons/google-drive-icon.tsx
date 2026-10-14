@@ -3,15 +3,18 @@ import { cn } from "@/lib/utils";
 type Props = {
   className?: string;
   title?: string;
+  /** Render as decorative (no accessible name) inside controls that already say "Google Drive". */
+  decorative?: boolean;
 };
 
 /** Official-style Google Drive triangle mark (brand colors). */
-export function GoogleDriveIcon({ className, title = "Google Drive" }: Props) {
+export function GoogleDriveIcon({ className, title = "Google Drive", decorative = false }: Props) {
   return (
     <svg
       viewBox="0 0 87.3 78"
-      role="img"
-      aria-label={title}
+      role={decorative ? undefined : "img"}
+      aria-hidden={decorative ? true : undefined}
+      aria-label={decorative ? undefined : title}
       className={cn("size-5 shrink-0", className)}
     >
       <path

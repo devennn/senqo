@@ -27,6 +27,7 @@ vi.mock("../repositories/workspace-context-groups.js", () => ({
 
 vi.mock("../repositories/workspace-asset-groups.js", () => ({
   listWorkspaceAssetsForInstructions: (...args: unknown[]) => mockListAssets(...args),
+  listWorkspaceDocAssetsForGroups: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../repositories/conversation-labels.js", () => ({
@@ -123,7 +124,7 @@ describe("buildAgentInstructions conversation labels", () => {
       response_template_groups: [],
       handoff_topic_groups: [],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       auto_assign_conversation_labels: true,
     });
     mockListLabels.mockResolvedValue([
@@ -193,7 +194,7 @@ describe("buildAgentInstructions handoff topics", () => {
       response_template_groups: [],
       handoff_topic_groups: ["hg-1"],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       auto_assign_conversation_labels: false,
     });
     mockListHandoff.mockResolvedValue([
@@ -228,7 +229,7 @@ describe("buildAgentInstructions handoff topics", () => {
       response_template_groups: [],
       handoff_topic_groups: [],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       auto_assign_conversation_labels: false,
     });
     mockListHandoff.mockResolvedValue([]);
@@ -333,7 +334,7 @@ describe("buildAgentInstructions time context", () => {
       response_template_groups: [],
       handoff_topic_groups: [],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       auto_assign_conversation_labels: false,
     });
     mockGetWorkspaceTimeZone.mockResolvedValue("Asia/Kuala_Lumpur");
@@ -357,7 +358,7 @@ describe("buildAgentInstructions time context", () => {
       response_template_groups: [],
       handoff_topic_groups: [],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       auto_assign_conversation_labels: false,
     });
 

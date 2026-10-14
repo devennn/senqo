@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { getAgentConfigById } from "../../repositories/agent.js";
+import { listWorkspaceDocAssetsForGroups } from "../../repositories/workspace-asset-groups.js";
 import { getWorkspaceAppConnection } from "../../repositories/workspace-app-connections.js";
 import { listWorkspaceCustomToolsByKeys } from "../../repositories/workspace-custom-tools.js";
 import { resolveCustomToolEnv } from "../../services/custom-tool-env.js";
@@ -49,7 +50,11 @@ async function loadComposioContext(context: AgentToolRuntimeContext) {
       context.workspaceId,
       context.agentConfigId,
     );
-    allowedDocIds = agent?.linked_docs ?? [];
+    const docs = await listWorkspaceDocAssetsForGroups(
+      context.workspaceId,
+      agent?.asset_groups ?? [],
+    );
+    allowedDocIds = docs.map((doc) => doc.id);
   }
   if (!connection || connection.status !== "active") {
     return allowedDocIds.length > 0

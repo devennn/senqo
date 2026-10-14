@@ -4,7 +4,6 @@ import { AgentToolsFields } from "@/pages/dashboard/components/agent-tools-field
 import { AgentResponseTemplateGroupsFields } from "@/pages/dashboard/components/agent-response-template-groups-fields";
 import { AgentHandoffTopicGroupsFields } from "@/pages/dashboard/components/agent-handoff-topic-groups-fields";
 import { AgentAssetGroupsFields } from "@/pages/dashboard/components/agent-asset-groups-fields";
-import { AgentLinkedDocsFields } from "@/pages/dashboard/components/agent-linked-docs-fields";
 import { AgentWorkspaceContextGroupsFields } from "@/pages/dashboard/components/agent-workspace-context-groups-fields";
 import type { AgentConfigKnowledgeCapabilityFieldsProps } from "@/types/ui";
 
@@ -14,24 +13,20 @@ export function AgentConfigKnowledgeCapabilityFields({
   responseTemplateGroups,
   workspaceContextGroups,
   workspaceAssetGroups,
-  workspaceLinkedDocs,
   handoffTopicGroups,
   selectedTools,
   selectedSkills,
   selectedResponseTemplateGroups,
   selectedContextGroups,
   selectedAssetGroups,
-  selectedLinkedDocs,
   selectedHandoffTopicGroups,
   templatesTabHref,
   contextTabHref,
   assetsTabHref,
-  docsTabHref,
   handoffTabHref,
   toolsTabHref,
   workspaceContextDirty,
   assetGroupsDirty,
-  linkedDocsDirty,
   responseTemplatesDirty,
   handoffTopicsDirty,
   toolsDirty,
@@ -102,13 +97,6 @@ export function AgentConfigKnowledgeCapabilityFields({
           selectedIds={selectedAssetGroups}
           assetsTabHref={assetsTabHref}
           subsectionDirty={assetGroupsDirty}
-          saving={saving}
-        />
-        <AgentLinkedDocsFields
-          docs={workspaceLinkedDocs}
-          selectedIds={selectedLinkedDocs}
-          docsTabHref={docsTabHref}
-          subsectionDirty={linkedDocsDirty}
           saving={saving}
         />
         <AgentToolsFields

@@ -27,7 +27,6 @@ export type AgentConfigFormNormalizedSnapshot = {
   responseTemplateGroups: readonly string[];
   workspaceContextGroups: readonly string[];
   assetGroups: readonly string[];
-  linkedDocs: readonly string[];
   handoffTopicGroups: readonly string[];
   handoffNotifyUserIds: readonly string[];
   attachedConnectionIds: readonly string[];
@@ -40,6 +39,31 @@ export type HandoffNotifyRecipientOption = {
   phone: string;
 };
 
+/** Why a selected notify user cannot receive handoff alerts right now. */
+export type HandoffNotifyUnavailableReason = "not_verified" | "not_member";
+
+/** Stored notify user without a usable verified handoff phone. */
+export type HandoffNotifyUnavailableOption = {
+  userId: string;
+  email: string | null;
+  reason: HandoffNotifyUnavailableReason;
+};
+
+/** Teammate info used to label notify selections (verified or not). */
+export type HandoffNotifyMemberLookup = {
+  email: string | null;
+};
+
+export type HandoffNotifyTeammateStatus = "loading" | "ready" | "error";
+
+export type HandoffNotifyRecipientsState = {
+  /** Teammates with at least one verified handoff phone, ready to select. */
+  recipients: HandoffNotifyRecipientOption[];
+  /** Every teammate by user id, so stored selections can be labeled. */
+  membersById: ReadonlyMap<string, HandoffNotifyMemberLookup>;
+  status: HandoffNotifyTeammateStatus;
+};
+
 export type AgentConfigFormProps = {
   agent: AgentConfigRecord;
   connections: AgentConfigConnectionOption[];
@@ -48,12 +72,6 @@ export type AgentConfigFormProps = {
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
-  workspaceLinkedDocs: Array<{
-    id: string;
-    file_name: string;
-    description: string;
-    source: string;
-  }>;
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   onSaved?: () => void;
 };
@@ -72,7 +90,6 @@ export type AgentConfigFormSectionDirtyState = {
   connection: boolean;
   workspaceContext: boolean;
   assetGroups: boolean;
-  linkedDocs: boolean;
   responseTemplates: boolean;
   handoffTopics: boolean;
   tools: boolean;
@@ -100,29 +117,20 @@ export type AgentConfigKnowledgeCapabilityFieldsProps = {
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
-  workspaceLinkedDocs: Array<{
-    id: string;
-    file_name: string;
-    description: string;
-    source: string;
-  }>;
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   selectedTools: Set<string>;
   selectedSkills: Set<string>;
   selectedResponseTemplateGroups: Set<string>;
   selectedContextGroups: Set<string>;
   selectedAssetGroups: Set<string>;
-  selectedLinkedDocs: Set<string>;
   selectedHandoffTopicGroups: Set<string>;
   templatesTabHref: string;
   contextTabHref: string;
   assetsTabHref: string;
-  docsTabHref: string;
   handoffTabHref: string;
   toolsTabHref: string;
   workspaceContextDirty: boolean;
   assetGroupsDirty: boolean;
-  linkedDocsDirty: boolean;
   responseTemplatesDirty: boolean;
   handoffTopicsDirty: boolean;
   toolsDirty: boolean;

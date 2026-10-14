@@ -5,8 +5,8 @@ const mockGetConnection = vi.fn();
 const mockDownloadDrive = vi.fn();
 const mockStorageDownload = vi.fn();
 
-vi.mock("../repositories/workspace-linked-docs.js", () => ({
-  getWorkspaceLinkedDocById: (...args: unknown[]) => mockGetDoc(...args),
+vi.mock("../repositories/workspace-asset-groups.js", () => ({
+  getAgentDocAssetById: (...args: unknown[]) => mockGetDoc(...args),
 }));
 
 vi.mock("../repositories/workspace-app-connections.js", () => ({
@@ -51,6 +51,8 @@ describe("readLinkedDocContent", () => {
     mockGetDoc.mockResolvedValueOnce({
       id: "doc-1",
       workspace_id: "ws-1",
+      group_id: "g-1",
+      kind: "doc",
       source: "google_drive",
       file_name: "stock.csv",
       mime_type: "text/csv",
@@ -58,7 +60,7 @@ describe("readLinkedDocContent", () => {
       drive_file_id: "drive-1",
       storage_path: null,
       file_size_bytes: 0,
-      created_by_user_id: null,
+      sort_order: 0,
       created_at: "2026-01-01T00:00:00.000Z",
       updated_at: "2026-01-01T00:00:00.000Z",
     });
@@ -103,6 +105,8 @@ describe("readLinkedDocContent", () => {
     mockGetDoc.mockResolvedValueOnce({
       id: "doc-2",
       workspace_id: "ws-1",
+      group_id: "g-1",
+      kind: "doc",
       source: "upload",
       file_name: "notes.txt",
       mime_type: "text/plain",
@@ -110,7 +114,7 @@ describe("readLinkedDocContent", () => {
       drive_file_id: null,
       storage_path: "ws-1/notes.txt",
       file_size_bytes: 5,
-      created_by_user_id: null,
+      sort_order: 0,
       created_at: "2026-01-01T00:00:00.000Z",
       updated_at: "2026-01-01T00:00:00.000Z",
     });

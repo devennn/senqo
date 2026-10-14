@@ -156,7 +156,7 @@ describe("evals routes", () => {
       response_template_groups: [],
       handoff_topic_groups: [],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       handoff_notify_user_ids: [],
     });
     createManualEvalCaseMock.mockResolvedValue({ ok: true, id: EVAL_ID });
@@ -231,7 +231,7 @@ describe("evals routes", () => {
         response_template_groups: [groupId],
         handoff_topic_groups: [],
         context_groups: [],
-        asset_groups: [], linked_docs: [],
+        asset_groups: [],
         handoff_notify_user_ids: [],
       },
     ]);
@@ -247,7 +247,7 @@ describe("evals routes", () => {
       response_template_groups: [groupId],
       handoff_topic_groups: [],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       handoff_notify_user_ids: [],
     });
     draftEvalFromKnowledgeMock.mockResolvedValue({
@@ -337,7 +337,7 @@ describe("evals routes", () => {
         response_template_groups: [],
         handoff_topic_groups: [],
         context_groups: [groupId],
-        asset_groups: [], linked_docs: [],
+        asset_groups: [],
         handoff_notify_user_ids: [],
       },
     ]);
@@ -353,7 +353,7 @@ describe("evals routes", () => {
       response_template_groups: [],
       handoff_topic_groups: [],
       context_groups: [groupId],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       handoff_notify_user_ids: [],
     });
     draftEvalFromKnowledgeMock.mockResolvedValue({
@@ -432,7 +432,7 @@ describe("evals routes", () => {
         response_template_groups: [],
         handoff_topic_groups: [groupId],
         context_groups: [],
-        asset_groups: [], linked_docs: [],
+        asset_groups: [],
         handoff_notify_user_ids: [],
       },
     ]);
@@ -448,7 +448,7 @@ describe("evals routes", () => {
       response_template_groups: [],
       handoff_topic_groups: [groupId],
       context_groups: [],
-      asset_groups: [], linked_docs: [],
+      asset_groups: [],
       handoff_notify_user_ids: [],
     });
     draftEvalFromHandoffMock.mockResolvedValue({
