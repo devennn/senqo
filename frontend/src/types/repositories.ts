@@ -286,6 +286,8 @@ export type ConversationHeaderData = {
     id: string;
     displayName: string;
     phoneNumber: string | null;
+    /** Per-line AI reply mode; drives dry-run hints in the composer. */
+    mode: WhatsappConnectionMode;
   } | null;
   group: {
     subject: string | null;
@@ -416,7 +418,7 @@ export type ConversationRow = {
   contacts: ContactEmbed | ContactEmbed[];
 };
 
-export type WhatsappConnectionMode = "inactive" | "testing" | "live";
+export type WhatsappConnectionMode = "inactive" | "testing" | "dry_run" | "live";
 
 /** Result of verifying a connection against the live WhatsApp service. */
 export type WhatsappConnectionCheckStatus =

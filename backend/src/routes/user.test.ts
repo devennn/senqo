@@ -372,7 +372,7 @@ import { listContactsPage } from "../repositories/contacts.js";
 import { listConversations, getConversationWithContact, updateConversationHandlingMode } from "../repositories/conversations.js";
 import { listAgentMessagesPage } from "../repositories/agent-messages.js";
 import { listTasksPage, listSchedulableAgents } from "../repositories/tasks.js";
-import { listConnections, listRecentConnectionEvents, createConversationMessage, getConnectionById, recordConnectionEvent } from "../repositories/whatsapp.js";
+import { listConnections, listRecentConnectionEvents, createConversationMessage, getConnectionById, recordConnectionEvent, updateConnectionMode } from "../repositories/whatsapp.js";
 import { listWorkspaceSecrets, createWorkspaceSecret, deleteWorkspaceSecret } from "../repositories/workspace-secrets.js";
 import { listApiKeys, createApiKey, deleteApiKey } from "../repositories/api-keys.js";
 import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentConfig } from "../repositories/agent.js";
@@ -417,6 +417,7 @@ const listSchedulableAgentsMock = vi.mocked(listSchedulableAgents);
 const listConnectionsMock = vi.mocked(listConnections);
 const listRecentConnectionEventsMock = vi.mocked(listRecentConnectionEvents);
 const getConnectionByIdMock = vi.mocked(getConnectionById);
+const updateConnectionModeMock = vi.mocked(updateConnectionMode);
 const recordConnectionEventMock = vi.mocked(recordConnectionEvent);
 const destroyConnectionMock = vi.mocked(destroyConnection);
 const checkConnectionMock = vi.mocked(checkConnection);
@@ -794,6 +795,73 @@ describe("GET /connections", () => {
     expect(body.connections).toHaveLength(1);
     expect(body.events).toHaveLength(0);
     expect(body.canCreateConnection).toBe(true);
+  });
+});
+
+describe("PATCH /connections/:id/mode", () => {
+  const connectionFixture = {
+    id: "conn-1",
+    workspace_id: "ws-1",
+    agent_config_id: null,
+    mode: "inactive" as const,
+    display_name: "Line",
+    status: "authorized",
+    phone_number: "60111111111",
+    qr_code_payload: null,
+    webhook_token: "tok",
+    wa_avatar_url: null,
+    wa_device_id: null,
+    last_state_instance: "authorized",
+    last_status_instance: null,
+    last_seen_at: null,
+    last_sync_at: null,
+  };
+
+  // Dry run is a valid AI mode → 200 and the repository receives dry_run, needed so
+  // admins can turn on draft-only replies before going live.
+  it("accepts dry_run and persists it", async () => {
+    getConnectionByIdMock.mockResolvedValue({ ...connectionFixture });
+    updateConnectionModeMock.mockResolvedValue({ ok: true, message: "Connection mode updated" });
+
+    const res = await app.request("/connections/conn-1/mode", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ mode: "dry_run" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ ok: true, mode: "dry_run" });
+    expect(updateConnectionModeMock).toHaveBeenCalledWith("ws-1", "conn-1", "dry_run");
+  });
+
+  // An unknown mode value → 400 before any repository call, needed to keep the mode
+  // column free of arbitrary strings.
+  it("rejects an unknown mode", async () => {
+    getConnectionByIdMock.mockResolvedValue({ ...connectionFixture });
+
+    const res = await app.request("/connections/conn-1/mode", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ mode: "published" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(updateConnectionModeMock).not.toHaveBeenCalled();
+  });
+
+  // A missing connection → 404, needed so the UI can surface a clear not-found state.
+  it("returns 404 when the connection does not exist", async () => {
+    getConnectionByIdMock.mockResolvedValue(null);
+
+    const res = await app.request("/connections/conn-1/mode", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ mode: "dry_run" }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(updateConnectionModeMock).not.toHaveBeenCalled();
   });
 });
 

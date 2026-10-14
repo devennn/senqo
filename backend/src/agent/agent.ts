@@ -21,6 +21,7 @@ import { createCustomToolFailureTracker } from "../agent/tool-failures.js";
 import { getAgentTools } from "../agent/tools/index.js";
 import { normalizeStoredContentForModelMessage } from "../lib/agent-multimodal-normalize.js";
 import { BUILTIN_AGENT_TOOL_KEYS } from "../lib/builtin-agent-tool-keys.js";
+import { THREAD_EVENT_HANDOFF_TO_HUMAN } from "../lib/conversation-thread-events.js";
 import type {
   StoredUserImageUrlPart,
   StoredUserTextPart,
@@ -36,7 +37,10 @@ import {
 import { getWorkspaceTimeZone } from "../repositories/workspaces.js";
 import { formatZonedDateTimeFromIso } from "../lib/timezone.js";
 import { touchAgentSession } from "../repositories/agent-sessions.js";
-import { mergeAiReasoningOntoAgentRunMessages } from "../repositories/whatsapp.js";
+import {
+  createConversationMessage,
+  mergeAiReasoningOntoAgentRunMessages,
+} from "../repositories/whatsapp.js";
 import {
   needsKnowledgeSourcesRegen,
   resolveAgentReplySources,
@@ -51,7 +55,7 @@ import {
 } from "../lib/agent-run-log.js";
 import { agentOutputSchema } from "./agent-output-schema.js";
 import { getChatLLM } from "./llm.js";
-import { handoffAfterAgentRunFailure } from "../services/agent-run-failure.js";
+import { handoffAfterAgentRunFailure, recordDryRunAgentFailure } from "../services/agent-run-failure.js";
 
 const logScope = "AgentRuntime";
 
@@ -82,6 +86,7 @@ export async function runAgentSession(
   input: RunAgentInput,
 ): Promise<RunAgentResult | null> {
   const isDryRun = Boolean(input.dryRun);
+  const isDraftRun = !isDryRun && Boolean(input.draftRun);
   const skipInference = Boolean(input.skipInference);
   const sessionId = await resolveSessionId(
     input.workspaceId,
@@ -211,7 +216,7 @@ export async function runAgentSession(
       workspaceId: input.workspaceId,
       sessionId,
       agentConfigId: input.agentConfigId,
-      dryRun: isDryRun,
+      dryRun: isDryRun || isDraftRun,
       ...(agentRunId ? { agentRunId } : {}),
     },
     enabledToolKeys,
@@ -454,14 +459,24 @@ export async function runAgentSession(
       `[${logScope}] Failed query: custom tool failure suppresses reply sessionId=${sessionId} detail=${customToolFailureSummary}`,
     );
     if (!resolved.handoffCalled) {
-      await handoffAfterAgentRunFailure({
-        workspaceId: input.workspaceId,
-        conversationId: sessionId,
-        agentConfigId: input.agentConfigId,
-        errorMessage: customToolFailureSummary,
-      });
+      if (isDraftRun) {
+        await recordDryRunAgentFailure({
+          workspaceId: input.workspaceId,
+          conversationId: sessionId,
+          errorMessage: customToolFailureSummary,
+        });
+      } else {
+        await handoffAfterAgentRunFailure({
+          workspaceId: input.workspaceId,
+          conversationId: sessionId,
+          agentConfigId: input.agentConfigId,
+          errorMessage: customToolFailureSummary,
+        });
+      }
     }
-    const failureNote = `Internal tool failure (${customToolFailureSummary}). No customer reply was sent; the conversation was handed off to a human.`;
+    const failureNote = isDraftRun
+      ? `Internal tool failure (${customToolFailureSummary}). No customer reply was sent in dry run; the draft conversation continues.`
+      : `Internal tool failure (${customToolFailureSummary}). No customer reply was sent; the conversation was handed off to a human.`;
     resolved = {
       ...resolved,
       handoffEnabled: true,
@@ -471,6 +486,30 @@ export async function runAgentSession(
         ? `${resolved.reasoningForOperators} ${failureNote}`
         : failureNote,
     };
+  }
+
+  if (isDraftRun && input.sessionId && handoffCalledFromTools) {
+    const handoffNoteSaved = await createConversationMessage(
+      input.workspaceId,
+      sessionId,
+      "assistant",
+      "Human handoff",
+      {
+        thread_event: THREAD_EVENT_HANDOFF_TO_HUMAN,
+        handoff_tool_reason: handoffReason ?? "",
+        dry_run: true,
+        ...(handoffTopicEntryId
+          ? { handoff_topic_entry_id: handoffTopicEntryId }
+          : {}),
+        ...(agentRunId ? { agent_run_id: agentRunId } : {}),
+      },
+      null,
+    );
+    if (!handoffNoteSaved.ok) {
+      console.error(
+        `[${logScope}] Failed query: could not save dry-run handoff note conversationId=${sessionId}`,
+      );
+    }
   }
 
   const generated = extractGeneratedModelMessages(result);
@@ -503,6 +542,7 @@ export async function runAgentSession(
 
   let outboundMessages = prepareOutboundMessages(rawMessages);
   let outboundSent = 0;
+  let outboundDrafted = 0;
   let deliveries: Array<{
     text: string;
     assetFileName: string;
@@ -515,10 +555,12 @@ export async function runAgentSession(
       agentConfigId: input.agentConfigId,
       messages: rawMessages,
       dryRun: isDryRun,
+      draftRun: isDraftRun,
       ...(agentRunId ? { agentRunId } : {}),
     });
     outboundMessages = sent.messages;
     outboundSent = sent.sent;
+    outboundDrafted = sent.drafts;
     deliveries = sent.deliveries;
   }
 
@@ -529,7 +571,7 @@ export async function runAgentSession(
   console.info(
     formatAgentStructuredOutputBlock(logScope, {
       sessionId,
-      dryRun: isDryRun,
+      dryRun: isDryRun || isDraftRun,
       structuredOutput,
       outboundPrepared: outboundMessages,
       outboundSent,
@@ -564,7 +606,8 @@ export async function runAgentSession(
         content: {
           type: AGENT_RUN_LOG_KIND_WHATSAPP_SENT,
           sent: outboundSent,
-          dryRun: isDryRun,
+          drafted: outboundDrafted,
+          dryRun: isDryRun || isDraftRun,
           bubbles: deliveries.map((d) => ({
             text: d.text,
             assetFileName: d.assetFileName,

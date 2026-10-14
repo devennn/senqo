@@ -1671,7 +1671,7 @@ app.post("/connections/:id/reconnect", async (c) => {
 });
 
 const patchConnectionModeSchema = z.object({
-  mode: z.enum(["inactive", "testing", "live"]),
+  mode: z.enum(["inactive", "testing", "dry_run", "live"]),
 });
 
 app.patch("/connections/:id/mode", async (c) => {

@@ -13,5 +13,6 @@ export function shouldRunInboundAi(
   if (handlingMode === "human") return false;
   if (mode === "inactive") return false;
   if (mode === "testing" && !isTestContact) return false;
+  // Live and dry_run both process every contact; dry runs persist drafts only.
   return true;
 }

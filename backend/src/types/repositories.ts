@@ -243,11 +243,16 @@ export type ConversationMessageSenderInput = {
   whatsappSenderName?: string | null;
 };
 
+/** Non-visible message rows: `failed` = technical error, `dry_run` = AI draft never sent. */
+export type ConversationMessageStatus = "failed" | "dry_run";
+
 export type ConversationMessageCreateOptions = {
   sender?: ConversationMessageSenderInput;
   createdAt?: string | null;
   /** Baileys message key id; used for idempotent inserts when set. */
   waMessageId?: string | null;
+  /** Defaults to a normal visible message. `dry_run` marks an AI draft shown only in the thread. */
+  status?: ConversationMessageStatus;
 };
 
 export type CreateConversationMessageResult = {
@@ -286,6 +291,8 @@ export type ConversationHeaderData = {
     id: string;
     displayName: string;
     phoneNumber: string | null;
+    /** Per-line AI reply mode; drives dry-run hints in the composer. */
+    mode: WhatsappConnectionMode;
   } | null;
   labels: ConversationLabelBadge[];
   contact: {
@@ -383,7 +390,7 @@ export type ConversationRow = {
   contacts: ContactEmbed | ContactEmbed[];
 };
 
-export type WhatsappConnectionMode = "inactive" | "testing" | "live";
+export type WhatsappConnectionMode = "inactive" | "testing" | "dry_run" | "live";
 
 export type WhatsappConnection = {
   id: string;

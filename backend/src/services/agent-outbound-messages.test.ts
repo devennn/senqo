@@ -1,10 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSendAgentWhatsappMessage = vi.fn();
+const mockCreateConversationMessage = vi.fn();
+const mockRecordFailedOutboundMessage = vi.fn();
+const mockGetAgentConfigById = vi.fn();
+const mockGetAgentAssetByFileNameForAgent = vi.fn();
 
 vi.mock("./agent-whatsapp.js", () => ({
   sendAgentWhatsappMessage: (...args: unknown[]) =>
     mockSendAgentWhatsappMessage(...args),
+}));
+
+vi.mock("../repositories/whatsapp.js", () => ({
+  createConversationMessage: (...args: unknown[]) =>
+    mockCreateConversationMessage(...args),
+  recordFailedOutboundMessage: (...args: unknown[]) =>
+    mockRecordFailedOutboundMessage(...args),
+}));
+
+vi.mock("../repositories/agent.js", () => ({
+  getAgentConfigById: (...args: unknown[]) => mockGetAgentConfigById(...args),
+}));
+
+vi.mock("../repositories/workspace-asset-groups.js", () => ({
+  getAgentAssetByFileNameForAgent: (...args: unknown[]) =>
+    mockGetAgentAssetByFileNameForAgent(...args),
 }));
 
 const {
@@ -16,6 +36,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSendAgentWhatsappMessage.mockReset();
   mockSendAgentWhatsappMessage.mockResolvedValue({ ok: true, idMessage: "wa-1" });
+  mockCreateConversationMessage.mockResolvedValue({ ok: true, created: true });
 });
 
 describe("prepareOutboundMessages", () => {
@@ -207,5 +228,119 @@ describe("sendPreparedOutboundMessages", () => {
 
     expect(result.sent).toBe(1);
     expect(mockSendAgentWhatsappMessage).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("sendPreparedOutboundMessages dry run (draftRun)", () => {
+  // Draft mode persists the reply so operators can review it, and never calls WhatsApp.
+  it("persists a draft bubble without sending when draftRun is true", async () => {
+    const result = await sendPreparedOutboundMessages({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      agentConfigId: "agent-1",
+      messages: [{ text: "Draft reply" }],
+      draftRun: true,
+      agentRunId: "run-1",
+    });
+
+    expect(result.sent).toBe(0);
+    expect(result.drafts).toBe(1);
+    expect(mockSendAgentWhatsappMessage).not.toHaveBeenCalled();
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Draft reply",
+      { source: "agent_dry_run", dry_run: true, agent_run_id: "run-1" },
+      "ai_agent",
+      { status: "dry_run" },
+    );
+  });
+
+  // Asset drafts carry the agent-assets media reference so the thread previews what would have been sent.
+  it("persists asset media metadata on the draft without sending", async () => {
+    mockGetAgentConfigById.mockResolvedValue({ asset_groups: ["group-1"] });
+    mockGetAgentAssetByFileNameForAgent.mockResolvedValue({
+      storage_path: "ws/g/a/menu.pdf",
+      file_name: "menu.pdf",
+      mime_type: "application/pdf",
+    });
+
+    const result = await sendPreparedOutboundMessages({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      agentConfigId: "agent-1",
+      messages: [{ text: "Menu", assetFileName: "menu.pdf" }],
+      draftRun: true,
+    });
+
+    expect(result.drafts).toBe(1);
+    expect(mockGetAgentAssetByFileNameForAgent).toHaveBeenCalledWith(
+      "ws-1",
+      ["group-1"],
+      "menu.pdf",
+    );
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Menu",
+      expect.objectContaining({
+        dry_run: true,
+        mediaKind: "file",
+        media: expect.objectContaining({
+          storageBucket: "agent-assets",
+          fileName: "menu.pdf",
+        }),
+      }),
+      "ai_agent",
+      { status: "dry_run" },
+    );
+    expect(mockSendAgentWhatsappMessage).not.toHaveBeenCalled();
+  });
+
+  // An unknown asset name must still leave the draft text with a marker instead of crashing the run.
+  it("marks a missing asset on the draft instead of failing", async () => {
+    mockGetAgentConfigById.mockResolvedValue({ asset_groups: [] });
+    mockGetAgentAssetByFileNameForAgent.mockResolvedValue(null);
+
+    const result = await sendPreparedOutboundMessages({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      agentConfigId: "agent-1",
+      messages: [{ text: "Missing file", assetFileName: "gone.pdf" }],
+      draftRun: true,
+    });
+
+    expect(result.drafts).toBe(1);
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Missing file",
+      expect.objectContaining({ dry_run_asset_missing: "gone.pdf" }),
+      "ai_agent",
+      { status: "dry_run" },
+    );
+  });
+
+  // A failed draft insert must stop the batch so later bubbles do not appear out of order.
+  it("stops persisting when a draft insert fails", async () => {
+    mockCreateConversationMessage
+      .mockResolvedValueOnce({ ok: false, created: false })
+      .mockResolvedValueOnce({ ok: true, created: true });
+
+    const result = await sendPreparedOutboundMessages({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      agentConfigId: "agent-1",
+      messages: [{ text: "one" }, { text: "two" }],
+      draftRun: true,
+    });
+
+    expect(result.drafts).toBe(0);
+    expect(
+      mockCreateConversationMessage.mock.calls.map((call) => call[3]),
+    ).toEqual(["one"]);
   });
 });

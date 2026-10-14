@@ -9,6 +9,13 @@ export type RunAgentInput = {
   sessionId?: string;
   agentConfigId?: string;
   dryRun?: boolean;
+  /**
+   * Dry runs (per-connection mode `dry_run`): persist the run like a live one
+   * (transcript, logs, operator reasoning), but persist outbound replies as
+   * `dry_run` drafts in the thread instead of sending them over WhatsApp.
+   * Distinct from `dryRun`, which persists nothing (evals / CLI / playground).
+   */
+  draftRun?: boolean;
   /** When true, persist inbound user message only; do not run the model or tools. */
   skipInference?: boolean;
   /** Optional reason used for operator logs when inference is intentionally skipped. */
@@ -56,7 +63,7 @@ export type AgentToolRuntimeContext = {
   agentConfigId?: string;
   /** Present for non-dry agent runs; used to correlate WhatsApp rows with operator reasoning. */
   agentRunId?: string;
-  /** When true, tools must not mutate live conversation/task state (eval / dry-run). */
+  /** When true, tools must not mutate live conversation/task state (eval / dry run / dry-run draft). */
   dryRun?: boolean;
 };
 

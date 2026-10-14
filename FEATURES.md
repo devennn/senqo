@@ -6,6 +6,7 @@
 - Threads are per WhatsApp line — the same contact on two connected numbers is two conversations (pre-fix merged threads are left as-is)
 - Thread view — message history with infinite scroll, AI reasoning insights with knowledge references, timeline-style handoff markers
 - Manual replies — compose text and media; outbound sends show delivery confirmation; replying manually from the app on an AI-handled chat automatically switches it to Human handling and logs a "You replied from the app" marker in the thread
+- Dry-run replies — while a line is in Dry run mode, the AI drafts replies for real traffic and shows them in the thread as gray "Dry run · Not sent" bubbles (with the same operator reasoning); nothing is delivered to the customer, drafts remain visible after the line goes Live, and drafts never count as AI replies in Reports
 - AI / Human toggle — per-conversation control over automated vs manual replies
 - Handoff WhatsApp notify — when a chat switches to human handling, chosen verified teammates get a WhatsApp alert with reason, customer phone, WhatsApp line, workspace, and a dashboard link to open the conversation
 - Conversation labels — apply workspace labels; filter inbox by label
@@ -24,10 +25,11 @@
 - Multi-model — powered by OpenRouter; plug in any supported LLM
 - Inline saves — per-section save buttons when settings change; transient success feedback
 - Operator insights — dashboard-only explanation of what grounded each AI reply, plus knowledge references (context, templates, skills, handoff) that link to Knowledge when the item still exists; knowledge-backed turns must cite refs (`knowledge_used`), greetings omit them. Each ref names its group and the specific fact, template, or topic used, so a chip reads `Context · Location & Facilities › Operating Hours` and clicking it opens that group with the entry expanded
-- Per-connection attach — bind an agent to one or more WhatsApp lines from Agent setup; Inactive / Testing / Live modes stay per connection
+- Per-connection attach — bind an agent to one or more WhatsApp lines from Agent setup; Inactive / Testing / Dry run / Live modes stay per connection
 - Tasks — when an agent has multiple attached lines, pick which WhatsApp connection the task sends on
 - Inbound processing — debounced AI runs per conversation; only text and images reach the model
 - Failed AI runs — when an internal AI error occurs (a thrown run, or `execute_code` / a nested catalog tool that still returns `ok: false` — a later successful retry does not count), the customer gets no reply: the runtime drops the draft reply, the chat switches to human handling, the thread shows an operator-only AI error event (customers never see it), and team members ticked for AI error alerts on Settings → Team are notified (default: nobody)
+- Dry runs — per-connection mode that runs the real inbound pipeline (debounce, history, tools, reasoning) on live traffic but persists replies as drafts in the thread instead of sending them; handoffs, unsupported media, and internal errors show operator-only "Dry run · would hand off" / "Dry run · AI error" notes without switching conversation handling or notifying teammates, drafts become part of the agent's conversation history so going Live continues naturally, and drafts are excluded from Reports, inbox previews, and AI context
 - Business time — every agent run receives the workspace timezone and current business-local time; relative dates ("tonight", "tomorrow") and time-specific requests are reasoned in that timezone, and the agent must check opening hours or availability from workspace knowledge before confirming any time; it offers alternatives or hands off instead of guessing
 - Custom tools — TypeScript modules in Tool Catalog; compiled on save, run in isolated-vm with SSRF-guarded `fetch`. At agent runtime they are not discrete ToolLoop tools: the model calls builtin `execute_code` and invokes attached catalog tools via `callTool(toolKey, input)` inside one script (code mode for multi-step API work); the same sandbox exposes `readLinkedDoc` and allowlisted `composioExecute` for live Knowledge Docs / Google Drive
 - AI tool draft — on Create tool, Generate with AI (Execute code row) drafts name, description, required env, and execute code from pasted API examples or instructions; review before save
@@ -62,7 +64,7 @@
 - Connection manager — cards per session with live status, display name, phone
 - First-party Baileys — lightweight Node service on Baileys v7 (no headless browser)
 - QR pairing — scan QR to link a number; sessions persist across restarts
-- AI reply mode — per-connection: Inactive, Testing (test contacts only), or Live
+- AI reply mode — per-connection: Inactive, Testing (test contacts only), Dry run (drafts replies in the inbox; nothing is sent), or Live
 - Activity sheet — recent connection/disconnection events
 - LID resolution — WhatsApp privacy identifiers resolved to phone-number JIDs
 - Connection check — Test connection asks the live WhatsApp session whether the number is still signed in; a stale Authorized card flips to Not Authorized (with an activity event) when the check confirms it is offline

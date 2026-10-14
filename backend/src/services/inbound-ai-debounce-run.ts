@@ -10,7 +10,7 @@ import {
   isBareWhatsAppTypePlaceholderLine,
 } from "../lib/trailing-user-messages.js";
 import { THREAD_EVENT_HANDOFF_TO_HUMAN } from "../lib/conversation-thread-events.js";
-import { handoffAfterAgentRunFailure } from "./agent-run-failure.js";
+import { handoffAfterAgentRunFailure, recordDryRunAgentFailure } from "./agent-run-failure.js";
 import { scheduleHandoffNotify } from "./handoff-notify.js";
 import { resolveInboundMediaSigned } from "../lib/inbound-media-resolve.js";
 import {
@@ -58,6 +58,7 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
     ),
   );
   const normalizedHandling = handlingMode ?? "ai";
+  const isDryRunMode = mode === "dry_run";
   const policySkipInference = !shouldRunInboundAi(mode, isTestContact, normalizedHandling);
   const skipReason =
     normalizedHandling === "human"
@@ -87,22 +88,14 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
   const imageDescriptors = mediaDescriptors.filter((d) => isInboundImageMimeType(d.mimeType));
 
   if (unsupportedAiMediaDescriptors.length > 0) {
-    message +=
-      "\n\n[System: Customer sent content that is not plain text or an image (for example voice notes, video, documents, or other files). The AI does not process that media. Conversation switched to human handling.]";
+    message += isDryRunMode
+      ? "\n\n[System: Customer sent content that is not plain text or an image (for example voice notes, video, documents, or other files). The AI does not process that media. In dry run, no customer reply is sent and a human handoff would have been triggered.]"
+      : "\n\n[System: Customer sent content that is not plain text or an image (for example voice notes, video, documents, or other files). The AI does not process that media. Conversation switched to human handling.]";
     console.info(
-      `[${logScope}] Unsupported inbound media handoff conversationId=${input.conversationId} count=${unsupportedAiMediaDescriptors.length}`,
+      `[${logScope}] Unsupported inbound media handoff conversationId=${input.conversationId} count=${unsupportedAiMediaDescriptors.length} dryRun=${isDryRunMode}`,
     );
-    const handoffUpdated = await updateConversationHandlingMode(
-      input.workspaceId,
-      input.conversationId,
-      "human",
-    );
-    if (!handoffUpdated.ok) {
-      console.error(
-        `[${logScope}] Failed to set human handling after unsupported media conversationId=${input.conversationId}`,
-      );
-    } else {
-      const handoffThreadSaved = await createConversationMessage(
+    if (isDryRunMode) {
+      const noteSaved = await createConversationMessage(
         input.workspaceId,
         input.conversationId,
         "assistant",
@@ -110,20 +103,49 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
         {
           thread_event: THREAD_EVENT_HANDOFF_TO_HUMAN,
           handoff_tool_reason: INBOUND_UNSUPPORTED_MEDIA_HANDOFF_REASON,
+          dry_run: true,
         },
         null,
       );
-      if (!handoffThreadSaved.ok) {
+      if (!noteSaved.ok) {
         console.error(
-          `[${logScope}] Failed query: unable to save handoff thread event conversationId=${input.conversationId}`,
+          `[${logScope}] Failed query: unable to save dry-run handoff note conversationId=${input.conversationId}`,
         );
       }
-      scheduleHandoffNotify({
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        agentConfigId: input.agentConfigId,
-        reason: INBOUND_UNSUPPORTED_MEDIA_HANDOFF_REASON,
-      });
+    } else {
+      const handoffUpdated = await updateConversationHandlingMode(
+        input.workspaceId,
+        input.conversationId,
+        "human",
+      );
+      if (!handoffUpdated.ok) {
+        console.error(
+          `[${logScope}] Failed to set human handling after unsupported media conversationId=${input.conversationId}`,
+        );
+      } else {
+        const handoffThreadSaved = await createConversationMessage(
+          input.workspaceId,
+          input.conversationId,
+          "assistant",
+          "Human handoff",
+          {
+            thread_event: THREAD_EVENT_HANDOFF_TO_HUMAN,
+            handoff_tool_reason: INBOUND_UNSUPPORTED_MEDIA_HANDOFF_REASON,
+          },
+          null,
+        );
+        if (!handoffThreadSaved.ok) {
+          console.error(
+            `[${logScope}] Failed query: unable to save handoff thread event conversationId=${input.conversationId}`,
+          );
+        }
+        scheduleHandoffNotify({
+          workspaceId: input.workspaceId,
+          conversationId: input.conversationId,
+          agentConfigId: input.agentConfigId,
+          reason: INBOUND_UNSUPPORTED_MEDIA_HANDOFF_REASON,
+        });
+      }
     }
     try {
       const result = await runAgentSession({
@@ -183,18 +205,27 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
       message,
       messageTimestamp,
       dryRun: false,
+      draftRun: isDryRunMode,
       skipInference,
       skipInferenceReason: skipInference ? skipReason : undefined,
       userMediaParts: userMediaParts.length > 0 ? userMediaParts : undefined,
     });
     if (!result) {
       console.error(`[${logScope}] Unexpected error: runAgentSession returned null`);
-      await handoffAfterAgentRunFailure({
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        agentConfigId: input.agentConfigId,
-        errorMessage: "Agent run returned no result",
-      });
+      if (isDryRunMode) {
+        await recordDryRunAgentFailure({
+          workspaceId: input.workspaceId,
+          conversationId: input.conversationId,
+          errorMessage: "Agent run returned no result",
+        });
+      } else {
+        await handoffAfterAgentRunFailure({
+          workspaceId: input.workspaceId,
+          conversationId: input.conversationId,
+          agentConfigId: input.agentConfigId,
+          errorMessage: "Agent run returned no result",
+        });
+      }
       void clearInboundAiDebouncePending(input.conversationId);
       return { ok: false, error: "agent_null" };
     }
@@ -204,12 +235,20 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
   } catch (error) {
     const messageText = error instanceof Error ? error.message : String(error);
     console.error(`[${logScope}] Unexpected error: ${messageText}`);
-    await handoffAfterAgentRunFailure({
-      workspaceId: input.workspaceId,
-      conversationId: input.conversationId,
-      agentConfigId: input.agentConfigId,
-      errorMessage: messageText,
-    });
+    if (isDryRunMode) {
+      await recordDryRunAgentFailure({
+        workspaceId: input.workspaceId,
+        conversationId: input.conversationId,
+        errorMessage: messageText,
+      });
+    } else {
+      await handoffAfterAgentRunFailure({
+        workspaceId: input.workspaceId,
+        conversationId: input.conversationId,
+        agentConfigId: input.agentConfigId,
+        errorMessage: messageText,
+      });
+    }
     void clearInboundAiDebouncePending(input.conversationId);
     return { ok: false, error: messageText };
   }

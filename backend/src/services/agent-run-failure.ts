@@ -73,3 +73,41 @@ export async function handoffAfterAgentRunFailure(input: {
     `[${scope}/handoffAfterAgentRunFailure] Success: conversationId=${input.conversationId}`,
   );
 }
+
+/**
+ * Dry runs: a failed run must not send a customer-facing reply, must not change
+ * conversation handling, and must not alert teammates. Leave an operator-only
+ * dry-run thread event with the error instead.
+ */
+export async function recordDryRunAgentFailure(input: {
+  workspaceId: string;
+  conversationId: string;
+  errorMessage: string;
+}): Promise<void> {
+  const errorMessage = truncateErrorMessage(
+    input.errorMessage.trim() || "Agent run failed",
+  );
+
+  const eventSaved = await createConversationMessage(
+    input.workspaceId,
+    input.conversationId,
+    "assistant",
+    AGENT_ERROR_THREAD_CONTENT,
+    {
+      thread_event: THREAD_EVENT_AGENT_ERROR,
+      agent_error_message: errorMessage,
+      dry_run: true,
+    },
+    null,
+  );
+  if (!eventSaved.ok) {
+    console.error(
+      `[${scope}/recordDryRunAgentFailure] Failed query: unable to save dry-run agent error event conversationId=${input.conversationId}`,
+    );
+    return;
+  }
+
+  console.info(
+    `[${scope}/recordDryRunAgentFailure] Success: conversationId=${input.conversationId}`,
+  );
+}

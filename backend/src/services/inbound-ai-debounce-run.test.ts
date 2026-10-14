@@ -178,4 +178,79 @@ describe("executeInboundDebouncedAiRun", () => {
       null,
     );
   });
+
+  // Dry-run mode must run inference with draftRun so replies are persisted as
+  // drafts for review, never sent to the customer.
+  it("passes draftRun when the connection mode is dry_run", async () => {
+    mockGetWhatsappConnectionModeForInboundAi.mockResolvedValue("dry_run");
+    mockTrailingUserMessage();
+
+    const result = await executeInboundDebouncedAiRun(baseInput);
+
+    expect(result.ok).toBe(true);
+    expect(mockRunAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draftRun: true,
+        dryRun: false,
+        skipInference: false,
+      }),
+    );
+  });
+
+  // A failed dry run must leave an operator-only dry-run error event without
+  // switching the chat to human or alerting teammates.
+  it("records a dry-run error without handoff when the run throws in dry_run mode", async () => {
+    mockGetWhatsappConnectionModeForInboundAi.mockResolvedValue("dry_run");
+    mockTrailingUserMessage();
+    mockRunAgentSession.mockRejectedValue(new Error("OpenRouter request failed"));
+
+    const result = await executeInboundDebouncedAiRun(baseInput);
+
+    expect(result.ok).toBe(false);
+    expect(mockUpdateConversationHandlingMode).not.toHaveBeenCalled();
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "AI could not reply",
+      {
+        thread_event: "agent_error",
+        agent_error_message: "OpenRouter request failed",
+        dry_run: true,
+      },
+      null,
+    );
+    expect(mockScheduleHandoffNotify).not.toHaveBeenCalled();
+  });
+
+  // A voice note the AI cannot process during a dry run must annotate a
+  // would-hand-off note without switching live handling or notifying teammates.
+  it("records a dry-run handoff note for unsupported media without switching handling", async () => {
+    mockGetWhatsappConnectionModeForInboundAi.mockResolvedValue("dry_run");
+    mockListConversationMessagesBareForAi.mockResolvedValue([
+      {
+        role: "user",
+        content: "[audioMessage]",
+        created_at: "2026-06-11T10:00:00.000Z",
+        metadata: { messageType: "audioMessage" },
+      },
+    ]);
+
+    const result = await executeInboundDebouncedAiRun(baseInput);
+
+    expect(result.ok).toBe(true);
+    expect(mockUpdateConversationHandlingMode).not.toHaveBeenCalled();
+    expect(mockScheduleHandoffNotify).not.toHaveBeenCalled();
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Human handoff",
+      expect.objectContaining({
+        thread_event: "handoff_to_human",
+        dry_run: true,
+      }),
+      null,
+    );
+  });
 });

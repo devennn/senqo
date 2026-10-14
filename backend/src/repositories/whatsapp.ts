@@ -13,6 +13,7 @@ import type {
   WhatsappWebhookPayloadDumpInput,
 } from "../types/repositories.js";
 import { THREAD_EVENT_HANDOFF_TO_HUMAN } from "../lib/conversation-thread-events.js";
+import { normalizeWhatsappConnectionMode } from "../lib/inbound-ai-mode.js";
 import { publish as publishRealtime } from "../lib/realtime-bus.js";
 import { db } from "../db/index.js";
 import {
@@ -26,7 +27,7 @@ import {
 } from "../db/schema/index.js";
 import { eq, desc, asc, and, isNull, inArray, or, sql, not } from "drizzle-orm";
 
-const WHATSAPP_MODES: readonly WhatsappConnectionMode[] = ["inactive", "testing", "live"];
+const WHATSAPP_MODES: readonly WhatsappConnectionMode[] = ["inactive", "testing", "dry_run", "live"];
 
 function isWhatsappConnectionMode(value: string): value is WhatsappConnectionMode {
   return (WHATSAPP_MODES as readonly string[]).includes(value);
@@ -38,9 +39,9 @@ const scope = "WhatsappRepository";
 export const WHATSAPP_CONNECTION_DISPLAY_NAME_MAX_LEN = 120;
 
 function mapConnectionRow(row: typeof whatsappConnections.$inferSelect): WhatsappConnection {
-  const rawMode = row.mode as string | null | undefined;
-  const mode: WhatsappConnectionMode =
-    rawMode === "testing" || rawMode === "live" ? rawMode : "inactive";
+  const mode = normalizeWhatsappConnectionMode(
+    row.mode as string | null | undefined,
+  );
   return {
     id: row.id,
     workspace_id: row.workspaceId,
@@ -626,9 +627,9 @@ export async function findConnectionByPhoneNumber(
       console.error(`[${scope}/findConnectionByPhoneNumber] Failed query: Connection not found`);
       return fallback;
     }
-    const rawMode = row.mode as string | null | undefined;
-    const mode: WhatsappConnectionMode =
-      rawMode === "testing" || rawMode === "live" ? rawMode : "inactive";
+    const mode = normalizeWhatsappConnectionMode(
+      row.mode as string | null | undefined,
+    );
     console.info(`[${scope}/findConnectionByPhoneNumber] Success: userId=${workspaceId}`);
     return {
       id: row.id,
@@ -674,9 +675,9 @@ export async function listConnectionsByAgentConfigId(
       )
       .orderBy(asc(whatsappConnections.createdAt));
     const rows = data.map((row) => {
-      const rawMode = row.mode as string | null | undefined;
-      const mode: WhatsappConnectionMode =
-        rawMode === "testing" || rawMode === "live" ? rawMode : "inactive";
+      const mode = normalizeWhatsappConnectionMode(
+        row.mode as string | null | undefined,
+      );
       return {
         id: row.id,
         workspace_id: row.workspaceId,
@@ -823,9 +824,9 @@ export async function getWorkspaceSendableWhatsappConnectionRow(
       console.info(`[${scope}/getWorkspaceSendableWhatsappConnectionRow] Success: no row userId=${workspaceId}`);
       return null;
     }
-    const rawMode = row.mode as string | null | undefined;
-    const mode: WhatsappConnectionMode =
-      rawMode === "testing" || rawMode === "live" ? rawMode : "inactive";
+    const mode = normalizeWhatsappConnectionMode(
+      row.mode as string | null | undefined,
+    );
     console.info(`[${scope}/getWorkspaceSendableWhatsappConnectionRow] Success: userId=${workspaceId}`);
     return { id: row.id, mode };
   } catch (error) {
@@ -877,9 +878,9 @@ export async function getWhatsappConnectionRowById(
       );
       return null;
     }
-    const rawMode = row.mode as string | null | undefined;
-    const mode: WhatsappConnectionMode =
-      rawMode === "testing" || rawMode === "live" ? rawMode : "inactive";
+    const mode = normalizeWhatsappConnectionMode(
+      row.mode as string | null | undefined,
+    );
     const rawAgent = row.agentConfigId;
     const agentConfigId =
       rawAgent != null && String(rawAgent).trim().length > 0 ? String(rawAgent).trim() : null;
@@ -1540,6 +1541,7 @@ export async function createConversationMessage(
       content,
       metadata: normalizedMetadata,
       outgoingSenderType: outgoingSenderType ?? null,
+      status: options?.status ?? null,
       whatsappSenderChatId: options?.sender?.whatsappSenderChatId ?? null,
       whatsappSenderName: options?.sender?.whatsappSenderName ?? null,
       waMessageId,

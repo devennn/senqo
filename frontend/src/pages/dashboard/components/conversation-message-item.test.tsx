@@ -19,6 +19,20 @@ function buildThreadEventMessage(
   };
 }
 
+function buildAiMessage(metadata: Record<string, unknown>): ConversationMessage {
+  return {
+    id: "msg-ai-1",
+    role: "assistant",
+    content: "Draft reply",
+    created_at: "2026-09-23T10:00:00.000Z",
+    metadata,
+    outgoing_sender_type: "ai_agent",
+    whatsapp_sender_chat_id: null,
+    whatsapp_sender_name: null,
+    media: null,
+  };
+}
+
 const baseProps = {
   previousMessage: null,
   nextMessage: null,
@@ -97,5 +111,47 @@ describe("ConversationMessageItem", () => {
 
     expect(screen.getByText("AI error")).toBeInTheDocument();
     expect(screen.getByText("OpenRouter request failed")).toBeInTheDocument();
+  });
+
+  // A dry-run draft is an AI reply that was never sent: operators must see the
+  // "Dry run · Not sent" label so it is never mistaken for a delivered reply.
+  it("labels a dry-run draft as not sent", () => {
+    render(
+      <ConversationMessageItem
+        message={buildAiMessage({ source: "agent_dry_run", dry_run: true })}
+        {...baseProps}
+      />,
+    );
+
+    expect(screen.getByText("Dry run · Not sent")).toBeInTheDocument();
+    expect(screen.getByText("Draft reply")).toBeInTheDocument();
+    expect(screen.queryByText("AI")).not.toBeInTheDocument();
+  });
+
+  // A regular AI reply keeps its "AI" label, guarding against the dry-run branch
+  // leaking into live AI messages.
+  it("labels a live AI reply as AI", () => {
+    render(<ConversationMessageItem message={buildAiMessage({})} {...baseProps} />);
+
+    expect(screen.getByText("AI")).toBeInTheDocument();
+    expect(screen.queryByText("Dry run · Not sent")).not.toBeInTheDocument();
+  });
+
+  // Would-hand-off notes from a dry run must be operator-visible without implying
+  // the live conversation actually switched to human handling.
+  it("renders a dry-run would-hand-off pill", () => {
+    render(
+      <ConversationMessageItem
+        message={buildThreadEventMessage({
+          thread_event: "handoff_to_human",
+          handoff_tool_reason: "Customer asked for a person",
+          dry_run: true,
+        })}
+        {...baseProps}
+      />,
+    );
+
+    expect(screen.getByText("Dry run · would hand off")).toBeInTheDocument();
+    expect(screen.getByText("Customer asked for a person")).toBeInTheDocument();
   });
 });

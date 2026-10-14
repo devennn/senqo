@@ -1,4 +1,10 @@
-import { recordFailedOutboundMessage } from "../repositories/whatsapp.js";
+import { mediaKindFromMimeType } from "../lib/mime-media-kind.js";
+import { getAgentConfigById } from "../repositories/agent.js";
+import { getAgentAssetByFileNameForAgent } from "../repositories/workspace-asset-groups.js";
+import {
+  createConversationMessage,
+  recordFailedOutboundMessage,
+} from "../repositories/whatsapp.js";
 import { sendAgentWhatsappMessage } from "./agent-whatsapp.js";
 
 const scope = "AgentOutboundMessages";
@@ -51,15 +57,70 @@ export type OutboundDelivery = PreparedOutboundMessage & {
   idMessage: string;
 };
 
+/**
+ * Dry runs: persist a reply the agent would have sent as a `dry_run` draft row.
+ * Visible in the thread only; never delivered to WhatsApp.
+ */
+async function persistDryRunDraft(input: {
+  workspaceId: string;
+  conversationId: string;
+  agentConfigId: string;
+  message: PreparedOutboundMessage;
+  agentRunId?: string;
+}): Promise<boolean> {
+  let assetMetadata: Record<string, unknown> = {};
+  if (input.message.assetFileName) {
+    const agentConfig = await getAgentConfigById(input.workspaceId, input.agentConfigId);
+    const groupIds = agentConfig?.asset_groups ?? [];
+    const asset = await getAgentAssetByFileNameForAgent(
+      input.workspaceId,
+      groupIds,
+      input.message.assetFileName,
+    );
+    assetMetadata =
+      asset && asset.storage_path
+        ? {
+            mediaKind: mediaKindFromMimeType(asset.mime_type),
+            media: {
+              path: asset.storage_path,
+              storageBucket: "agent-assets",
+              fileName: asset.file_name,
+              mimeType: asset.mime_type,
+              caption: input.message.text || asset.file_name,
+            },
+          }
+        : { dry_run_asset_missing: input.message.assetFileName };
+  }
+
+  const saved = await createConversationMessage(
+    input.workspaceId,
+    input.conversationId,
+    "assistant",
+    input.message.text,
+    {
+      source: "agent_dry_run",
+      dry_run: true,
+      ...(input.agentRunId ? { agent_run_id: input.agentRunId } : {}),
+      ...assetMetadata,
+    },
+    "ai_agent",
+    { status: "dry_run" },
+  );
+  return saved.ok && saved.created;
+}
+
 export async function sendPreparedOutboundMessages(input: {
   workspaceId: string;
   conversationId: string;
   agentConfigId: string;
   messages: PreparedOutboundMessage[];
   dryRun?: boolean;
+  /** Dry-run mode: persist drafts instead of sending. */
+  draftRun?: boolean;
   agentRunId?: string;
 }): Promise<{
   sent: number;
+  drafts: number;
   messages: PreparedOutboundMessage[];
   deliveries: OutboundDelivery[];
 }> {
@@ -70,7 +131,31 @@ export async function sendPreparedOutboundMessages(input: {
         `[${scope}/sendPreparedOutboundMessages] Dry run: skipped send count=${messages.length}`,
       );
     }
-    return { sent: 0, messages, deliveries: [] };
+    return { sent: 0, drafts: 0, messages, deliveries: [] };
+  }
+
+  if (input.draftRun) {
+    let drafts = 0;
+    for (const message of messages) {
+      const created = await persistDryRunDraft({
+        workspaceId: input.workspaceId,
+        conversationId: input.conversationId,
+        agentConfigId: input.agentConfigId,
+        message,
+        ...(input.agentRunId ? { agentRunId: input.agentRunId } : {}),
+      });
+      if (!created) {
+        console.error(
+          `[${scope}/sendPreparedOutboundMessages] Failed query: could not persist dry-run draft after=${drafts} conversationId=${input.conversationId}`,
+        );
+        break;
+      }
+      drafts += 1;
+    }
+    console.info(
+      `[${scope}/sendPreparedOutboundMessages] Dry run: persisted drafts=${drafts} prepared=${messages.length} conversationId=${input.conversationId}`,
+    );
+    return { sent: 0, drafts, messages, deliveries: [] };
   }
 
   let sent = 0;
@@ -108,5 +193,5 @@ export async function sendPreparedOutboundMessages(input: {
   console.info(
     `[${scope}/sendPreparedOutboundMessages] Success: sent=${sent} prepared=${messages.length} conversationId=${input.conversationId}`,
   );
-  return { sent, messages, deliveries };
+  return { sent, drafts: 0, messages, deliveries };
 }

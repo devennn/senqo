@@ -27,6 +27,7 @@ const {
   deleteConnectionByWorkspace,
   findOrCreateConversationByWhatsappChatId,
   getWhatsappConnectionModeForInboundAi,
+  getWhatsappConnectionRowById,
   createConversationMessage,
   mergeAiReasoningOntoAgentRunMessages,
 } = await vi.importActual("../repositories/whatsapp.js") as typeof import("../repositories/whatsapp.js");
@@ -193,6 +194,13 @@ describe("updateConnectionMode", () => {
     expect(result.ok).toBe(true);
   });
 
+  // Dry run is a valid mode → update succeeds with ok:true, needed so lines can draft replies before going live.
+  it("sets dry_run mode", async () => {
+    mockSet.mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const result = await updateConnectionMode("ws-1", "conn-1", "dry_run");
+    expect(result.ok).toBe(true);
+  });
+
   // An unrecognized mode string is passed → ok:false is returned, needed to reject invalid mode values at the repository boundary.
   it("rejects invalid mode", async () => {
     // @ts-expect-error - testing invalid mode input
@@ -266,6 +274,47 @@ describe("getWhatsappConnectionModeForInboundAi", () => {
     const mode = await getWhatsappConnectionModeForInboundAi("ws-1", "conv-1", "agent-1");
 
     expect(mode).toBe("testing");
+  });
+
+  // A dry-run line must resolve as dry_run (not inactive), needed so debounced runs
+  // know to persist drafts instead of skipping inference.
+  it("returns dry_run for a dry-run preferred connection", async () => {
+    mockSelectLimitRows([
+      {
+        id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        mode: "dry_run",
+        status: "authorized",
+        agentConfigId: "agent-1",
+      },
+    ]);
+
+    const mode = await getWhatsappConnectionModeForInboundAi(
+      "ws-1",
+      "conv-1",
+      "agent-1",
+      "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    );
+
+    expect(mode).toBe("dry_run");
+  });
+});
+
+describe("getWhatsappConnectionRowById", () => {
+  // Row readers must not downgrade dry_run to inactive, needed so composer gating
+  // and conversation headers show the dry-run state.
+  it("returns dry_run without downgrading to inactive", async () => {
+    mockSelectLimitRows([
+      {
+        id: "conn-1",
+        mode: "dry_run",
+        status: "authorized",
+        agentConfigId: "agent-1",
+      },
+    ]);
+
+    const row = await getWhatsappConnectionRowById("ws-1", "conn-1");
+
+    expect(row?.mode).toBe("dry_run");
   });
 });
 
@@ -484,6 +533,27 @@ describe("createConversationMessage", () => {
     );
 
     expect(result).toEqual({ ok: false, created: false });
+  });
+
+  // Dry-run drafts persist with status="dry_run" → thread-only visibility, needed so
+  // drafts never count as sent messages in reports or AI context.
+  it("persists dry_run status when options request it", async () => {
+    mockMessageInsert([{ id: "msg-draft" }]);
+
+    const result = await createConversationMessage(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Draft reply",
+      { source: "agent_dry_run", dry_run: true },
+      "ai_agent",
+      { status: "dry_run" },
+    );
+
+    expect(result).toEqual({ ok: true, created: true });
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "dry_run" }),
+    );
   });
 });
 
