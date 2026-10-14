@@ -5,12 +5,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Phone, Plug, Wifi, WifiOff } from "lucide-react";
 import type {
   WhatsappConnection,
+  WhatsappConnectionCheckStatus,
   WhatsappConnectionMode,
 } from "@/types/repositories";
 import { ConnectionAiModeSegmented } from "@/pages/dashboard/connect/components/connection-ai-mode-segmented";
 import { ConnectionCardMenu } from "@/pages/dashboard/connect/components/connection-card-menu";
 import { ConnectionRenameDialog } from "@/pages/dashboard/connect/components/connection-rename-dialog";
 import { ConnectionDeleteDialog } from "@/pages/dashboard/connect/components/connection-delete-dialog";
+import { ConnectionTestButton } from "@/pages/dashboard/connect/components/connection-test-button";
 
 type StateInfo = { label: string; note: string; isHealthy: boolean };
 
@@ -75,6 +77,7 @@ type Props = {
   onUpdateMode: (id: string, mode: WhatsappConnectionMode) => Promise<void>;
   onUpdateDisplayName: (id: string, displayName: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onCheck: (id: string) => Promise<WhatsappConnectionCheckStatus>;
 };
 
 export function ConnectionCard({
@@ -84,6 +87,7 @@ export function ConnectionCard({
   onUpdateMode,
   onUpdateDisplayName,
   onDelete,
+  onCheck,
 }: Props) {
   const [updatingMode, setUpdatingMode] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -133,8 +137,8 @@ export function ConnectionCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-2 pt-0">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 text-base">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-base">
               {info.isHealthy ? (
                 <Wifi className="size-4 text-primary" />
               ) : (
@@ -149,6 +153,7 @@ export function ConnectionCard({
               >
                 {info.label}
               </span>
+              <ConnectionTestButton connectionId={conn.id} onCheck={onCheck} />
             </div>
             <ConnectionAiModeSegmented
               mode={mode}
@@ -223,6 +228,7 @@ export function ConnectionCard({
       <ConnectionDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
+        connectionId={conn.id}
         displayName={conn.display_name}
         isDeleting={deleting}
         onConfirm={async () => {

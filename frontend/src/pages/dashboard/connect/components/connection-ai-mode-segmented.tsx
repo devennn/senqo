@@ -16,7 +16,7 @@ type Props = {
 
 export function ConnectionAiModeSegmented({ mode, disabled, onChange }: Props) {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex shrink-0 items-center gap-2">
       <InlineHelpHint label="AI reply mode details">
         <p className="font-semibold text-popover-foreground">Modes</p>
         <ul className="mt-2 list-inside list-disc space-y-1.5 text-popover-foreground">

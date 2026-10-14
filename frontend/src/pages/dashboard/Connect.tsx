@@ -42,6 +42,7 @@ export default function ConnectPage() {
     updateMode,
     updateDisplayName,
     deleteConnection,
+    checkConnection,
   } = useConnections();
 
   function handleTabChange(next: ConnectTab) {
@@ -129,6 +130,7 @@ export default function ConnectPage() {
                       onUpdateMode={updateMode}
                       onUpdateDisplayName={updateDisplayName}
                       onDelete={deleteConnection}
+                      onCheck={checkConnection}
                     />
                   ))}
                   {connections.length === 0 && (

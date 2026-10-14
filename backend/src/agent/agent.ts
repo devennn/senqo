@@ -12,7 +12,7 @@ import {
 import {
   asStorableAgentMessageContent,
   extractGeneratedModelMessages,
-  pruneOrphanedToolCalls,
+  sanitizeToolCallHistory,
   toModelMessageFromRow,
 } from "../agent/messages.js";
 import { resolveSessionId } from "../agent/session.js";
@@ -99,7 +99,7 @@ export async function runAgentSession(
 
   let historyMessages: ModelMessage[] = [];
   if (input.historyOverride) {
-    historyMessages = pruneOrphanedToolCalls(input.historyOverride);
+    historyMessages = sanitizeToolCallHistory(input.historyOverride);
   } else if (!isDryRun) {
     const historicalRows = (await listAgentMessages(
       input.workspaceId,
@@ -111,10 +111,10 @@ export async function runAgentSession(
         content: row.content,
       }),
     );
-    historyMessages = pruneOrphanedToolCalls(rawHistory);
+    historyMessages = sanitizeToolCallHistory(rawHistory);
     if (historyMessages.length < rawHistory.length) {
       console.warn(
-        `[${logScope}] Pruned ${rawHistory.length - historyMessages.length} orphaned tool-call message(s) from history sessionId=${sessionId}`,
+        `[${logScope}] Pruned ${rawHistory.length - historyMessages.length} invalid tool history message(s) sessionId=${sessionId}`,
       );
     } else {
       const assistantShapes = rawHistory
@@ -394,7 +394,7 @@ export async function runAgentSession(
         }),
         stopWhen: stepCountIs(20),
       });
-      const cleanHistory = pruneOrphanedToolCalls(historyMessages);
+      const cleanHistory = sanitizeToolCallHistory(historyMessages);
       result = await fallbackAgent.generate({
         messages: [...cleanHistory, userMessageForModel],
       });

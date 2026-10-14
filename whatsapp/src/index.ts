@@ -52,9 +52,9 @@ app.get("/sessions/:id/qr", async (c) => {
 app.get("/sessions/:id/state", (c) => {
   const id = c.req.param("id");
   const session = get(id);
-  if (!session) return c.json({ status: "not_authorized" });
-  const { status, phone } = session.getStatus();
-  return c.json({ status, phone });
+  if (!session) return c.json({ status: "not_authorized", socketOpen: false });
+  const { status, phone, socketOpen } = session.getStatus();
+  return c.json({ status, phone, socketOpen });
 });
 
 app.post("/sessions/:id/restart", async (c) => {

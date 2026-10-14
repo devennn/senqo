@@ -76,8 +76,12 @@ export class BaileysSession {
     this.authDir = path.join(env.sessionsDir, connectionId);
   }
 
-  getStatus(): { status: SessionStatus; phone?: string } {
-    return { status: this.status, phone: this.phone || undefined };
+  getStatus(): { status: SessionStatus; phone?: string; socketOpen: boolean } {
+    return {
+      status: this.status,
+      phone: this.phone || undefined,
+      socketOpen: this.sock !== null && this.sock.ws.isOpen,
+    };
   }
 
   getQr(): string | undefined {
