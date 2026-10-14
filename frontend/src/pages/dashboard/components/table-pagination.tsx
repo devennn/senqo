@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function TablePagination({
   page,
@@ -7,6 +8,7 @@ export function TablePagination({
   pageSize,
   onPage,
   compact = false,
+  className,
 }: {
   page: number;
   total: number;
@@ -14,6 +16,8 @@ export function TablePagination({
   onPage: (page: number) => void;
   /** Single-row icon controls for narrow sidebars. */
   compact?: boolean;
+  /** Extra classes, e.g. `mt-auto` to pin a sidebar pagination to the card bottom. */
+  className?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(page, 1), totalPages);
@@ -22,7 +26,7 @@ export function TablePagination({
 
   if (compact) {
     return (
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+      <div className={cn("mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-3 text-xs text-muted-foreground", className)}>
         <p className="min-w-0 truncate tabular-nums">
           {start}–{end} of {total}
         </p>
@@ -54,7 +58,7 @@ export function TablePagination({
   }
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm text-muted-foreground">
+    <div className={cn("mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm text-muted-foreground", className)}>
       <p className="min-w-0 shrink tabular-nums">
         Showing {start}–{end} of {total}
       </p>
