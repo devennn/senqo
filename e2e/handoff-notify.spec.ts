@@ -254,4 +254,51 @@ test.describe("Agent handoff notify", () => {
     await dialog.getByRole("checkbox", { name: /ops@senqo.app/ }).check();
     await expect(dialog.getByRole("button", { name: "Save" })).toBeEnabled();
   });
+
+  // A stored notify person without a verified phone is flagged, blocks saving, and can be
+  // removed — the save then persists only people that can actually receive alerts.
+  test("flags stored notify people without a verified phone and removes them on save", async ({
+    page,
+  }) => {
+    const state = {
+      notifyUserIds: ["33333333-3333-4333-8333-333333333333"] as string[],
+      recipients: [
+        {
+          userId: "11111111-1111-4111-8111-111111111111",
+          email: "ops@senqo.app",
+          phone: "15551234567",
+          status: "verified",
+        },
+        {
+          userId: "33333333-3333-4333-8333-333333333333",
+          email: "stale@senqo.app",
+          phone: "",
+          status: "none",
+        },
+      ],
+    };
+    await seedSession(page);
+    await mockApis(page, state);
+    await page.goto(`/${WORKSPACE_ID}/knowledge?tab=handoff`);
+    await page.getByRole("button", { name: "Handoff settings" }).click();
+
+    const dialog = page.getByRole("dialog");
+    const staleRow = dialog.getByRole("checkbox", { name: /stale@senqo.app/ });
+    await expect(staleRow).toBeChecked();
+    await expect(dialog.getByText(/No verified phone/)).toBeVisible();
+
+    // Any change while the flagged person stays selected cannot be saved.
+    await dialog.getByRole("checkbox", { name: /ops@senqo.app/ }).check();
+    await expect(dialog.getByRole("button", { name: "Save" })).toBeDisabled();
+    await expect(dialog.getByText(/Uncheck the flagged notify people/)).toBeVisible();
+
+    // Removing the flagged person clears the row and enables Save with the verified ids only.
+    await staleRow.click();
+    await expect(staleRow).toHaveCount(0);
+    const saveButton = dialog.getByRole("button", { name: "Save" });
+    await expect(saveButton).toBeEnabled();
+    await saveButton.click();
+    await expect(dialog.getByText("Handoff settings saved.")).toBeVisible();
+    expect(state.notifyUserIds).toEqual(["11111111-1111-4111-8111-111111111111"]);
+  });
 });

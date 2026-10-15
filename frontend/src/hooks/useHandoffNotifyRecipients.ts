@@ -2,10 +2,24 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { formatHandoffPhoneDisplay } from "@/lib/handoff-phone";
 import type { TeamMemberRecord } from "@/types/repositories";
-import type { HandoffNotifyRecipientOption } from "@/types/ui";
+import type {
+  HandoffNotifyMemberLookup,
+  HandoffNotifyRecipientOption,
+  HandoffNotifyRecipientsState,
+} from "@/types/ui";
 
-export function useHandoffNotifyRecipients(): HandoffNotifyRecipientOption[] {
-  const [recipients, setRecipients] = useState<HandoffNotifyRecipientOption[]>([]);
+const initialState: HandoffNotifyRecipientsState = {
+  recipients: [],
+  membersById: new Map(),
+  status: "loading",
+};
+
+/**
+ * Verified teammates for the notify list, plus a lookup of every teammate so stored
+ * selections without a verified phone can be labeled and removed in the dialog.
+ */
+export function useHandoffNotifyRecipients(): HandoffNotifyRecipientsState {
+  const [state, setState] = useState<HandoffNotifyRecipientsState>(initialState);
 
   useEffect(() => {
     let cancelled = false;
@@ -13,24 +27,27 @@ export function useHandoffNotifyRecipients(): HandoffNotifyRecipientOption[] {
       try {
         const res = await api.get<{ members: TeamMemberRecord[] }>("/api/user/team");
         if (cancelled) return;
-        setRecipients(
-          (res.members ?? [])
-            .map((m) => {
-              const verified = m.handoffPhones.filter((p) => p.status === "verified");
-              if (verified.length === 0) return null;
-              const phoneLabel = verified
-                .map((p) => `${formatHandoffPhoneDisplay(p.phone)} via ${p.connectionName}`)
-                .join("; ");
-              return {
-                userId: m.userId,
-                email: m.email,
-                phone: phoneLabel,
-              };
-            })
-            .filter((r): r is HandoffNotifyRecipientOption => r !== null),
-        );
+        const members = res.members ?? [];
+        const membersById = new Map<string, HandoffNotifyMemberLookup>();
+        const recipients: HandoffNotifyRecipientOption[] = [];
+        for (const member of members) {
+          membersById.set(member.userId, { email: member.email });
+          const verified = member.handoffPhones.filter((p) => p.status === "verified");
+          if (verified.length === 0) continue;
+          const phoneLabel = verified
+            .map((p) => `${formatHandoffPhoneDisplay(p.phone)} via ${p.connectionName}`)
+            .join("; ");
+          recipients.push({
+            userId: member.userId,
+            email: member.email,
+            phone: phoneLabel,
+          });
+        }
+        setState({ recipients, membersById, status: "ready" });
       } catch {
-        if (!cancelled) setRecipients([]);
+        if (!cancelled) {
+          setState({ recipients: [], membersById: new Map(), status: "error" });
+        }
       }
     })();
     return () => {
@@ -38,5 +55,5 @@ export function useHandoffNotifyRecipients(): HandoffNotifyRecipientOption[] {
     };
   }, []);
 
-  return recipients;
+  return state;
 }
