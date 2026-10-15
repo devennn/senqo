@@ -175,6 +175,7 @@ vi.mock("../repositories/agent.js", () => ({
   archiveAgentConfig: vi.fn(),
   deleteAgentConfig: vi.fn(),
   getAgentConfigById: vi.fn(),
+  setAgentEvalsEnabled: vi.fn(),
 }));
 
 vi.mock("../repositories/workspace-secrets.js", () => ({
@@ -408,7 +409,7 @@ import { listTasksPage, listSchedulableAgents } from "../repositories/tasks.js";
 import { listConnections, listRecentConnectionEvents, createConversationMessage, getConnectionById, recordConnectionEvent, updateConnectionMode } from "../repositories/whatsapp.js";
 import { listWorkspaceSecrets, createWorkspaceSecret, deleteWorkspaceSecret } from "../repositories/workspace-secrets.js";
 import { listApiKeys, createApiKey, deleteApiKey } from "../repositories/api-keys.js";
-import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentConfig } from "../repositories/agent.js";
+import { listAgentConfigs, createAgentConfig, getAgentConfigById, updateAgentConfig, setAgentEvalsEnabled } from "../repositories/agent.js";
 import { userHasVerifiedHandoffPhone } from "../repositories/handoff-phones.js";
 import { validateHandoffTopicGroupIdsForWorkspace } from "../repositories/handoff-topic-groups.js";
 import { getAgentPerformanceReport } from "../repositories/reports.js";
@@ -476,6 +477,7 @@ const listAgentConfigsMock = vi.mocked(listAgentConfigs);
 const createAgentConfigMock = vi.mocked(createAgentConfig);
 const getAgentConfigByIdMock = vi.mocked(getAgentConfigById);
 const updateAgentConfigMock = vi.mocked(updateAgentConfig);
+const setAgentEvalsEnabledMock = vi.mocked(setAgentEvalsEnabled);
 const validateHandoffTopicGroupIdsMock = vi.mocked(validateHandoffTopicGroupIdsForWorkspace);
 const isWorkspaceTeammateMock = vi.mocked(isWorkspaceTeammate);
 const userHasVerifiedHandoffPhoneMock = vi.mocked(userHasVerifiedHandoffPhone);
@@ -1676,6 +1678,59 @@ describe("POST /agents", () => {
   });
 });
 
+describe("PATCH /agents/:id/evals", () => {
+  // Turning the master switch off persists the flag and echoes it, needed so the
+  // Evals sidebar can gray the agent and block its runs.
+  it("persists evals_enabled false and returns the new value", async () => {
+    setAgentEvalsEnabledMock.mockResolvedValue({
+      ok: true,
+      message: "Evals setting saved",
+    });
+
+    const res = await app.request("/agents/agent-1/evals", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ enabled: false }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ evals_enabled: false });
+    expect(setAgentEvalsEnabledMock).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      agentId: "agent-1",
+      enabled: false,
+    });
+  });
+
+  // A non-boolean payload must be rejected before touching the repo.
+  it("rejects a non-boolean payload", async () => {
+    const res = await app.request("/agents/agent-1/evals", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ enabled: "yes" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(setAgentEvalsEnabledMock).not.toHaveBeenCalled();
+  });
+
+  // Unknown or archived agents surface as 404 so the UI can refresh.
+  it("returns 404 when the agent cannot be updated", async () => {
+    setAgentEvalsEnabledMock.mockResolvedValue({
+      ok: false,
+      message: "Agent not found.",
+    });
+
+    const res = await app.request("/agents/agent-1/evals", {
+      method: "PATCH",
+      headers: AUTH,
+      body: JSON.stringify({ enabled: true }),
+    });
+
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("PUT /agents/:id handoff topic groups", () => {
   // Profile save must persist marked handoff topic groups for prompt inclusion.
   it("persists handoffTopicGroups on agent update", async () => {
@@ -2174,69 +2229,5 @@ describe("POST /workspace-asset-groups/:id/assets/:assetId/summarize", () => {
 
     expect(res.status).toBe(200);
     expect(storageDownload).toHaveBeenCalledWith("linked-docs", "ws-1/notes.csv");
-  });
-
-  // Bulk re-runs persist the fresh summary in the same request instead of a follow-up PATCH.
-  it("persists the description when persistDescription is true", async () => {
-    vi.mocked(getAgentAssetInGroup).mockResolvedValueOnce({
-      id: "asset-1",
-      workspace_id: "ws-1",
-      group_id: GROUP_ID,
-      kind: "doc",
-      source: "google_drive",
-      file_name: "stock.csv",
-      storage_path: null,
-      drive_file_id: "drive-1",
-      mime_type: "text/csv",
-      description: "old",
-      file_size_bytes: 0,
-      sort_order: 0,
-      created_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
-    });
-    vi.mocked(getWorkspaceAppConnection).mockResolvedValueOnce({
-      id: "c1",
-      workspace_id: "ws-1",
-      toolkit: "googledrive",
-      composio_user_id: "workspace_ws-1",
-      composio_connected_account_id: "ca-1",
-      status: "active",
-      drive_access_mode: "entire_drive",
-      drive_scope_id: null,
-      drive_scope_name: null,
-      drive_scope_mime_type: null,
-      created_at: "2026-01-01T00:00:00.000Z",
-      updated_at: "2026-01-01T00:00:00.000Z",
-    });
-    vi.mocked(downloadGoogleDriveFileText).mockResolvedValueOnce({
-      ok: true,
-      text: "sku,qty\nA,10",
-    });
-    vi.mocked(summarizeLinkedDocContent).mockResolvedValueOnce({
-      ok: true,
-      description: "Fresh summary",
-    });
-    vi.mocked(updateAgentAssetDescription).mockResolvedValueOnce({
-      ok: true,
-      message: "Description saved",
-    });
-
-    const res = await app.request(
-      `/workspace-asset-groups/${GROUP_ID}/assets/asset-1/summarize`,
-      {
-        method: "POST",
-        headers: AUTH,
-        body: JSON.stringify({ persistDescription: true }),
-      },
-    );
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ description: "Fresh summary" });
-    expect(updateAgentAssetDescription).toHaveBeenCalledWith({
-      workspaceId: "ws-1",
-      groupId: GROUP_ID,
-      assetId: "asset-1",
-      description: "Fresh summary",
-    });
   });
 });

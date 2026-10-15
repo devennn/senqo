@@ -80,6 +80,8 @@ export type AgentConfigRecord = {
   context_groups: string[];
   asset_groups: string[];
   handoff_notify_user_ids: string[];
+  /** When false, every eval of this agent is paused (schedules skip, runs blocked). */
+  evals_enabled: boolean;
 };
 
 export type WorkspaceStorageCategory = "asset" | "media";

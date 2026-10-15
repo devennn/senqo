@@ -101,8 +101,14 @@ function pruneOrphanedToolCalls(messages: ModelMessage[]): ModelMessage[] {
 }
 
 /**
- * Removes tool history that providers reject:
+ * Removes replayed history that providers reject:
  *
+ * - `reasoning` parts (provider-bound thinking blocks). Their signatures are
+ *   bound to the request that produced them — including its system prompt —
+ *   and this runtime rebuilds the system prompt per run, so providers such as
+ *   Azure Anthropic reject them on replay with "Invalid `signature` in
+ *   `thinking` block". Thinking is only needed while the run that produced it
+ *   continues; cross-run replay must drop it.
  * - duplicate `tool-call` / `tool-result` parts for the same `toolCallId`
  *   (older runtime code persisted cumulative AI SDK step snapshots, so a run
  *   with tools wrote its earlier steps once per later step), and
@@ -112,7 +118,7 @@ function pruneOrphanedToolCalls(messages: ModelMessage[]): ModelMessage[] {
  * calls are pruned. Existing poisoned sessions recover on their next run
  * because history is sanitized again on every load.
  */
-export function sanitizeToolCallHistory(
+export function sanitizeAgentHistory(
   messages: ModelMessage[],
 ): ModelMessage[] {
   const seenCallIds = new Set<string>();
@@ -127,6 +133,7 @@ export function sanitizeToolCallHistory(
 
     const parts = message.content.filter((part) => {
       const p = part as { type?: string; toolCallId?: string };
+      if (p.type === "reasoning") return false;
       const toolCallId =
         typeof p.toolCallId === "string" ? p.toolCallId : undefined;
       if (toolCallId && p.type === "tool-call") {
@@ -174,6 +181,56 @@ export function sanitizeToolCallHistory(
       }
       return survivingCallIds.has(p.toolCallId);
     });
+    if (parts.length === 0) continue;
+    cleaned.push({ ...message, content: parts } as ModelMessage);
+  }
+
+  return cleaned;
+}
+
+/** Part types that replay safely as-is when a provider rejects richer history. */
+const REPLAYABLE_HISTORY_PART_TYPES = new Set([
+  "text",
+  "image",
+  "file",
+  "tool-call",
+  "tool-result",
+]);
+
+/**
+ * Last-resort scrub for a provider that rejected an already-sanitized replay
+ * (for example a thinking-block signature bound to an older request). Keeps
+ * only standard replayable part types, drops part-level `providerOptions`
+ * (signatures, cache hints) and removes messages left empty. Used once as a
+ * retry before the run is allowed to fail.
+ */
+export function stripVolatileHistoryParts(
+  messages: ModelMessage[],
+): ModelMessage[] {
+  const cleaned: ModelMessage[] = [];
+
+  for (const message of messages) {
+    if (!Array.isArray(message.content)) {
+      cleaned.push(message);
+      continue;
+    }
+
+    const parts: unknown[] = [];
+    for (const part of message.content) {
+      if (!part || typeof part !== "object") continue;
+      const p = part as Record<string, unknown>;
+      const type = p.type;
+      if (typeof type !== "string" || !REPLAYABLE_HISTORY_PART_TYPES.has(type)) {
+        continue;
+      }
+      if (!("providerOptions" in p)) {
+        parts.push(part);
+        continue;
+      }
+      const { providerOptions: _providerOptions, ...rest } = p;
+      parts.push(rest);
+    }
+
     if (parts.length === 0) continue;
     cleaned.push({ ...message, content: parts } as ModelMessage);
   }

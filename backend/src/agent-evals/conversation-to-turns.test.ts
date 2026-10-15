@@ -38,10 +38,7 @@ describe("conversationMessagesToEvalTurns", () => {
       msg({
         role: "assistant",
         content: "AI could not reply",
-        metadata: {
-          thread_event: "agent_error",
-          agent_error_message: "OpenRouter request failed",
-        },
+        metadata: { thread_event: "agent_error" },
       }),
     ]);
 

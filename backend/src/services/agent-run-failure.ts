@@ -1,4 +1,9 @@
+import {
+  AGENT_RUN_LOG_KIND_AGENT_ERROR,
+  AGENT_RUN_LOG_SOURCE,
+} from "../lib/agent-run-log.js";
 import { THREAD_EVENT_AGENT_ERROR } from "../lib/conversation-thread-events.js";
+import { insertAgentMessages } from "../repositories/agent-messages.js";
 import { updateConversationHandlingMode } from "../repositories/conversations.js";
 import { listErrorAlertSubscriberUserIds } from "../repositories/error-alert-subscribers.js";
 import { createConversationMessage } from "../repositories/whatsapp.js";
@@ -17,9 +22,47 @@ function truncateErrorMessage(errorMessage: string): string {
 }
 
 /**
+ * Stores the provider error verbatim in the conversation's agent transcript so
+ * operators can read it in Agent Logs. The thread only carries a short,
+ * non-technical summary; run-log rows are excluded from model history on later
+ * runs via their provider options.
+ */
+async function recordAgentErrorLog(input: {
+  workspaceId: string;
+  conversationId: string;
+  agentConfigId?: string | null;
+  errorMessage: string;
+  dryRun: boolean;
+}): Promise<void> {
+  const saved = await insertAgentMessages([
+    {
+      workspaceId: input.workspaceId,
+      sessionId: input.conversationId,
+      role: "assistant",
+      content: {
+        type: AGENT_RUN_LOG_KIND_AGENT_ERROR,
+        error: input.errorMessage,
+        dry_run: input.dryRun,
+        ...(input.agentConfigId ? { agent_config_id: input.agentConfigId } : {}),
+      },
+      providerOptions: {
+        source: AGENT_RUN_LOG_SOURCE,
+        kind: AGENT_RUN_LOG_KIND_AGENT_ERROR,
+      },
+    },
+  ]);
+  if (!saved) {
+    console.error(
+      `[${scope}/recordAgentErrorLog] Failed query: unable to save agent error log conversationId=${input.conversationId}`,
+    );
+  }
+}
+
+/**
  * An agent run that fails must never produce a customer-facing reply. Switch the
- * conversation to human handling, leave an operator-only thread event with the
- * error, and alert team members opted in to AI error alerts (default: nobody).
+ * conversation to human handling, leave an operator-only thread event with a
+ * non-technical summary (the verbose provider error goes to Agent Logs), and
+ * alert team members opted in to AI error alerts (default: nobody).
  */
 export async function handoffAfterAgentRunFailure(input: {
   workspaceId: string;
@@ -30,6 +73,14 @@ export async function handoffAfterAgentRunFailure(input: {
   const errorMessage = truncateErrorMessage(
     input.errorMessage.trim() || "Agent run failed",
   );
+
+  await recordAgentErrorLog({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    agentConfigId: input.agentConfigId,
+    errorMessage,
+    dryRun: false,
+  });
 
   const updated = await updateConversationHandlingMode(
     input.workspaceId,
@@ -50,7 +101,6 @@ export async function handoffAfterAgentRunFailure(input: {
     AGENT_ERROR_THREAD_CONTENT,
     {
       thread_event: THREAD_EVENT_AGENT_ERROR,
-      agent_error_message: errorMessage,
     },
     null,
   );
@@ -77,7 +127,8 @@ export async function handoffAfterAgentRunFailure(input: {
 /**
  * Dry runs: a failed run must not send a customer-facing reply, must not change
  * conversation handling, and must not alert teammates. Leave an operator-only
- * dry-run thread event with the error instead.
+ * dry-run thread event with a non-technical summary; the verbose provider error
+ * goes to Agent Logs.
  */
 export async function recordDryRunAgentFailure(input: {
   workspaceId: string;
@@ -88,6 +139,13 @@ export async function recordDryRunAgentFailure(input: {
     input.errorMessage.trim() || "Agent run failed",
   );
 
+  await recordAgentErrorLog({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    errorMessage,
+    dryRun: true,
+  });
+
   const eventSaved = await createConversationMessage(
     input.workspaceId,
     input.conversationId,
@@ -95,7 +153,6 @@ export async function recordDryRunAgentFailure(input: {
     AGENT_ERROR_THREAD_CONTENT,
     {
       thread_event: THREAD_EVENT_AGENT_ERROR,
-      agent_error_message: errorMessage,
       dry_run: true,
     },
     null,

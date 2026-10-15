@@ -273,6 +273,8 @@ export const agentConfigs = pgTable(
     contextGroups: jsonb("context_groups").default([]),
     assetGroups: jsonb("asset_groups").default([]),
     handoffNotifyUserIds: jsonb("handoff_notify_user_ids").default([]),
+    /** When false, every eval of this agent is paused: schedules skip and runs are blocked. */
+    evalsEnabled: boolean("evals_enabled").notNull().default(true),
   },
   (t) => [
     index("idx_agent_configs_workspace_active").on(

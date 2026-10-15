@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import { api } from "@/lib/api";
 import { AssetGroupFilesBlock } from "./asset-group-files-block";
 import type { AgentAssetRecord } from "@/types/repositories";
@@ -40,7 +39,6 @@ const onWorkspaceStale = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.get).mockResolvedValue({ composioConfigured: false, apps: [] } as never);
-  vi.mocked(api.post).mockResolvedValue({ description: "fresh" } as never);
   reloadGroup.mockResolvedValue(undefined);
   onWorkspaceStale.mockResolvedValue(undefined);
 });
@@ -56,50 +54,25 @@ function renderBlock(assets: AgentAssetRecord[]) {
   );
 }
 
-describe("AssetGroupFilesBlock re-run summaries", () => {
-  // Bulk re-run drafts and saves a fresh summary for every existing item in the group.
-  it("re-runs and persists summaries for every asset", async () => {
-    const user = userEvent.setup();
+describe("AssetGroupFilesBlock", () => {
+  // Every asset renders as its own editable row with the file name, needed so
+  // operators can review, regenerate, or remove each item individually.
+  it("renders a row per asset", () => {
     renderBlock([makeAsset("a1", "notes.csv"), makeAsset("a2", "stock.csv")]);
 
-    await user.click(screen.getByRole("button", { name: "Re-run summaries" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: "Re-run summaries" }));
-
-    await waitFor(() => expect(reloadGroup).toHaveBeenCalledTimes(1));
-    expect(api.post).toHaveBeenCalledWith(
-      "/api/user/workspace-asset-groups/g1/assets/a1/summarize",
-      { persistDescription: true },
-    );
-    expect(api.post).toHaveBeenCalledWith(
-      "/api/user/workspace-asset-groups/g1/assets/a2/summarize",
-      { persistDescription: true },
-    );
-    expect(await screen.findByText("Summaries updated.")).toBeInTheDocument();
+    expect(screen.getByText("notes.csv")).toBeInTheDocument();
+    expect(screen.getByText("stock.csv")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /regenerate/i })).toHaveLength(2);
   });
 
-  // One failing item must not block the rest; the failure count is surfaced to the operator.
-  it("keeps going when one summary fails and reports the count", async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.post).mockImplementation((async (path: string) => {
-      if (String(path).includes("/a1/")) throw new Error("drive unavailable");
-      return { description: "fresh" };
-    }) as never);
-    renderBlock([makeAsset("a1", "notes.csv"), makeAsset("a2", "stock.csv")]);
-
-    await user.click(screen.getByRole("button", { name: "Re-run summaries" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.click(within(dialog).getByRole("button", { name: "Re-run summaries" }));
+  // Empty groups show guidance instead of a bare list.
+  it("shows the empty state when the group has no assets", () => {
+    renderBlock([]);
 
     expect(
-      await screen.findByText("1 of 2 summaries could not be generated."),
+      screen.getByText(
+        "Nothing in this group yet. Click Add asset to add a sendable file or reference.",
+      ),
     ).toBeInTheDocument();
-    await waitFor(() => expect(reloadGroup).toHaveBeenCalledTimes(1));
-  });
-
-  // Nothing to re-run in an empty group.
-  it("disables the re-run action when the group is empty", () => {
-    renderBlock([]);
-    expect(screen.getByRole("button", { name: "Re-run summaries" })).toBeDisabled();
   });
 });

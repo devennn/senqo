@@ -1,9 +1,16 @@
 import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { evalRuns, evalSchedules, workspaceHandoffTopicEntries } from "../db/schema/index.js";
+import {
+  agentConfigs,
+  evalCases,
+  evalRuns,
+  evalSchedules,
+  workspaceHandoffTopicEntries,
+} from "../db/schema/index.js";
 import { listPageOffset } from "../lib/pagination.js";
 import type {
   CreateEvalScheduleInput,
+  EvalScheduleForTickRecord,
   EvalScheduleRecord,
   EvalScheduleRepeat,
   EvalScheduledRunRecord,
@@ -242,11 +249,37 @@ export async function setEvalScheduleEnabled(
   }
 }
 
-export async function listAllEvalSchedules(): Promise<EvalScheduleRecord[]> {
+export async function listAllEvalSchedules(): Promise<EvalScheduleForTickRecord[]> {
   try {
-    const rows = await db.select().from(evalSchedules);
+    const rows = await db
+      .select({
+        id: evalSchedules.id,
+        workspaceId: evalSchedules.workspaceId,
+        evalCaseId: evalSchedules.evalCaseId,
+        repeat: evalSchedules.repeat,
+        weekdays: evalSchedules.weekdays,
+        monthDay: evalSchedules.monthDay,
+        hour: evalSchedules.hour,
+        minute: evalSchedules.minute,
+        timezone: evalSchedules.timezone,
+        notifyUserId: evalSchedules.notifyUserId,
+        enabled: evalSchedules.enabled,
+        lastFiredAt: evalSchedules.lastFiredAt,
+        createdAt: evalSchedules.createdAt,
+        updatedAt: evalSchedules.updatedAt,
+        agentConfigId: evalCases.agentConfigId,
+        evalsEnabled: agentConfigs.evalsEnabled,
+      })
+      .from(evalSchedules)
+      .innerJoin(evalCases, eq(evalCases.id, evalSchedules.evalCaseId))
+      .innerJoin(agentConfigs, eq(agentConfigs.id, evalCases.agentConfigId));
+
     console.info(`[${scope}/listAllEvalSchedules] Success: count=${rows.length}`);
-    return rows.map(toScheduleRecord);
+    return rows.map((row) => ({
+      ...toScheduleRecord(row),
+      agentConfigId: row.agentConfigId,
+      evalsEnabled: row.evalsEnabled,
+    }));
   } catch (error) {
     console.error(`[${scope}/listAllEvalSchedules] Unexpected error: ${String(error)}`);
     return [];

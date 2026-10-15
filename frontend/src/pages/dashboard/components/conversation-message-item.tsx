@@ -14,7 +14,7 @@ import {
   getOperatorAiSources,
   shouldShowOperatorAiReasoningFooter,
 } from "@/lib/conversation-operator-ai-reasoning";
-import { asConversationThreadEventType } from "@/lib/conversation-thread-events";
+import { asConversationThreadEventType, AGENT_ERROR_SUMMARY } from "@/lib/conversation-thread-events";
 import { MessageMedia } from "@/pages/dashboard/components/message-media";
 import { ConversationOperatorAiReasoning } from "@/pages/dashboard/components/conversation-operator-ai-reasoning";
 import { ConversationThreadEvent } from "@/pages/dashboard/components/conversation-thread-event";
@@ -73,9 +73,8 @@ export function ConversationMessageItem({
         : threadEventType === "manual_toggle_human" &&
             typeof metadata?.manual_toggle_reason === "string"
           ? metadata.manual_toggle_reason.trim() || null
-          : threadEventType === "agent_error" &&
-              typeof metadata?.agent_error_message === "string"
-            ? metadata.agent_error_message.trim() || null
+          : threadEventType === "agent_error"
+            ? AGENT_ERROR_SUMMARY
             : null;
     return (
       <ConversationThreadEvent

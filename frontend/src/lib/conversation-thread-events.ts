@@ -2,6 +2,12 @@ export const THREAD_EVENT_HANDOFF_TO_HUMAN = "handoff_to_human";
 export const THREAD_EVENT_MANUAL_TOGGLE = "manual_toggle_human";
 export const THREAD_EVENT_AGENT_ERROR = "agent_error";
 
+/**
+ * Short non-technical summary shown for AI error events. The verbose provider
+ * error is never rendered in the thread; operators read it in Agent Logs.
+ */
+export const AGENT_ERROR_SUMMARY = "Unexpected error. Please check logs.";
+
 export type ConversationThreadEventType =
   | typeof THREAD_EVENT_HANDOFF_TO_HUMAN
   | typeof THREAD_EVENT_MANUAL_TOGGLE

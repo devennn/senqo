@@ -80,9 +80,9 @@ describe("AgentAssetRow removal", () => {
     expect(screen.getByText("menu.pdf")).toBeInTheDocument();
   });
 
-  // Live docs render the kind badge with an open link, and Regenerate fills the description draft
+  // References render the kind badge with an open link, and Regenerate fills the description draft
   // with the AI rewrite so the operator can review before saving.
-  it("AgentAssetRow → shows live doc details and regenerates the description", async () => {
+  it("AgentAssetRow → shows reference details and regenerates the description", async () => {
     const user = userEvent.setup();
     const onSummarize = vi
       .fn()
@@ -96,7 +96,7 @@ describe("AgentAssetRow removal", () => {
       />,
     );
 
-    expect(screen.getByText("Live doc")).toBeInTheDocument();
+    expect(screen.getByText("Reference")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open/i })).toHaveAttribute(
       "href",
       "https://docs.google.com/spreadsheets/d/drive-1/edit",
@@ -106,7 +106,7 @@ describe("AgentAssetRow removal", () => {
     await user.click(screen.getByRole("button", { name: /regenerate/i }));
 
     expect(onSummarize).toHaveBeenCalledWith("asset-doc");
-    expect(screen.getByRole("textbox", { name: /what is this about/i })).toHaveValue(
+    expect(screen.getByRole("textbox", { name: /description/i })).toHaveValue(
       "Live stock sheet — use for inventory Q&A.",
     );
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();

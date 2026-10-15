@@ -59,6 +59,12 @@ export type EvalRunRecord = {
 
 export type EvalScheduleRepeat = "daily" | "weekly" | "monthly";
 
+/** `listAllEvalSchedules` rows carry the case's agent so the scheduler can skip agents with evals off. */
+export type EvalScheduleForTickRecord = EvalScheduleRecord & {
+  agentConfigId: string;
+  evalsEnabled: boolean;
+};
+
 export type EvalScheduleRecord = {
   id: string;
   workspaceId: string;

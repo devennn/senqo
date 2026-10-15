@@ -17,6 +17,8 @@ import {
   formatAgentMessageProviderOptions,
 } from "@/lib/format-agent-message-content";
 import {
+  AGENT_RUN_LOG_KIND_AGENT_ERROR,
+  AGENT_RUN_LOG_KIND_HISTORY_RETRY,
   AGENT_RUN_LOG_KIND_LLM_OUTPUT,
   AGENT_RUN_LOG_KIND_WHATSAPP_SENT,
   agentRunLogKind,
@@ -46,6 +48,18 @@ function logBadge(message: AgentMessageRecord): { label: string; className: stri
     return {
       label: "WhatsApp sent",
       className: "bg-violet-500/10 text-violet-800 dark:text-violet-300",
+    };
+  }
+  if (kind === AGENT_RUN_LOG_KIND_AGENT_ERROR) {
+    return {
+      label: "Agent error",
+      className: "bg-destructive/10 text-destructive",
+    };
+  }
+  if (kind === AGENT_RUN_LOG_KIND_HISTORY_RETRY) {
+    return {
+      label: "History retry",
+      className: "bg-amber-500/10 text-amber-800 dark:text-amber-300",
     };
   }
   return {

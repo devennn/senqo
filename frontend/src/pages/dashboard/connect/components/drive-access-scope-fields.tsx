@@ -194,7 +194,7 @@ export function DriveAccessScopeFields({
             <p className="text-sm font-medium">Docs access</p>
             <InlineHelpHint label="About Drive access limits">
               <p>
-                Live docs in Knowledge → Assets can only link files inside this boundary. The
+                References in Knowledge → Assets can only link files inside this boundary. The
                 Google account stays connected; the limit is enforced by Senqo,
                 not by Google OAuth scopes.
               </p>

@@ -1,11 +1,14 @@
 import { stripTrailingAssistantTurns } from "../agent-evals/conversation-to-turns.js";
 import { runEvalCase } from "../agent-evals/index.js";
+import { getAgentConfigById } from "../repositories/agent.js";
 import {
   createEvalRun,
   getEvalCaseById,
   updateEvalCase,
 } from "../repositories/evals.js";
 import type { EvalCaseRecord, EvalRunStatus } from "../types/evals.js";
+
+const scope = "EvalRun";
 
 export type RunAndPersistEvalCaseResult =
   | {
@@ -23,6 +26,16 @@ export async function runAndPersistEvalCase(input: {
 }): Promise<RunAndPersistEvalCaseResult> {
   const existing = await getEvalCaseById(input.workspaceId, input.evalCaseId);
   if (!existing) return { ok: false, error: "not_found", httpStatus: 404 };
+  const agentConfig = await getAgentConfigById(
+    input.workspaceId,
+    existing.agentId,
+  );
+  if (!agentConfig || !agentConfig.evals_enabled) {
+    console.info(
+      `[${scope}/runAndPersistEvalCase] Failed query: agent evals off evalCaseId=${input.evalCaseId}`,
+    );
+    return { ok: false, error: "agent_evals_off", httpStatus: 400 };
+  }
   if (existing.expectedAction === "reply" && !existing.expectedReply.trim()) {
     return { ok: false, error: "expected_reply_required", httpStatus: 400 };
   }

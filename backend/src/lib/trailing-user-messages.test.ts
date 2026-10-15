@@ -16,10 +16,7 @@ describe("collectTrailingUserBlockForAi", () => {
         role: "assistant",
         content: "AI could not reply",
         created_at: "2026-09-25T05:01:00.000Z",
-        metadata: {
-          thread_event: "agent_error",
-          agent_error_message: "OpenRouter request failed",
-        },
+        metadata: { thread_event: "agent_error" },
       },
     ]);
 

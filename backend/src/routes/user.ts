@@ -15,6 +15,7 @@ import {
   archiveAgentConfig,
   deleteAgentConfig,
   getAgentConfigById,
+  setAgentEvalsEnabled,
 } from "../repositories/agent.js";
 import {
   ASSET_GROUP_NAME_MAX_LEN,
@@ -585,6 +586,26 @@ app.put("/agents/:id", async (c) => {
     );
   }
   return c.json({ ok: true });
+});
+
+const setAgentEvalsSchema = z.object({ enabled: z.boolean() });
+
+/** Per-agent master switch: off pauses every schedule and blocks runs for that agent. */
+app.patch("/agents/:id/evals", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const agentId = c.req.param("id");
+  const body = setAgentEvalsSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!body.success) return c.json({ error: "invalid_payload" }, 400);
+
+  const result = await setAgentEvalsEnabled({
+    workspaceId,
+    agentId,
+    enabled: body.data.enabled,
+  });
+  if (!result.ok) return c.json({ error: "agent_not_found" }, 404);
+  return c.json({ evals_enabled: body.data.enabled });
 });
 
 const workspaceHandoffTopicEntryBodySchema = z
@@ -1418,9 +1439,6 @@ app.post("/workspace-asset-groups/:id/assets/summarize-drive", async (c) => {
 app.post("/workspace-asset-groups/:id/assets/:assetId/summarize", async (c) => {
   const workspaceId = c.get("workspaceId");
   const groupId = c.req.param("id");
-  const body = (await c.req.json().catch(() => ({}))) as {
-    persistDescription?: boolean;
-  };
   const asset = await getAgentAssetInGroup(workspaceId, groupId, c.req.param("assetId"));
   if (!asset) {
     return c.json({ error: "not_found" }, 404);
@@ -1456,17 +1474,6 @@ app.post("/workspace-asset-groups/:id/assets/:assetId/summarize", async (c) => {
 
   if (!summarized.ok) {
     return c.json({ error: "summarize_failed", message: summarized.message }, 400);
-  }
-  if (body.persistDescription === true) {
-    const updated = await updateAgentAssetDescription({
-      workspaceId,
-      groupId,
-      assetId: asset.id,
-      description: summarized.description,
-    });
-    if (!updated.ok) {
-      return c.json({ error: "asset_update_failed", message: updated.message }, 400);
-    }
   }
   return c.json({ description: summarized.description });
 });

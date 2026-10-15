@@ -80,6 +80,8 @@ export type EvalCase = {
 export type EvalAgentOption = {
   id: string;
   name: string;
+  /** False when the agent's evals are switched off; the picker marks it "off". */
+  evalsEnabled: boolean;
 };
 
 export type EvalScheduleRepeat = "daily" | "weekly" | "monthly";

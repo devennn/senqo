@@ -60,8 +60,8 @@ describe("AssetAddDialog", () => {
     expect((body.get("file") as File).name).toBe("menu.pdf");
   });
 
-  // Choosing the Live doc kind uploads the file as a doc the agent re-reads at chat time.
-  it("adds an uploaded live doc when the Live doc kind is chosen", async () => {
+  // Choosing the Reference kind uploads the file as a doc the agent re-reads at chat time.
+  it("adds an uploaded reference when the Reference kind is chosen", async () => {
     const user = userEvent.setup();
     vi.mocked(api.postForm).mockImplementation((async (path: string) => {
       if (String(path).endsWith("/summarize")) return { description: "AI doc description" };
@@ -69,7 +69,7 @@ describe("AssetAddDialog", () => {
     }) as never);
     renderDialog();
 
-    await user.click(screen.getByRole("radio", { name: /live doc/i }));
+    await user.click(screen.getByRole("radio", { name: /reference/i }));
     await user.upload(
       screen.getByLabelText(/Document/),
       new File(["# Notes"], "notes.md", { type: "text/markdown" }),
@@ -85,8 +85,8 @@ describe("AssetAddDialog", () => {
     expect((createCall?.[1] as FormData).get("kind")).toBe("doc");
   });
 
-  // Picking a Drive file drafts from live content and saves it as a google_drive live doc.
-  it("adds a live doc from a Google Drive pick", async () => {
+  // Picking a Drive file drafts from live content and saves it as a google_drive reference.
+  it("adds a reference from a Google Drive pick", async () => {
     const user = userEvent.setup();
     vi.mocked(api.get).mockImplementation((async (path: string) => {
       if (String(path).endsWith("/api/user/apps")) {
@@ -116,7 +116,7 @@ describe("AssetAddDialog", () => {
     }) as never);
     renderDialog();
 
-    await user.click(screen.getByRole("radio", { name: /live doc/i }));
+    await user.click(screen.getByRole("radio", { name: /reference/i }));
     await user.click(screen.getByRole("tab", { name: "Google Drive" }));
     await user.click(await screen.findByRole("button", { name: /stock\.csv/ }));
 
@@ -169,7 +169,7 @@ describe("AssetAddDialog", () => {
     );
     await screen.findByDisplayValue("AI menu description");
 
-    await user.click(screen.getByRole("radio", { name: /live doc/i }));
+    await user.click(screen.getByRole("radio", { name: /reference/i }));
 
     expect(screen.getByRole("textbox")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();

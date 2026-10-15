@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader } from "@/components/ui/card";
 import { useClickToEditGroupName } from "@/hooks/useClickToEditGroupName";
 import { api } from "@/lib/api";
-import { ASSETS_MAX_PER_GROUP } from "@/lib/asset-groups-limits";
 import type { AgentAssetRecord } from "@/types/repositories";
 import { AssetGroupFilesBlock } from "@/pages/dashboard/components/asset-group-files-block";
 import { AssetGroupNameFields } from "@/pages/dashboard/components/asset-group-name-fields";
@@ -94,11 +93,16 @@ export function AssetGroupEditor({ groupId, onSaved }: { groupId: string; onSave
           icon={<FolderOpen className="size-5 shrink-0 text-primary" aria-hidden />}
           helpLabel="Workspace asset groups"
           helpContent={
-            <p>
-              Click the title to rename. Each item includes what it is about. Sendable files go out on
-              WhatsApp; live docs are re-read by the agent at chat time. Attach groups per agent on
-              Profile.
-            </p>
+            <>
+              <p>
+                Click the title to rename. Each item includes a description. Attach groups per agent
+                on Profile.
+              </p>
+              <p>
+                Sendable file — the agent can send it to customers. Reference — the agent reads it
+                to answer; customers never receive it.
+              </p>
+            </>
           }
           loading={loading}
           loadError={loadError}
@@ -120,11 +124,6 @@ export function AssetGroupEditor({ groupId, onSaved }: { groupId: string; onSave
             />
           }
         />
-        {!loading && !loadError ? (
-          <CardDescription>
-            {assets.length}/{ASSETS_MAX_PER_GROUP} items
-          </CardDescription>
-        ) : null}
         <CardAction className="-mt-0.5 shrink-0 sm:justify-self-end">
           <Button
             type="button"

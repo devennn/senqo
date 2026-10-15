@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const aiState = vi.hoisted(() => ({
-  queue: [] as Array<{ stepEvents: Array<Record<string, unknown>>; result: unknown }>,
+  queue: [] as Array<{
+    stepEvents: Array<Record<string, unknown>>;
+    result: unknown;
+    error?: Error;
+  }>,
+  generateCalls: [] as Array<{ messages?: unknown }>,
 }));
 
 vi.mock("ai", () => ({
@@ -10,9 +15,11 @@ vi.mock("ai", () => ({
     constructor(options: Record<string, unknown>) {
       this.options = options;
     }
-    async generate() {
+    async generate(input?: { messages?: unknown }) {
+      aiState.generateCalls.push(input ?? {});
       const item = aiState.queue.shift();
       if (!item) throw new Error("FakeToolLoopAgent has no queued result");
+      if (item.error) throw item.error;
       const onStepFinish = this.options.onStepFinish as
         | ((event: Record<string, unknown>) => void)
         | undefined;
@@ -125,6 +132,7 @@ function queueRun(
 beforeEach(() => {
   vi.clearAllMocks();
   aiState.queue.length = 0;
+  aiState.generateCalls.length = 0;
   mockResolveSessionId.mockResolvedValue("conv-1");
   mockBuildAgentInstructions.mockResolvedValue({
     instructions: "system",
@@ -389,5 +397,77 @@ describe("runAgentSession dry-run drafts", () => {
     );
     expect(mockHandoffAfterAgentRunFailure).not.toHaveBeenCalled();
     expect(result?.messages).toEqual([]);
+  });
+});
+
+describe("runAgentSession provider history rejection", () => {
+  // A provider can reject replayed history whose signature-bound thinking block
+  // was created under an older system prompt. The runtime must log the rejection
+  // to Agent Logs, retry once without volatile history parts, and still reply.
+  it("retries once without volatile parts and records a history_retry log", async () => {
+    mockListAgentMessages.mockResolvedValue([
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "text",
+            text: "previous reply",
+            providerOptions: { anthropic: { signature: "stale" } },
+          },
+        ],
+        provider_options: null,
+      },
+    ]);
+    aiState.queue.push({
+      stepEvents: [],
+      result: null,
+      error: new Error(
+        "Invalid `signature` in `thinking` block. The block is bound to a different conversation.",
+      ),
+    });
+    queueRun([], structuredOutput([{ text: "Hello again", assetFileName: "" }]));
+
+    const result = await runAgentSession(baseInput);
+
+    expect(result?.messages).toEqual([
+      { text: "Hello again", assetFileName: "" },
+    ]);
+
+    const retryLogRow = mockInsertAgentMessages.mock.calls
+      .flatMap(
+        (call) =>
+          call[0] as Array<{
+            providerOptions?: Record<string, unknown>;
+            content?: { error?: string };
+          }>,
+      )
+      .find((row) => row.providerOptions?.kind === "history_retry");
+    expect(retryLogRow?.content?.error).toContain(
+      "bound to a different conversation",
+    );
+
+    const retryMessages = aiState.generateCalls[1]?.messages as Array<{
+      role: string;
+      content: unknown;
+    }>;
+    expect(retryMessages[0]?.content).toEqual([
+      { type: "text", text: "previous reply" },
+    ]);
+  });
+
+  // A retry that fails again must surface the error to the caller so the normal
+  // failure handling (handoff / dry-run event) still runs.
+  it("surfaces the error when the retry also fails", async () => {
+    const signatureError = new Error(
+      "Invalid `signature` in `thinking` block. The block is bound to a different conversation.",
+    );
+    aiState.queue.push({ stepEvents: [], result: null, error: signatureError });
+    aiState.queue.push({ stepEvents: [], result: null, error: signatureError });
+
+    await expect(runAgentSession(baseInput)).rejects.toThrow(
+      "bound to a different conversation",
+    );
+
+    expect(aiState.generateCalls).toHaveLength(2);
   });
 });

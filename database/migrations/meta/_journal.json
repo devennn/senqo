@@ -197,6 +197,13 @@
       "when": 1780540924826,
       "tag": "0027_merge_docs_into_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1780540924827,
+      "tag": "0028_agent_evals_enabled",
+      "breakpoints": true
     }
   ]
 }

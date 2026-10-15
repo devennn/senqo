@@ -22,6 +22,8 @@ type Props = {
   onDelete: (id: string) => Promise<void>;
   onRun: (id: string) => void;
   running?: boolean;
+  /** Agent-level master switch is off: Run is blocked and schedules are paused. */
+  evalsOff?: boolean;
   onScheduleChange?: (hasSchedule: boolean) => void;
 };
 
@@ -34,6 +36,7 @@ export function EvalDetail({
   onDelete,
   onRun,
   running = false,
+  evalsOff = false,
   onScheduleChange,
 }: Props) {
   const [tab, setTab] = useState<EvalDetailTab>("conversation");
@@ -63,7 +66,8 @@ export function EvalDetail({
                 type="button"
                 size="xs"
                 aria-label={running ? "Running eval" : "Run eval"}
-                disabled={running}
+                disabled={running || evalsOff}
+                title={evalsOff ? "Agent evals are off" : undefined}
                 onClick={() => onRun(evalCase.id)}
               >
                 {running ? (
@@ -104,6 +108,12 @@ export function EvalDetail({
         }
       />
 
+      {evalsOff ? (
+        <p className="border-b border-border/60 bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+          Agent evals are off — turn them on in the sidebar to run evals.
+        </p>
+      ) : null}
+
       {tab === "conversation" ? (
         <>
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -139,6 +149,7 @@ export function EvalDetail({
       ) : (
         <EvalSchedulePanel
           evalId={evalCase.id}
+          evalsOff={evalsOff}
           onScheduleChange={onScheduleChange}
         />
       )}

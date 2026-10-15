@@ -27,7 +27,7 @@ type Props = {
   onAdded: () => Promise<void> | void;
 };
 
-/** Add a sendable file or a live doc (upload or Google Drive) to an asset group. */
+/** Add a sendable file or a reference (upload or Google Drive) to an asset group. */
 export function AssetAddDialog({ groupId, open, onOpenChange, onAdded }: Props) {
   const [kind, setKind] = useState<AssetAddKind>("file");
   const [docSource, setDocSource] = useState<AssetAddDocSource>("upload");
@@ -165,7 +165,7 @@ export function AssetAddDialog({ groupId, open, onOpenChange, onAdded }: Props) 
 
           <div className="min-w-0 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="asset-add-description">What is this about?</Label>
+              <Label htmlFor="asset-add-description">Description</Label>
               {summarizing ? (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <Loader2 className="size-3.5 animate-spin" />
@@ -180,7 +180,7 @@ export function AssetAddDialog({ groupId, open, onOpenChange, onAdded }: Props) 
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               disabled={busy || summarizing}
-              placeholder="Pick a file — AI drafts a short agent-facing description"
+              placeholder="Pick a file — AI drafts a description of what it contains"
             />
           </div>
 

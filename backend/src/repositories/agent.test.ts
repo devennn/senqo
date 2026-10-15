@@ -16,7 +16,7 @@ const mockDb = {
 
 vi.mock("../db/index.js", () => ({ db: mockDb }));
 
-const { listAgentConfigs, getAgentConfigById, createAgentConfig, updateAgentConfig, archiveAgentConfig, deleteAgentConfig, markAgentConfigFirstUsed } =
+const { listAgentConfigs, getAgentConfigById, createAgentConfig, updateAgentConfig, archiveAgentConfig, deleteAgentConfig, markAgentConfigFirstUsed, setAgentEvalsEnabled } =
   await vi.importActual("../repositories/agent.js") as typeof import("../repositories/agent.js");
 
 beforeEach(() => { vi.clearAllMocks(); });
@@ -101,6 +101,25 @@ describe("updateAgentConfig", () => {
       auto_assign_conversation_labels: false, response_template_groups: [], handoff_topic_groups: [], context_groups: [], asset_groups: [],
       handoff_notify_user_ids: [],
     });
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("setAgentEvalsEnabled", () => {
+  // Toggling succeeds → ok:true so the route can echo the new value, needed to
+  // pause or resume every eval of an agent with one master switch.
+  it("sets the flag and returns ok true", async () => {
+    mockSet.mockReturnValue({ where: mockWhere.mockReturnValue({ returning: mockReturning }) });
+    mockReturning.mockResolvedValue([{ id: "a1" }]);
+    const result = await setAgentEvalsEnabled({ workspaceId: "ws-1", agentId: "a1", enabled: false });
+    expect(result.ok).toBe(true);
+  });
+
+  // No row matched (unknown or archived agent) → ok:false so the route returns 404.
+  it("returns ok false when no agent matches", async () => {
+    mockSet.mockReturnValue({ where: mockWhere.mockReturnValue({ returning: mockReturning }) });
+    mockReturning.mockResolvedValue([]);
+    const result = await setAgentEvalsEnabled({ workspaceId: "ws-1", agentId: "gone", enabled: false });
     expect(result.ok).toBe(false);
   });
 });

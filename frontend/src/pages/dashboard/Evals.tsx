@@ -4,18 +4,21 @@ import { AppFrame } from "@/components/layout/app-frame";
 import { InlineHelpHint } from "@/components/ui/inline-help-hint";
 import { useAgents } from "@/hooks/useAgents";
 import { EVALS_UI_PAGE_SIZE, useEvals } from "@/hooks/useEvals";
+import { api } from "@/lib/api";
 import { CreateEvalDialog } from "@/pages/dashboard/evals/components/create-eval-dialog";
 import { EvalDetail } from "@/pages/dashboard/evals/components/eval-detail";
 import { EvalsSidebar } from "@/pages/dashboard/evals/components/evals-sidebar";
 
 export default function EvalsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: agentsData, loading: agentsLoading } = useAgents();
+  const { data: agentsData, loading: agentsLoading, reload: reloadAgents } = useAgents();
   const agents = agentsData.agents.map((agent) => ({
     id: agent.id,
     name: agent.profile_name,
+    evalsEnabled: agent.evals_enabled !== false,
   }));
   const [agentId, setAgentId] = useState("");
+  const [togglingEvals, setTogglingEvals] = useState(false);
   const selectedId = searchParams.get("evalId");
   const {
     cases,
@@ -65,6 +68,23 @@ export default function EvalsPage() {
     setSearchParams(next, { replace: true });
   }
 
+  const selectedAgent = agents.find((agent) => agent.id === agentId) ?? null;
+  const evalsOff = selectedAgent ? !selectedAgent.evalsEnabled : false;
+
+  /** Per-agent master switch: while off, every schedule pauses and Run is blocked. */
+  async function toggleAgentEvals(): Promise<void> {
+    if (!selectedAgent || togglingEvals) return;
+    setTogglingEvals(true);
+    try {
+      await api.patch(`/api/user/agents/${selectedAgent.id}/evals`, {
+        enabled: !selectedAgent.evalsEnabled,
+      });
+      await reloadAgents({ silent: true });
+    } finally {
+      setTogglingEvals(false);
+    }
+  }
+
   return (
     <AppFrame
       conversations={[]}
@@ -80,7 +100,8 @@ export default function EvalsPage() {
                   <p>
                     Test cases for one agent at a time. Create manually, or capture a bad chat reply
                     with feedback so AI can draft a case. Run uses the same agent loop as live chats;
-                    a judge scores pass or fail.
+                    a judge scores pass or fail. Turn evals off for an agent to pause its schedules
+                    and block Run in one switch.
                   </p>
                 </InlineHelpHint>
               </div>
@@ -107,6 +128,12 @@ export default function EvalsPage() {
                 agentId={agentId}
                 agentsLoading={agentsLoading}
                 onAgentChange={changeAgent}
+                agentEvalsEnabled={selectedAgent?.evalsEnabled ?? true}
+                togglingEvals={togglingEvals}
+                onToggleEvals={() => {
+                  void toggleAgentEvals();
+                }}
+                evalsOff={evalsOff}
                 cases={cases}
                 selectedId={selected?.id ?? null}
                 loading={loading}
@@ -139,6 +166,7 @@ export default function EvalsPage() {
                     void run(id);
                   }}
                   running={runningId === selected.id}
+                  evalsOff={evalsOff}
                   onScheduleChange={(hasSchedule) => setHasSchedule(selected.id, hasSchedule)}
                 />
               ) : (

@@ -12,7 +12,8 @@ import {
 import {
   asStorableAgentMessageContent,
   extractGeneratedModelMessages,
-  sanitizeToolCallHistory,
+  sanitizeAgentHistory,
+  stripVolatileHistoryParts,
   toModelMessageFromRow,
 } from "../agent/messages.js";
 import { resolveSessionId } from "../agent/session.js";
@@ -48,6 +49,7 @@ import {
 } from "./reply-sources.js";
 import { prepareOutboundMessages, sendPreparedOutboundMessages } from "../services/agent-outbound-messages.js";
 import {
+  AGENT_RUN_LOG_KIND_HISTORY_RETRY,
   AGENT_RUN_LOG_KIND_LLM_OUTPUT,
   AGENT_RUN_LOG_KIND_WHATSAPP_SENT,
   AGENT_RUN_LOG_SOURCE,
@@ -70,6 +72,19 @@ const KNOWLEDGE_SOURCES_CORRECTION =
 function isMissingToolResultError(messageText: string): boolean {
   return /Tool result(s)? (is|are) missing for tool call(s)?/i.test(
     messageText,
+  );
+}
+
+/**
+ * Provider rejection of replayed history whose blocks are bound to an older
+ * request (thinking-block signatures, block binding / prefix mismatches).
+ */
+function isVolatileHistoryRejectionError(messageText: string): boolean {
+  return (
+    /invalid `signature` in `thinking` block/i.test(messageText) ||
+    /block_binding|prefix_mismatch_behavior/i.test(messageText) ||
+    /bound to a different conversation/i.test(messageText) ||
+    /expected `thinking` or `redacted_thinking`/i.test(messageText)
   );
 }
 
@@ -104,7 +119,7 @@ export async function runAgentSession(
 
   let historyMessages: ModelMessage[] = [];
   if (input.historyOverride) {
-    historyMessages = sanitizeToolCallHistory(input.historyOverride);
+    historyMessages = sanitizeAgentHistory(input.historyOverride);
   } else if (!isDryRun) {
     const historicalRows = (await listAgentMessages(
       input.workspaceId,
@@ -116,7 +131,7 @@ export async function runAgentSession(
         content: row.content,
       }),
     );
-    historyMessages = sanitizeToolCallHistory(rawHistory);
+    historyMessages = sanitizeAgentHistory(rawHistory);
     if (historyMessages.length < rawHistory.length) {
       console.warn(
         `[${logScope}] Pruned ${rawHistory.length - historyMessages.length} invalid tool history message(s) sessionId=${sessionId}`,
@@ -399,9 +414,43 @@ export async function runAgentSession(
         }),
         stopWhen: stepCountIs(20),
       });
-      const cleanHistory = sanitizeToolCallHistory(historyMessages);
+      const cleanHistory = sanitizeAgentHistory(historyMessages);
       result = await fallbackAgent.generate({
         messages: [...cleanHistory, userMessageForModel],
+      });
+    } else if (isVolatileHistoryRejectionError(messageText)) {
+      if (!isDryRun) {
+        const retryLogged = await insertAgentMessages([
+          {
+            workspaceId: input.workspaceId,
+            sessionId,
+            role: "assistant",
+            content: {
+              type: AGENT_RUN_LOG_KIND_HISTORY_RETRY,
+              action: "retried_without_volatile_history_parts",
+              error: messageText,
+              dry_run: isDraftRun,
+            },
+            providerOptions: {
+              source: AGENT_RUN_LOG_SOURCE,
+              kind: AGENT_RUN_LOG_KIND_HISTORY_RETRY,
+            },
+          },
+        ]);
+        if (!retryLogged) {
+          console.error(
+            `[${logScope}] Failed query: could not persist history-retry agent log sessionId=${sessionId}`,
+          );
+        }
+      }
+      console.error(
+        `[${logScope}] Failed query: provider rejected bound history, retrying once without volatile parts detail=${messageText}`,
+      );
+      result = await agent.generate({
+        messages: [
+          ...stripVolatileHistoryParts(historyMessages),
+          userMessageForModel,
+        ],
       });
     } else {
       throw error;

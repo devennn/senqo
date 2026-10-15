@@ -6,10 +6,12 @@ import { EvalSuiteRunHistory } from "@/pages/dashboard/evals/components/eval-sui
 
 type Props = {
   evalId: string;
+  /** Agent-level master switch is off: schedules keep their state but do not fire. */
+  evalsOff?: boolean;
   onScheduleChange?: (hasSchedule: boolean) => void;
 };
 
-export function EvalSchedulePanel({ evalId, onScheduleChange }: Props) {
+export function EvalSchedulePanel({ evalId, evalsOff = false, onScheduleChange }: Props) {
   const {
     draft,
     setDraft,
@@ -57,12 +59,17 @@ export function EvalSchedulePanel({ evalId, onScheduleChange }: Props) {
               {actionLabel}
             </Button>
           </div>
+          {evalsOff ? (
+            <p className="mb-3 rounded-md border border-dashed border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Agent evals are off — schedules are paused until the agent is turned on again.
+            </p>
+          ) : null}
           {created ? (
             <div className="mb-3">
               <Button
                 type="button"
                 size="xs"
-                variant={enabled ? "destructive" : "default"}
+                variant={enabled ? "outline" : "default"}
                 disabled={saving}
                 onClick={() => setEnabled(!enabled)}
               >

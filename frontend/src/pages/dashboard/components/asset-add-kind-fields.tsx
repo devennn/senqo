@@ -28,7 +28,7 @@ const DOC_ACCEPT = ".pdf,.csv,.doc,.docx,.xls,.xlsx,.txt,.md";
 
 /**
  * Add asset inputs: first what the agent should do with the item (send it, or re-read it live),
- * then — for live docs only — where it comes from (upload or Google Drive).
+ * then — for references only — where it comes from (upload or Google Drive).
  */
 export function AssetAddKindFields({
   open,
@@ -79,7 +79,7 @@ export function AssetAddKindFields({
           selected={kind === "doc"}
           onSelect={() => onKindChange("doc")}
           icon={<FileText className="size-4" />}
-          title="Live doc"
+          title="Reference"
           description="The agent re-reads the latest content whenever a chat needs it."
         />
       </div>
@@ -90,7 +90,7 @@ export function AssetAddKindFields({
             <Label>Source</Label>
             <div
               role="tablist"
-              aria-label="Live doc source"
+              aria-label="Reference source"
               className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/40 p-1"
             >
               <SourceTab

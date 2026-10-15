@@ -44,6 +44,7 @@ type AgentConfigRow = {
   contextGroups: unknown;
   assetGroups: unknown;
   handoffNotifyUserIds: unknown;
+  evalsEnabled: boolean | null;
 };
 
 function mapAgentConfigRow(row: AgentConfigRow): AgentConfigRecord {
@@ -63,6 +64,7 @@ function mapAgentConfigRow(row: AgentConfigRow): AgentConfigRecord {
     context_groups: parseContextGroupIds(row.contextGroups),
     asset_groups: parseAssetGroupIds(row.assetGroups),
     handoff_notify_user_ids: parseHandoffNotifyUserIds(row.handoffNotifyUserIds),
+    evals_enabled: row.evalsEnabled !== false,
   };
 }
 
@@ -83,6 +85,7 @@ export async function listAgentConfigs(workspaceId: string): Promise<AgentConfig
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
         handoffNotifyUserIds: agentConfigs.handoffNotifyUserIds,
+        evalsEnabled: agentConfigs.evalsEnabled,
       })
       .from(agentConfigs)
       .where(
@@ -121,6 +124,7 @@ export async function getAgentConfigById(
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
         handoffNotifyUserIds: agentConfigs.handoffNotifyUserIds,
+        evalsEnabled: agentConfigs.evalsEnabled,
       })
       .from(agentConfigs)
       .where(
@@ -207,6 +211,41 @@ export async function updateAgentConfig(payload: {
     return { ok: true, message: "Agent settings saved" };
   } catch (error) {
     console.error(`[${scope}/updateAgentConfig] Unexpected error: ${String(error)}`);
+    return { ok: false, message: "Unexpected error" };
+  }
+}
+
+export async function setAgentEvalsEnabled(input: {
+  workspaceId: string;
+  agentId: string;
+  enabled: boolean;
+}): Promise<{ ok: boolean; message: string }> {
+  try {
+    const rows = await db
+      .update(agentConfigs)
+      .set({ evalsEnabled: input.enabled })
+      .where(
+        and(
+          eq(agentConfigs.id, input.agentId),
+          eq(agentConfigs.workspaceId, input.workspaceId),
+          isNull(agentConfigs.archivedAt),
+        ),
+      )
+      .returning({ id: agentConfigs.id });
+
+    if (rows.length === 0) {
+      console.error(
+        `[${scope}/setAgentEvalsEnabled] Failed query: agent not found agentId=${input.agentId}`,
+      );
+      return { ok: false, message: "Agent not found." };
+    }
+
+    console.info(
+      `[${scope}/setAgentEvalsEnabled] Success: agentId=${input.agentId} enabled=${input.enabled}`,
+    );
+    return { ok: true, message: "Evals setting saved" };
+  } catch (error) {
+    console.error(`[${scope}/setAgentEvalsEnabled] Unexpected error: ${String(error)}`);
     return { ok: false, message: "Unexpected error" };
   }
 }

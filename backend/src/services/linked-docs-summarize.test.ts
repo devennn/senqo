@@ -48,12 +48,12 @@ describe("summarizeLinkedDocContent", () => {
     vi.clearAllMocks();
   });
 
-  // Happy path returns a trimmed agent-facing description from the model.
+  // Happy path returns a trimmed, file-focused description from the model.
   it("returns description from structured LLM output", async () => {
     mockGenerateText.mockResolvedValueOnce({
       output: {
         description:
-          "  Kitchen inventory CSV with sku and qty columns. Use to answer current stock levels via readLinkedDoc.  ",
+          "  Kitchen inventory CSV with sku, qty, and unit price columns, plus daily restock notes.  ",
       },
     });
     const { summarizeLinkedDocContent } = await import(
@@ -67,8 +67,46 @@ describe("summarizeLinkedDocContent", () => {
     expect(result).toEqual({
       ok: true,
       description:
-        "Kitchen inventory CSV with sku and qty columns. Use to answer current stock levels via readLinkedDoc.",
+        "Kitchen inventory CSV with sku, qty, and unit price columns, plus daily restock notes.",
     });
+  });
+
+  // The description describes the file itself; agent usage instructions and
+  // tool names must not sneak back into the summarizer prompt.
+  it("asks for file content, not agent usage", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      output: { description: "Kitchen inventory CSV." },
+    });
+    const { summarizeLinkedDocContent } = await import(
+      "./linked-docs-summarize.js"
+    );
+    await summarizeLinkedDocContent({
+      fileName: "stock.csv",
+      mimeType: "text/csv",
+      excerpt: "sku,qty",
+    });
+
+    const prompt = String(mockGenerateText.mock.calls[0][0].prompt);
+    expect(prompt).not.toContain("readLinkedDoc");
+    expect(prompt).not.toContain("agent can do");
+  });
+
+  // Overlong model output is truncated at the stored cap so descriptions stay
+  // lightweight in the agent prompt.
+  it("truncates an oversized description at the stored cap", async () => {
+    mockGenerateText.mockResolvedValueOnce({
+      output: { description: "x".repeat(700) },
+    });
+    const { summarizeLinkedDocContent, LINKED_DOC_DESCRIPTION_MAX_CHARS } =
+      await import("./linked-docs-summarize.js");
+    const result = await summarizeLinkedDocContent({
+      fileName: "stock.csv",
+      mimeType: "text/csv",
+      excerpt: "sku,qty",
+    });
+    if (!result.ok) throw new Error("expected a summarized description");
+    expect(result.description.length).toBe(LINKED_DOC_DESCRIPTION_MAX_CHARS);
+    expect(result.description.endsWith("\u2026")).toBe(true);
   });
 
   // Empty file name should fail before calling the model.

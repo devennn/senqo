@@ -6,10 +6,12 @@ import { cn } from "@/lib/utils";
 type Props = {
   item: EvalCase;
   selected: boolean;
+  /** Agent evals are off: the row grays out but stays clickable for review. */
+  dimmed?: boolean;
   onSelect: () => void;
 };
 
-export function EvalListItem({ item, selected, onSelect }: Props) {
+export function EvalListItem({ item, selected, dimmed = false, onSelect }: Props) {
   const hasSchedule = item.hasSchedule;
 
   return (
@@ -24,6 +26,7 @@ export function EvalListItem({ item, selected, onSelect }: Props) {
           selected
             ? "border-primary bg-primary/5"
             : "border-border/70 bg-card hover:bg-muted/40 dark:hover:bg-muted/30",
+          dimmed && "opacity-60",
         )}
       >
         <div className="min-w-0 flex-1">

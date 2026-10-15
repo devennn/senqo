@@ -23,9 +23,9 @@ export function AgentAssetGroupsFields({
           </Label>
           <InlineHelpHint label="About agent assets">
             <p>
-              Files the agent can send on WhatsApp. Each file needs a specific &quot;what is this about&quot; description the AI
-              reads in its instructions; the agent decides when to send. Live docs in the same groups are
-              re-read by the agent at chat time. Select groups here; edit files and docs on Knowledge → Assets.
+              Files the agent can send on WhatsApp. Each file needs a specific description the AI
+              reads in its instructions; the agent decides when to send. References in the same groups are
+              re-read by the agent at chat time. Select groups here; edit files and references on Knowledge → Assets.
             </p>
           </InlineHelpHint>
         </div>

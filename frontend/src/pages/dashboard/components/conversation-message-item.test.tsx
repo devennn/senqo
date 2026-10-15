@@ -96,9 +96,10 @@ describe("ConversationMessageItem", () => {
     ).toBeInTheDocument();
   });
 
-  // Agent errors are operator-only: the pill plus the stored error must show so
-  // operators know why no AI reply was sent while the customer saw nothing.
-  it("renders the stored error under the AI error pill", () => {
+  // Agent errors are operator-only: the pill shows a short non-technical
+  // summary and the stored provider error must never render in the thread —
+  // operators read the verbose detail in Agent Logs.
+  it("renders a non-technical summary under the AI error pill", () => {
     render(
       <ConversationMessageItem
         message={buildThreadEventMessage({
@@ -110,7 +111,12 @@ describe("ConversationMessageItem", () => {
     );
 
     expect(screen.getByText("AI error")).toBeInTheDocument();
-    expect(screen.getByText("OpenRouter request failed")).toBeInTheDocument();
+    expect(
+      screen.getByText("Unexpected error. Please check logs."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("OpenRouter request failed"),
+    ).not.toBeInTheDocument();
   });
 
   // A dry-run draft is an AI reply that was never sent: operators must see the

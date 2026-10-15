@@ -1,5 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EVALS_UI_PAGE_SIZE } from "@/hooks/useEvals";
 import { TablePagination } from "@/pages/dashboard/components/table-pagination";
 import { EvalsList } from "@/pages/dashboard/evals/components/evals-list";
@@ -10,6 +12,12 @@ type Props = {
   agentId: string;
   agentsLoading: boolean;
   onAgentChange: (agentId: string) => void;
+  /** Selected agent's master switch: false pauses every schedule and blocks Run. */
+  agentEvalsEnabled: boolean;
+  togglingEvals: boolean;
+  onToggleEvals: () => void;
+  /** True while the selected agent's evals are off; the case list dims. */
+  evalsOff: boolean;
   cases: EvalCase[];
   selectedId: string | null;
   loading: boolean;
@@ -24,6 +32,10 @@ export function EvalsSidebar({
   agentId,
   agentsLoading,
   onAgentChange,
+  agentEvalsEnabled,
+  togglingEvals,
+  onToggleEvals,
+  evalsOff,
   cases,
   selectedId,
   loading,
@@ -49,18 +61,45 @@ export function EvalsSidebar({
             onChange={(event) => onAgentChange(event.target.value)}
           >
             {agents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
+              <option
+                key={agent.id}
+                value={agent.id}
+                className={agent.evalsEnabled ? undefined : "text-muted-foreground"}
+              >
                 {agent.name}
               </option>
             ))}
           </select>
+          <TooltipProvider delay={0}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0"
+                    variant={agentEvalsEnabled ? "outline" : "default"}
+                    disabled={agentsLoading || togglingEvals || !agentId}
+                    onClick={onToggleEvals}
+                  />
+                }
+              >
+                {togglingEvals ? "Saving…" : agentEvalsEnabled ? "Turn off" : "Turn on"}
+              </TooltipTrigger>
+              <TooltipContent>
+                {agentEvalsEnabled
+                  ? "Turn off all evals for this agent — pauses schedules and blocks Run"
+                  : "Turn on all evals for this agent — schedules and Run resume"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         {loading ? (
           <p className="py-6 text-sm text-muted-foreground">Loading evals…</p>
         ) : (
-          <EvalsList cases={cases} selectedId={selectedId} onSelect={onSelect} />
+          <EvalsList cases={cases} selectedId={selectedId} onSelect={onSelect} dimmed={evalsOff} />
         )}
       </CardContent>
       {showPagination ? (

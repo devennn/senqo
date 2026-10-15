@@ -317,6 +317,14 @@ Share a single delay constant where practical (`TRANSIENT_SUCCESS_FEEDBACK_MS` i
 
 ---
 
+# Error copy in the UI vs verbose logs
+
+- **Never surface raw technical errors in the UI** — customer-facing or operator-facing. Provider error bodies, stack traces, SQL, HTTP payloads, and similar detail must not be rendered as copy; show short, non-technical text instead (e.g. `Unexpected error. Please check logs.`).
+- **Verbose error detail belongs in backend logs or Agent Logs.** Use scoped `console.error` for server logs, and persist an `agent_messages` run-log row (kinds in `backend/src/lib/agent-run-log.ts`, badged in the conversation Agent Logs dialog) when the detail should be inspectable from the dashboard.
+- A failure path that surfaces in the UI must record the raw detail in one of those two places in the same change.
+
+---
+
 # Instructions vs. explanatory copy
 
 - In customer-facing UI (forms, setup wizards, dashboards, settings), keep the **default view text-light**: short **imperatives** and field labels only (what to do next).

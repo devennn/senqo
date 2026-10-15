@@ -20,7 +20,8 @@ export async function tickEvalSchedules(now = new Date()): Promise<EvalScheduleR
   const due: EvalScheduleRunPayload[] = [];
   const schedules = await listAllEvalSchedules();
   for (const schedule of schedules) {
-    if (!schedule.enabled) continue;
+    // Per-eval switch stays on; an agent with evals off pauses every schedule.
+    if (!schedule.enabled || !schedule.evalsEnabled) continue;
     const dueInput = {
       repeat: schedule.repeat,
       weekdays: schedule.weekdays,

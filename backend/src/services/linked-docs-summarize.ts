@@ -7,11 +7,11 @@ const scope = "LinkedDocsSummarize";
 /** Cap of file text sent to the model for summarization. */
 export const LINKED_DOC_SUMMARY_EXCERPT_MAX_CHARS = 12_000;
 
-/** Soft max for the agent-facing description field. */
-export const LINKED_DOC_DESCRIPTION_MAX_CHARS = 420;
+/** Soft max for the stored, internal file description. */
+export const LINKED_DOC_DESCRIPTION_MAX_CHARS = 600;
 
 const llmSchema = z.object({
-  description: z.string().min(1).max(600),
+  description: z.string().min(1).max(800),
 });
 
 export type LinkedDocSummarizeResult =
@@ -19,13 +19,15 @@ export type LinkedDocSummarizeResult =
   | { ok: false; message: string };
 
 const SYSTEM_RULES = [
-  "You write a short linked-doc description for a WhatsApp AI agent.",
-  "The description is shown in the agent prompt and tells the model when/how to use readLinkedDoc.",
+  "You write an internal description of a file for a workspace's AI agent setup.",
+  "The description is stored with the file and shown to workspace operators; it must describe the file itself, never how to use it.",
   "Requirements:",
-  "- 1–3 sentences, under 400 characters total.",
-  "- Be specific: what the file contains (sheet/columns/topics if visible) and what the agent can do with it (e.g. check stock qty, look up prices, answer hours).",
-  "- Do not invent numbers, SKUs, or facts not supported by the excerpt.",
-  "- If the excerpt is binary or thin, infer carefully from the file name and mime type only, and say the agent must re-read live content via readLinkedDoc.",
+  "- 2–4 sentences, up to 600 characters total.",
+  "- Describe what the file contains: document type, subject areas, structure (sections, tabs, columns), and concrete details visible in the excerpt (topics, date ranges, units, languages).",
+  "- Be specific and informative; prefer real names and values from the excerpt over vague phrases.",
+  "- Never include instructions, tool names, or usage advice (no 'use this to…', no 'the agent must…', no send rules).",
+  "- Do not invent numbers, names, or facts not supported by the excerpt.",
+  "- If the excerpt is binary or thin, describe the file from its name and mime type only; do not guess at specific contents.",
   "- No markdown, no bullet lists, no preamble.",
 ].join("\n");
 

@@ -9,6 +9,7 @@ const mockClearInboundAiDebouncePending = vi.fn();
 const mockUpdateConversationHandlingMode = vi.fn();
 const mockCreateConversationMessage = vi.fn();
 const mockScheduleHandoffNotify = vi.fn();
+const mockInsertAgentMessages = vi.fn();
 
 vi.mock("../agent/agent.js", () => ({
   runAgentSession: mockRunAgentSession,
@@ -31,6 +32,10 @@ vi.mock("../repositories/inbound-ai-debounce-pending.js", () => ({
 vi.mock("../repositories/whatsapp.js", () => ({
   createConversationMessage: mockCreateConversationMessage,
   getWhatsappConnectionModeForInboundAi: mockGetWhatsappConnectionModeForInboundAi,
+}));
+
+vi.mock("../repositories/agent-messages.js", () => ({
+  insertAgentMessages: mockInsertAgentMessages,
 }));
 
 vi.mock("../lib/inbound-media-resolve.js", () => ({
@@ -74,6 +79,7 @@ beforeEach(() => {
   mockClearInboundAiDebouncePending.mockResolvedValue(true);
   mockUpdateConversationHandlingMode.mockResolvedValue({ ok: true });
   mockCreateConversationMessage.mockResolvedValue({ ok: true, created: true });
+  mockInsertAgentMessages.mockResolvedValue(true);
 });
 
 describe("executeInboundDebouncedAiRun", () => {
@@ -139,7 +145,6 @@ describe("executeInboundDebouncedAiRun", () => {
       "AI could not reply",
       {
         thread_event: "agent_error",
-        agent_error_message: "OpenRouter request failed",
       },
       null,
     );
@@ -173,7 +178,6 @@ describe("executeInboundDebouncedAiRun", () => {
       "AI could not reply",
       {
         thread_event: "agent_error",
-        agent_error_message: "Agent run returned no result",
       },
       null,
     );
@@ -215,7 +219,6 @@ describe("executeInboundDebouncedAiRun", () => {
       "AI could not reply",
       {
         thread_event: "agent_error",
-        agent_error_message: "OpenRouter request failed",
         dry_run: true,
       },
       null,

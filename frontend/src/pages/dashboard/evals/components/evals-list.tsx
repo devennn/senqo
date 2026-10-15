@@ -5,9 +5,11 @@ type Props = {
   cases: EvalCase[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** True while the agent's evals are off; rows render dimmed but stay selectable. */
+  dimmed?: boolean;
 };
 
-export function EvalsList({ cases, selectedId, onSelect }: Props) {
+export function EvalsList({ cases, selectedId, onSelect, dimmed = false }: Props) {
   if (cases.length === 0) {
     return (
       <p className="rounded-md border border-dashed border-border/70 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -23,6 +25,7 @@ export function EvalsList({ cases, selectedId, onSelect }: Props) {
           key={item.id}
           item={item}
           selected={item.id === selectedId}
+          dimmed={dimmed}
           onSelect={() => onSelect(item.id)}
         />
       ))}

@@ -2,6 +2,8 @@
 export const AGENT_RUN_LOG_SOURCE = "agent_run_log";
 export const AGENT_RUN_LOG_KIND_LLM_OUTPUT = "llm_structured_output";
 export const AGENT_RUN_LOG_KIND_WHATSAPP_SENT = "whatsapp_outbound";
+export const AGENT_RUN_LOG_KIND_AGENT_ERROR = "agent_error";
+export const AGENT_RUN_LOG_KIND_HISTORY_RETRY = "history_retry";
 
 export function agentRunLogKind(
   providerOptions: Record<string, unknown> | null | undefined,
