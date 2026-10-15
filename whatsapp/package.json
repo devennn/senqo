@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
-    "baileys": "^7.0.0-rc13",
+    "baileys": "^7.0.0-rc14",
     "hono": "^4.7.10",
     "pino": "^9.5.0",
     "qrcode": "^1.5.4"
