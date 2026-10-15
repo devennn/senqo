@@ -11,6 +11,7 @@
     "agent": "node ./node_modules/.bin/tsx src/scripts/agent.ts",
     "skills:seed": "node ./node_modules/.bin/tsx src/scripts/seed-skills.ts",
     "tools:seed": "node ./node_modules/.bin/tsx src/scripts/seed-tools.ts",
+    "demo:seed": "node ./node_modules/.bin/tsx src/scripts/seed-demo/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

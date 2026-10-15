@@ -178,6 +178,27 @@ docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml b
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml up -d backend
 ```
 
+### Demo data (local)
+
+Want a busy workspace to click around in? The demo seed creates (or resets) an **Acme Workspace** with a demo login and realistic Malaysian sample data (+60 numbers, RM pricing, local couriers) — 60 contacts, 90 multi-turn inbox threads, four agents across four WhatsApp lines, knowledge groups, custom tools, skills, assets, scheduled tasks, evals, and reported conversations.
+
+```bash
+# with the dev stack running
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.dev.yml exec backend npm run demo:seed
+```
+
+Or from the host, with `DATABASE_URL` pointed at the published Postgres port (`5432`):
+
+```bash
+DATABASE_URL=postgresql://senqo:senqo@localhost:5432/senqo npm run seed:demo
+```
+
+Sign in as **`demo@acme.local` / `acme-demo-2026`** (the script prints this too). Re-running deletes and recreates the demo workspace, so refresh it any time new features ship.
+
+- **Local only** — the script refuses non-local `DATABASE_URL` hosts unless you pass `--force`.
+- The WhatsApp lines are demo rows: nothing sends or receives. Live doc reads, asset links, and agent runs still need real integrations (S3, OpenRouter, Composio).
+- Anything that could not be seeded (for example skills or asset uploads without S3 configured) is listed as a warning at the end of the run.
+
 ### Repo layout
 
 | Package     | Role                                                                         |
@@ -193,6 +214,7 @@ WhatsApp sessions persist under `whatsapp/sessions/` (host bind mount, gitignore
 
 ```bash
 npm run build              # backend + frontend production build
+npm run seed:demo          # create/reset the local demo workspace (see Demo data)
 
 docker compose logs -f backend
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml up -d backend          # pick up .env changes (FRONTEND_URL, etc.; no frontend rebuild)

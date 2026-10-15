@@ -6,6 +6,7 @@ Canonical agent instructions for this repo. **`CLAUDE.md`** and **`.cursor/rules
 
 ```bash
 npm run build          # backend + frontend
+npm run seed:demo      # local demo workspace (Acme) — see README → Demo data
 ```
 
 Run the stack: see root `README.md` (`docker compose up -d`).
