@@ -62,6 +62,43 @@ export function extractTextPreviewForSummary(input: {
   return `[Binary/office file ${input.fileName} (${input.mimeType}), ${bytes.byteLength} bytes. No text extract available.]`;
 }
 
+/** Trims, collapses whitespace, and caps a description for storage. */
+function normalizeDescription(raw: string): string {
+  const collapsed = raw.trim().replace(/\s+/g, " ");
+  if (collapsed.length <= LINKED_DOC_DESCRIPTION_MAX_CHARS) {
+    return collapsed;
+  }
+  return `${collapsed.slice(0, LINKED_DOC_DESCRIPTION_MAX_CHARS - 1).trimEnd()}…`;
+}
+
+/**
+ * Best-effort description from a reply that failed structured parsing.
+ * Some OpenRouter upstreams ignore response_format and answer with plain prose
+ * (or fenced JSON), which is already the intended description.
+ */
+function recoverDescriptionFromUnparsedOutput(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const body = (fenced?.[1] ?? trimmed).trim();
+  const objectStart = body.indexOf("{");
+  const objectEnd = body.lastIndexOf("}");
+  if (objectStart !== -1 && objectEnd > objectStart) {
+    try {
+      const parsed: unknown = JSON.parse(body.slice(objectStart, objectEnd + 1));
+      const description = (parsed as { description?: unknown } | null)?.description;
+      if (typeof description === "string" && description.trim()) {
+        return description.trim();
+      }
+    } catch {
+      // Not JSON — the reply is prose; fall through.
+    }
+  }
+  // A JSON envelope without a usable description must not be stored as prose.
+  if (body.startsWith("{") || body.startsWith("[")) return null;
+  return body || null;
+}
+
 export async function summarizeLinkedDocContent(input: {
   fileName: string;
   mimeType: string;
@@ -91,10 +128,7 @@ export async function summarizeLinkedDocContent(input: {
       ].join("\n"),
     });
 
-    let description = result.output.description.trim().replace(/\s+/g, " ");
-    if (description.length > LINKED_DOC_DESCRIPTION_MAX_CHARS) {
-      description = `${description.slice(0, LINKED_DOC_DESCRIPTION_MAX_CHARS - 1).trimEnd()}…`;
-    }
+    const description = normalizeDescription(result.output.description);
     if (!description) {
       return { ok: false, message: "Empty summary from model." };
     }
@@ -104,6 +138,26 @@ export async function summarizeLinkedDocContent(input: {
     );
     return { ok: true, description };
   } catch (error) {
+    // Some upstreams ignore response_format and reply in plain prose; the text
+    // is already the description, so recover it instead of failing the action.
+    const unparsedText =
+      typeof error === "object" && error !== null
+        ? (error as { text?: unknown }).text
+        : undefined;
+    const recovered =
+      typeof unparsedText === "string"
+        ? recoverDescriptionFromUnparsedOutput(unparsedText)
+        : null;
+    if (recovered) {
+      const description = normalizeDescription(recovered);
+      if (description) {
+        console.info(
+          `[${scope}/summarizeLinkedDocContent] Success: fileName=${fileName} chars=${description.length} recovered=unparsed_response`,
+        );
+        return { ok: true, description };
+      }
+    }
+
     console.error(
       `[${scope}/summarizeLinkedDocContent] Unexpected error: ${String(error)}`,
     );

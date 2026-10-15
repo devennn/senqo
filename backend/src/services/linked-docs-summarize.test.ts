@@ -139,4 +139,101 @@ describe("summarizeLinkedDocContent", () => {
       message: "Could not summarize file.",
     });
   });
+
+  // Some OpenRouter upstreams ignore response_format and answer with plain
+  // prose; the text is already the description and must be recovered.
+  it("recovers the description from plain prose when structured parsing fails", async () => {
+    const parseError = Object.assign(
+      new Error("No object generated: could not parse the response."),
+      {
+        name: "AI_NoObjectGeneratedError",
+        text: "  This file is a   compressed PDF brochure about event spaces.  ",
+      },
+    );
+    mockGenerateText.mockRejectedValueOnce(parseError);
+    const { summarizeLinkedDocContent } = await import(
+      "./linked-docs-summarize.js"
+    );
+    const result = await summarizeLinkedDocContent({
+      fileName: "brochure.pdf",
+      mimeType: "application/pdf",
+      excerpt: "[Binary/office file brochure.pdf (application/pdf), 3 MB.]",
+    });
+    expect(result).toEqual({
+      ok: true,
+      description: "This file is a compressed PDF brochure about event spaces.",
+    });
+  });
+
+  // A JSON envelope wrapped in a markdown fence still yields the description
+  // inside it instead of failing the operator's Regenerate action.
+  it("recovers a fenced JSON description when structured parsing fails", async () => {
+    const parseError = Object.assign(
+      new Error("No object generated: could not parse the response."),
+      {
+        name: "AI_NoObjectGeneratedError",
+        text: '```json\n{"description": "Kitchen inventory CSV with a sku column."}\n```',
+      },
+    );
+    mockGenerateText.mockRejectedValueOnce(parseError);
+    const { summarizeLinkedDocContent } = await import(
+      "./linked-docs-summarize.js"
+    );
+    const result = await summarizeLinkedDocContent({
+      fileName: "stock.csv",
+      mimeType: "text/csv",
+      excerpt: "sku,qty",
+    });
+    expect(result).toEqual({
+      ok: true,
+      description: "Kitchen inventory CSV with a sku column.",
+    });
+  });
+
+  // A parse error without any raw text has nothing to recover and still
+  // surfaces as summarize_failed.
+  it("returns failure when the parse error has no recoverable text", async () => {
+    const parseError = Object.assign(
+      new Error("No object generated: could not parse the response."),
+      { name: "AI_NoObjectGeneratedError" },
+    );
+    mockGenerateText.mockRejectedValueOnce(parseError);
+    const { summarizeLinkedDocContent } = await import(
+      "./linked-docs-summarize.js"
+    );
+    const result = await summarizeLinkedDocContent({
+      fileName: "stock.csv",
+      mimeType: "text/csv",
+      excerpt: "sku,qty",
+    });
+    expect(result).toEqual({
+      ok: false,
+      message: "Could not summarize file.",
+    });
+  });
+
+  // Unparsed JSON without a description field must not be stored as the
+  // description; fail cleanly instead of persisting a foreign shape.
+  it("returns failure when unparsed JSON lacks a description field", async () => {
+    const parseError = Object.assign(
+      new Error("No object generated: could not parse the response."),
+      {
+        name: "AI_NoObjectGeneratedError",
+        text: '{"result": "not the shape we asked for"}',
+      },
+    );
+    mockGenerateText.mockRejectedValueOnce(parseError);
+    const { summarizeLinkedDocContent } = await import(
+      "./linked-docs-summarize.js"
+    );
+    const result = await summarizeLinkedDocContent({
+      fileName: "stock.csv",
+      mimeType: "text/csv",
+      excerpt: "sku,qty",
+    });
+    expect(result).toEqual({
+      ok: false,
+      message: "Could not summarize file.",
+    });
+  });
 });
