@@ -16,6 +16,11 @@ describe("normalizeWhatsappConnectionMode", () => {
     expect(normalizeWhatsappConnectionMode("live")).toBe("live");
   });
 
+  // Raw mode is "dry_run" → "dry_run" is returned, needed so lines can draft AI replies without sending them.
+  it("returns 'dry_run' when raw is 'dry_run'", () => {
+    expect(normalizeWhatsappConnectionMode("dry_run")).toBe("dry_run");
+  });
+
   // Raw mode is null (e.g. from a missing DB field) → "inactive" is returned, needed to default nulls to the inactive/safe state.
   it("returns 'inactive' when raw is null", () => {
     expect(normalizeWhatsappConnectionMode(null)).toBe("inactive");
@@ -52,6 +57,11 @@ describe("connectionAiEnabledForComposer", () => {
   it("returns false when mode is 'testing' and isTestContact is false", () => {
     expect(connectionAiEnabledForComposer("testing", false)).toBe(false);
   });
+
+  // Mode is "dry_run" and contact is not a test contact → AI is enabled, needed because dry runs process all real traffic as drafts.
+  it("returns true when mode is 'dry_run'", () => {
+    expect(connectionAiEnabledForComposer("dry_run", false)).toBe(true);
+  });
 });
 
 describe("shouldRunInboundAi", () => {
@@ -78,5 +88,15 @@ describe("shouldRunInboundAi", () => {
   // Mode is "live" and handlingMode is "ai" → returns true, needed to confirm AI runs for all contacts when live with ai handling.
   it("returns true when mode is 'live' and handlingMode is 'ai'", () => {
     expect(shouldRunInboundAi("live", false, "ai")).toBe(true);
+  });
+
+  // Mode is "dry_run" with ai handling and a non-test contact → returns true, needed so dry runs draft replies for all real customer traffic.
+  it("returns true when mode is 'dry_run' and handlingMode is 'ai'", () => {
+    expect(shouldRunInboundAi("dry_run", false, "ai")).toBe(true);
+  });
+
+  // Mode is "dry_run" but handlingMode is "human" → returns false, needed so dry runs respect chats handed to a human.
+  it("returns false when mode is 'dry_run' and handlingMode is 'human'", () => {
+    expect(shouldRunInboundAi("dry_run", false, "human")).toBe(false);
   });
 });

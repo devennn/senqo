@@ -37,6 +37,8 @@ const mockListAgentMessages = vi.fn();
 const mockTouchAgentSession = vi.fn();
 const mockMergeAiReasoning = vi.fn();
 const mockHandoffAfterAgentRunFailure = vi.fn();
+const mockRecordDryRunAgentFailure = vi.fn();
+const mockCreateConversationMessage = vi.fn();
 const mockSendPreparedOutboundMessages = vi.fn();
 const mockGetChatLLM = vi.fn();
 
@@ -62,6 +64,7 @@ vi.mock("../repositories/agent-sessions.js", () => ({
 }));
 vi.mock("../repositories/whatsapp.js", () => ({
   mergeAiReasoningOntoAgentRunMessages: mockMergeAiReasoning,
+  createConversationMessage: mockCreateConversationMessage,
 }));
 vi.mock("./reply-sources.js", () => ({
   needsKnowledgeSourcesRegen: () => false,
@@ -74,6 +77,7 @@ vi.mock("../services/agent-outbound-messages.js", () => ({
 }));
 vi.mock("../services/agent-run-failure.js", () => ({
   handoffAfterAgentRunFailure: mockHandoffAfterAgentRunFailure,
+  recordDryRunAgentFailure: mockRecordDryRunAgentFailure,
 }));
 
 const { runAgentSession } = await import("./agent.js");
@@ -134,9 +138,12 @@ beforeEach(() => {
   mockTouchAgentSession.mockResolvedValue(true);
   mockMergeAiReasoning.mockResolvedValue({ ok: true });
   mockHandoffAfterAgentRunFailure.mockResolvedValue(undefined);
+  mockRecordDryRunAgentFailure.mockResolvedValue(undefined);
+  mockCreateConversationMessage.mockResolvedValue({ ok: true, created: true });
   mockSendPreparedOutboundMessages.mockImplementation(
     async (input: { messages: unknown[] }) => ({
       sent: 0,
+      drafts: 0,
       messages: input.messages,
       deliveries: [],
     }),
@@ -262,5 +269,125 @@ describe("runAgentSession custom tool failures", () => {
     expect(result?.messages).toEqual([
       { text: "Draft after failure", assetFileName: "" },
     ]);
+  });
+});
+
+describe("runAgentSession dry-run drafts", () => {
+  // Draft runs persist the reply as a draft (no send) while keeping the run
+  // grounded: tools must be non-mutating and operator reasoning must persist.
+  it("persists drafts and marks tools as dry run when draftRun is true", async () => {
+    queueRun([], structuredOutput([{ text: "Draft reply", assetFileName: "" }]));
+
+    const result = await runAgentSession({ ...baseInput, draftRun: true });
+
+    expect(result?.messages).toEqual([{ text: "Draft reply", assetFileName: "" }]);
+    expect(mockGetAgentTools).toHaveBeenCalledWith(
+      expect.objectContaining({ dryRun: true }),
+      expect.anything(),
+    );
+    expect(mockSendPreparedOutboundMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dryRun: false,
+        draftRun: true,
+        agentRunId: expect.any(String),
+      }),
+    );
+    expect(mockMergeAiReasoning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentRunId: expect.any(String),
+        aiReasoning: "Drafted a weather apology",
+      }),
+    );
+  });
+
+  // A handoff decision during a dry run must appear as an operator-only
+  // "would hand off" note and must not trigger the live handoff path.
+  it("records a dry-run handoff note without live handoff when the tool is called", async () => {
+    aiState.queue.push({
+      stepEvents: [
+        {
+          stepNumber: 0,
+          finishReason: "stop",
+          text: "",
+          toolCalls: [
+            {
+              toolName: "handoff_to_human",
+              toolCallId: "call-1",
+              input: { reason: "Customer asked for a person" },
+            },
+          ],
+          toolResults: [
+            {
+              toolName: "handoff_to_human",
+              toolCallId: "call-1",
+              output: {
+                ok: true,
+                dryRun: true,
+                handoff: true,
+                topicEntryId: null,
+                reason: "Customer asked for a person",
+              },
+            },
+          ],
+        },
+      ],
+      result: agentResult(structuredOutput([])),
+    });
+
+    await runAgentSession({ ...baseInput, draftRun: true });
+
+    expect(mockCreateConversationMessage).toHaveBeenCalledWith(
+      "ws-1",
+      "conv-1",
+      "assistant",
+      "Human handoff",
+      expect.objectContaining({
+        thread_event: "handoff_to_human",
+        handoff_tool_reason: "Customer asked for a person",
+        dry_run: true,
+      }),
+      null,
+    );
+    expect(mockHandoffAfterAgentRunFailure).not.toHaveBeenCalled();
+  });
+
+  // A nested tool failure during a dry run must suppress the reply and record a
+  // dry-run error event instead of switching the conversation to human handling.
+  it("records a dry-run error instead of live handoff when a tool fails in draftRun", async () => {
+    queueRun(
+      [
+        [
+          {
+            toolName: "execute_code",
+            toolCallId: "call-1",
+            output: {
+              ok: true,
+              result: { note: "failed" },
+              toolResults: [
+                {
+                  toolKey: "get_weather",
+                  output: { ok: false, error: "TypeError: fetch failed" },
+                },
+              ],
+            },
+          },
+        ],
+      ],
+      structuredOutput([
+        { text: "I'm unable to fetch the weather right now.", assetFileName: "" },
+      ]),
+    );
+
+    const result = await runAgentSession({ ...baseInput, draftRun: true });
+
+    expect(mockRecordDryRunAgentFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws-1",
+        conversationId: "conv-1",
+        errorMessage: "get_weather: TypeError: fetch failed",
+      }),
+    );
+    expect(mockHandoffAfterAgentRunFailure).not.toHaveBeenCalled();
+    expect(result?.messages).toEqual([]);
   });
 });

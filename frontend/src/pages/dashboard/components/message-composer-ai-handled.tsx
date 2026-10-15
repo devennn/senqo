@@ -17,6 +17,7 @@ export function MessageComposerAiHandled({
   handlingModeSaving: boolean;
   onHandlingModeChange?: (mode: ConversationHandlingMode) => void | Promise<void>;
 }) {
+  const isDryRunLine = whatsappConnection?.mode === "dry_run";
   return (
     <div className="flex min-h-[4.5rem] flex-col justify-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center gap-2">
@@ -24,7 +25,9 @@ export function MessageComposerAiHandled({
           <p className="text-sm text-muted-foreground">
             {connectionUnavailable
               ? "This WhatsApp connection is not connected."
-              : "AI is replying automatically..."}
+              : isDryRunLine
+                ? "Dry run — AI replies are drafted here but not sent to the customer."
+                : "AI is replying automatically..."}
           </p>
           {whatsappConnection ? (
             <MessageComposerViaLine connection={whatsappConnection} />

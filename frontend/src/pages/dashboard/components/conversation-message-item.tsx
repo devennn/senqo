@@ -6,6 +6,10 @@ import {
 } from "@/lib/group-participant-color";
 import { getMessageClusterSenderKey } from "@/lib/conversation-message-cluster";
 import {
+  isDryRunDraftMessage,
+  isDryRunThreadEventMessage,
+} from "@/lib/conversation-dry-run-message";
+import {
   getOperatorAiReasoning,
   getOperatorAiSources,
   shouldShowOperatorAiReasoningFooter,
@@ -27,7 +31,9 @@ function labelFromWhatsappId(chatId: string | null): string | null {
 }
 
 function getSenderLabel(message: ConversationMessage): string | null {
-  if (message.outgoing_sender_type === "ai_agent") return "AI";
+  if (message.outgoing_sender_type === "ai_agent") {
+    return isDryRunDraftMessage(message) ? "Dry run · Not sent" : "AI";
+  }
   if (message.role !== "user") return "Human";
   const metadata = message.metadata as Record<string, unknown> | null;
   const isGroupChat = metadata?.isGroupChat === true;
@@ -77,12 +83,14 @@ export function ConversationMessageItem({
         summaryText={summaryText}
         reasoningText={getOperatorAiReasoning(message)}
         sources={getOperatorAiSources(message)}
+        dryRun={isDryRunThreadEventMessage(message)}
       />
     );
   }
 
   const isUser = message.role === "user";
   const isAi = message.outgoing_sender_type === "ai_agent";
+  const isDryRunDraft = isDryRunDraftMessage(message);
   const isHumanOutgoing = !isUser && !isAi;
   const senderKey = getMessageClusterSenderKey(message);
   const clusterHead =
@@ -127,15 +135,24 @@ export function ConversationMessageItem({
               "flex size-8 shrink-0 items-center justify-center rounded-full",
               groupParticipantStyles?.avatarWrapClass,
               !groupParticipantStyles &&
-                (isAi
-                  ? "bg-purple-500/10 dark:bg-purple-500/20"
-                  : isHumanOutgoing
-                    ? "bg-primary/10 dark:bg-primary/20"
-                    : "bg-muted"),
+                (isDryRunDraft
+                  ? "bg-muted"
+                  : isAi
+                    ? "bg-purple-500/10 dark:bg-purple-500/20"
+                    : isHumanOutgoing
+                      ? "bg-primary/10 dark:bg-primary/20"
+                      : "bg-muted"),
             )}
           >
             {isAi ? (
-              <Bot className="size-4 text-purple-700 dark:text-purple-300" />
+              <Bot
+                className={cn(
+                  "size-4",
+                  isDryRunDraft
+                    ? "text-muted-foreground"
+                    : "text-purple-700 dark:text-purple-300",
+                )}
+              />
             ) : (
               <User
                 className={cn(
@@ -161,11 +178,13 @@ export function ConversationMessageItem({
                 "rounded-2xl px-4 py-3 text-[0.95rem] leading-relaxed shadow-sm ring-1 ring-black/5 dark:ring-white/10",
                 isUser ? "rounded-tl-sm" : "rounded-tr-sm",
                 groupParticipantStyles?.bubbleAccentClass,
-                isAi
-                  ? "bg-purple-500/10 text-foreground dark:bg-purple-500/20"
-                  : isHumanOutgoing
-                    ? "bg-chat-outgoing"
-                    : "bg-chat-incoming",
+                isDryRunDraft
+                  ? "border border-dashed border-border bg-muted/60 text-foreground dark:bg-muted/40"
+                  : isAi
+                    ? "bg-purple-500/10 text-foreground dark:bg-purple-500/20"
+                    : isHumanOutgoing
+                      ? "bg-chat-outgoing"
+                      : "bg-chat-incoming",
                 isFlashing && "conversation-message-target-flash",
               )}
             >
@@ -175,11 +194,13 @@ export function ConversationMessageItem({
                     "mb-1 text-[0.68rem] font-semibold uppercase tracking-wide",
                     groupParticipantStyles?.labelClass,
                     !groupParticipantStyles &&
-                      (isAi
-                        ? "text-purple-700 dark:text-purple-300"
-                        : isHumanOutgoing
-                          ? "text-primary dark:text-primary"
-                          : "text-muted-foreground"),
+                      (isDryRunDraft
+                        ? "text-muted-foreground"
+                        : isAi
+                          ? "text-purple-700 dark:text-purple-300"
+                          : isHumanOutgoing
+                            ? "text-primary dark:text-primary"
+                            : "text-muted-foreground"),
                   )}
                 >
                   {senderLabel}

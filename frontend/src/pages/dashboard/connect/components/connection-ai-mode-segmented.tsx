@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 const MODES: { id: WhatsappConnectionMode; label: string }[] = [
   { id: "inactive", label: "Inactive" },
   { id: "testing", label: "Testing" },
+  { id: "dry_run", label: "Dry run" },
   { id: "live", label: "Live" },
 ];
 
@@ -27,6 +28,9 @@ export function ConnectionAiModeSegmented({ mode, disabled, onChange }: Props) {
             <strong>Testing</strong> — replies only for CRM contacts marked Test.
           </li>
           <li>
+            <strong>Dry run</strong> — the assistant drafts replies in the inbox for review; nothing is sent to customers. Switch to Live to start sending.
+          </li>
+          <li>
             <strong>Live</strong> — replies for all contacts that reach this line (still respects Human vs AI per conversation).
           </li>
         </ul>
@@ -45,7 +49,7 @@ export function ConnectionAiModeSegmented({ mode, disabled, onChange }: Props) {
             aria-pressed={mode === m.id}
             onClick={() => void onChange(m.id)}
             className={cn(
-              "rounded-md px-2 py-1 text-xs font-semibold transition disabled:pointer-events-none disabled:opacity-50",
+              "whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold transition disabled:pointer-events-none disabled:opacity-50",
               mode === m.id
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : mode === "live"

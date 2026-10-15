@@ -66,7 +66,14 @@ function connectionInitials(displayName: string): string {
 function normalizeMode(
   raw: WhatsappConnection["mode"] | undefined,
 ): WhatsappConnectionMode {
-  if (raw === "testing" || raw === "live" || raw === "inactive") return raw;
+  if (
+    raw === "testing" ||
+    raw === "dry_run" ||
+    raw === "live" ||
+    raw === "inactive"
+  ) {
+    return raw;
+  }
   return "inactive";
 }
 

@@ -185,4 +185,39 @@ describe.skipIf(!hasDb)("listConversations (real DB)", () => {
     const middleRow = result.conversations.find((c) => c.title === "Chat middle");
     expect(middleRow?.lastMessage?.content).toBe("middle chat message");
   });
+
+  // Dry-run drafts are thread-only: the rail preview must keep the newest
+  // customer-visible message, not a draft that was never sent.
+  it("excludes dry-run drafts from the latest message preview", async () => {
+    const inserted = await db
+      .select({ id: conversations.id, title: conversations.title })
+      .from(conversations)
+      .where(eq(conversations.workspaceId, workspaceId));
+    const oldest = inserted.find((c) => c.title === "Chat oldest");
+    expect(oldest).toBeDefined();
+
+    await db.insert(messages).values([
+      {
+        workspaceId,
+        conversationId: oldest!.id,
+        role: "user",
+        content: "oldest chat question",
+        createdAt: new Date("2026-08-01T09:00:00Z"),
+      },
+      {
+        workspaceId,
+        conversationId: oldest!.id,
+        role: "assistant",
+        content: "Draft that must stay out of the rail",
+        outgoingSenderType: "ai_agent",
+        status: "dry_run",
+        metadata: { source: "agent_dry_run", dry_run: true },
+        createdAt: new Date("2026-08-01T12:00:00Z"),
+      },
+    ]);
+
+    const result = await listConversations(workspaceId, { limit: 10, offset: 0 });
+    const oldestRow = result.conversations.find((c) => c.title === "Chat oldest");
+    expect(oldestRow?.lastMessage?.content).toBe("oldest chat question");
+  });
 });

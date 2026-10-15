@@ -206,7 +206,7 @@ async function listLatestMessagePreviews(
         and(
           eq(messages.workspaceId, workspaceId),
           inArray(messages.conversationId, conversationIds),
-          // Failed sends are technical errors, not visible chat content.
+          // Failed sends and dry-run drafts are not customer-visible chat content.
           isNull(messages.status),
         ),
       )
@@ -740,7 +740,8 @@ export async function listConversationMessagesLatestPage(
           eq(messages.workspaceId, workspaceId),
           eq(messages.conversationId, conversationId),
           // Failed sends are technical errors, not visible chat content.
-          isNull(messages.status),
+          // Dry-run drafts are visible in the thread but were never sent.
+          or(isNull(messages.status), eq(messages.status, "dry_run")),
         ),
       )
       .orderBy(desc(messages.createdAt), desc(messages.id))
@@ -789,7 +790,8 @@ export async function listConversationMessagesOlderPage(
           eq(messages.workspaceId, workspaceId),
           eq(messages.conversationId, conversationId),
           // Failed sends are technical errors, not visible chat content.
-          isNull(messages.status),
+          // Dry-run drafts are visible in the thread but were never sent.
+          or(isNull(messages.status), eq(messages.status, "dry_run")),
           or(
             lt(messages.createdAt, beforeDate),
             and(
@@ -921,6 +923,7 @@ export async function getConversationWithContact(
         contactMetadata: contacts.metadata,
         wcDisplayName: whatsappConnections.displayName,
         wcPhoneNumber: whatsappConnections.phoneNumber,
+        wcMode: whatsappConnections.mode,
       })
       .from(conversations)
       .leftJoin(contacts, eq(conversations.contactId, contacts.id))
@@ -978,6 +981,7 @@ export async function getConversationWithContact(
       listLabelBadgesForConversations(workspaceId, [conversationId]),
       getConversationConnectionState(workspaceId, conversationId),
     ]);
+    const connectionSummary = whatsappConnectionSummaryFromRow(row);
     const result: ConversationHeaderData = {
       id: row.id,
       title: row.title,
@@ -986,7 +990,12 @@ export async function getConversationWithContact(
       connectionAiEnabled: connectionState.aiEnabled,
       canSendManualWhatsapp: connectionState.canSendManualWhatsapp,
       whatsappChatId: row.whatsapp_chat_id ?? null,
-      whatsappConnection: whatsappConnectionSummaryFromRow(row),
+      whatsappConnection: connectionSummary
+        ? {
+            ...connectionSummary,
+            mode: normalizeWhatsappConnectionMode(raw.wcMode),
+          }
+        : null,
       labels: labelsMap.get(conversationId) ?? [],
       contact: contactFromEmbed(row.contacts),
     };

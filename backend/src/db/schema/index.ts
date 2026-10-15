@@ -168,7 +168,7 @@ export const messages = pgTable(
       .defaultNow(),
     metadata: jsonb("metadata").notNull().default({}),
     outgoingSenderType: text("outgoing_sender_type"),
-    /** null = delivered; "failed" = outbound send that failed after retries. */
+    /** null = delivered/visible; "failed" = outbound send that failed; "dry_run" = AI draft never sent (thread-only). */
     status: text("status"),
     whatsappSenderChatId: text("whatsapp_sender_chat_id"),
     whatsappSenderName: text("whatsapp_sender_name"),
