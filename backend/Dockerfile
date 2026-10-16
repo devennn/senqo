@@ -23,6 +23,10 @@ COPY --from=build /app/dist /app/dist
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/package.json /app/package-lock.json* /app/
 
+# Run as the unprivileged image user (CIS Docker 4.1). The backend needs no
+# capabilities: it binds an unprivileged port and stores files in S3.
+USER node
+
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "dist/index.js"]
 EXPOSE 3001
