@@ -719,7 +719,25 @@ async function processSingleEvent(
   }
 }
 
+/**
+ * Shared-secret auth for the internal event webhook. The WhatsApp service sends
+ * `WHATSAPP_WEBHOOK_AUTHORIZATION` as the `x-webhook-token` header — never in the
+ * URL, which request logs capture (timing-safe compare, mirroring `/send`).
+ */
+function hasValidWebhookToken(c: {
+  req: { header: (name: string) => string | undefined };
+}): boolean {
+  const token = c.req.header("x-webhook-token") ?? "";
+  const expected = env.whatsappWebhookAuthorization;
+  if (token.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+}
+
 app.post("/events", async (c) => {
+  if (!hasValidWebhookToken(c)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
   const json = await c.req.json().catch(() => null);
   if (!json)
     return c.json({ received: true, message: "ignored: invalid json payload" });

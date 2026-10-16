@@ -74,6 +74,10 @@ vi.mock("../agent/agent.js", () => ({
   runAgentSession: vi.fn(),
 }));
 
+vi.mock("../lib/env.js", () => ({
+  env: { whatsappWebhookAuthorization: "test-webhook-token" },
+}));
+
 const { default: app } = await import("./whatsapp.js");
 
 const connectionId = "a1b2c3d4-e5f6-4789-a012-3456789abcde";
@@ -112,7 +116,11 @@ const inboundEvent = {
 async function postEvent(event: unknown) {
   return app.request("/events", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      // The event webhook requires the shared secret (S-01 fix) — send it like the WhatsApp service does.
+      "x-webhook-token": "test-webhook-token",
+    },
     body: JSON.stringify(event),
   });
 }

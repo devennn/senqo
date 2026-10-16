@@ -71,6 +71,10 @@ vi.mock("../agent/agent.js", () => ({
   runAgentSession: vi.fn(),
 }));
 
+vi.mock("../lib/env.js", () => ({
+  env: { whatsappWebhookAuthorization: "test-webhook-token" },
+}));
+
 const { default: app } = await import("./whatsapp.js");
 
 const connectionId = "a1b2c3d4-e5f6-4789-a012-3456789abcde";
@@ -94,10 +98,13 @@ function authorizedEvent() {
   };
 }
 
-async function postEvent(event: unknown) {
+async function postEvent(event: unknown, token: string | null = "test-webhook-token") {
   return app.request("/events", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(token === null ? {} : { "x-webhook-token": token }),
+    },
     body: JSON.stringify(event),
   });
 }
@@ -173,5 +180,28 @@ describe("connection.state webhook handling", () => {
     );
     expect(mockMarkConnectionDisconnected).not.toHaveBeenCalled();
     expect(mockDeleteConnectionWithTasks).not.toHaveBeenCalled();
+  });
+});
+
+describe("events webhook authorization", () => {
+  // Security regression (S-01): the event webhook previously accepted unauthenticated requests, so a
+  // forged inbound message could be injected with a single curl. A missing x-webhook-token must be
+  // rejected before any connection lookup or event processing happens.
+  it("rejects a request without x-webhook-token → 401 and no processing", async () => {
+    const res = await postEvent(notAuthorizedEvent(), null);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(mockGetConnectionByPublicId).not.toHaveBeenCalled();
+  });
+
+  // Wrong credentials must be rejected too: a same-length, non-matching token exercises the
+  // constant-time compare (a length mismatch short-circuits before it) and must not process events.
+  it("rejects a request with a wrong x-webhook-token → 401 and no processing", async () => {
+    const res = await postEvent(notAuthorizedEvent(), "test-webhook-tokeX");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(mockGetConnectionByPublicId).not.toHaveBeenCalled();
   });
 });

@@ -33,8 +33,8 @@ describe("deliverEvent — connection state events", () => {
     global.fetch = fetchMock;
   });
 
-  // Happy path: connection.state event is POSTed to the backend webhook URL with the correct token.
-  // Verifies that the event reaches the backend on the first attempt when it returns 200.
+  // Happy path: connection.state event is POSTed to the backend webhook URL on the first attempt,
+  // carrying the shared secret in the x-webhook-token header — never in the URL, which request logs capture.
   it("POSTs connection.state event to backend webhook", async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 200, text: vi.fn().mockResolvedValue("") });
 
@@ -49,9 +49,10 @@ describe("deliverEvent — connection state events", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0];
-    expect(url).toContain("token=test-token");
+    expect(url).toBe("http://backend/api/whatsapp/events");
     expect(options.method).toBe("POST");
     expect(options.headers["Content-Type"]).toBe("application/json");
+    expect(options.headers["x-webhook-token"]).toBe("test-token");
 
     const body = JSON.parse(options.body);
     expect(body.type).toBe("connection.state");

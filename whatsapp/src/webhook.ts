@@ -7,12 +7,6 @@ function isMessageEvent(event: WhatsappBackendEvent): boolean {
   return event.type === "message.inbound" || event.type === "message.outbound_mirror";
 }
 
-function webhookUrl(): string {
-  const base = env.backendWebhookUrl;
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}token=${encodeURIComponent(env.webhookToken)}`;
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -23,7 +17,7 @@ function sleep(ms: number): Promise<void> {
  * event is logged so it can be diagnosed.
  */
 export async function deliverEvent(event: WhatsappBackendEvent): Promise<void> {
-  const url = webhookUrl();
+  const url = env.backendWebhookUrl;
   const body = JSON.stringify(event);
   const maxAttempts = 4;
   const logPayload = isMessageEvent(event) ? eventPayloadForLog(event) : event;
@@ -57,7 +51,12 @@ export async function deliverEvent(event: WhatsappBackendEvent): Promise<void> {
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Shared secret for the backend's event webhook — header only; a URL
+          // query would leak into request logs.
+          "x-webhook-token": env.webhookToken,
+        },
         body,
       });
       if (res.ok) {
