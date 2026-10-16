@@ -234,6 +234,7 @@ import {
 import { deleteConnectionWithTasks } from "../services/connection-delete.js";
 import { findOrCreateLeadForContact } from "../repositories/leads.js";
 import { env } from "../lib/env.js";
+import { checkPasswordPolicy } from "../lib/password-policy.js";
 import { generateApiKeyMaterial } from "../lib/api-keys.js";
 import { isValidTimeZone } from "../lib/timezone.js";
 import {
@@ -2977,8 +2978,13 @@ app.put("/workspace", async (c) => {
 app.post("/profile/password", async (c) => {
   const userId = c.get("userId");
   const { currentPassword, newPassword } = (await c.req.json()) as { currentPassword?: string; newPassword: string };
-  if (!newPassword || newPassword.length < 8)
-    return c.json({ error: "invalid_password" }, 400);
+  const policy = checkPasswordPolicy(newPassword ?? "");
+  if (!policy.ok) {
+    return c.json(
+      { error: policy.reason === "too_common" ? "password_too_common" : "invalid_password" },
+      400,
+    );
+  }
   if (!currentPassword)
     return c.json({ error: "current_password_required" }, 400);
 

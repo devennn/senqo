@@ -28,6 +28,12 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    # Least privilege (CIS Docker 4.1): the service drops to the image's `node`
+    # user and needs no Linux capabilities.
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - .env
     environment:
@@ -56,7 +62,9 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       INBOUND_AI_DEBOUNCE_SECONDS: ${INBOUND_AI_DEBOUNCE_SECONDS:-7}
       API_KEY_PEPPER: ${API_KEY_PEPPER}
-      WORKSPACE_SECRETS_KEY: ${WORKSPACE_SECRETS_KEY:-dev-workspace-secrets-key-change-in-production-32b}
+      # Dev-only fallback (64 hex chars). Production must set a generated key —
+      # startup fails fast on any non-64-hex value.
+      WORKSPACE_SECRETS_KEY: ${WORKSPACE_SECRETS_KEY:-2f7a1c9d4b8e6f0a1c3d5e7b9f2a4c6d8e0f1a3b5c7d9e1f3a5b7c9d1e3f5a7b}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       BOOTSTRAP_WORKSPACE_NAME: ${BOOTSTRAP_WORKSPACE_NAME:-Default Workspace}
@@ -82,6 +90,19 @@ services:
   whatsapp:
     build: ./whatsapp
     restart: unless-stopped
+    # Least privilege (CIS Docker 4.1): the entrypoint uses these capabilities
+    # only to fix mounted-volume ownership and drop to `node`; the service runs
+    # unprivileged and no-new-privileges blocks any escalation from it.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
     environment:
       PORT: 8080
       WHATSAPP_SERVICE_API_KEY: ${WHATSAPP_SERVICE_API_KEY}

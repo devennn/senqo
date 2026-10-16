@@ -89,8 +89,8 @@ export function ProfilePasswordCard(props: {
 
   const canSubmit =
     !busy &&
-    newPassword.length >= 8 &&
-    confirmPassword.length >= 8 &&
+    newPassword.length >= 12 &&
+    confirmPassword.length >= 12 &&
     newPassword === confirmPassword;
 
   return (

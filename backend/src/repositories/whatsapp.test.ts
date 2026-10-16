@@ -29,6 +29,7 @@ const {
   getWhatsappConnectionModeForInboundAi,
   getWhatsappConnectionRowById,
   createConversationMessage,
+  deleteWebhookPayloadDumpsBefore,
   mergeAiReasoningOntoAgentRunMessages,
 } = await vi.importActual("../repositories/whatsapp.js") as typeof import("../repositories/whatsapp.js");
 
@@ -586,5 +587,31 @@ describe("mergeAiReasoningOntoAgentRunMessages", () => {
         ai_sources: [{ kind: "context", label: "Refund policy" }],
       },
     });
+  });
+});
+
+describe("deleteWebhookPayloadDumpsBefore", () => {
+  // Retention job contract: rows older than the cutoff are deleted and the removed count is
+  // returned so the retention job can report activity.
+  it("deletes dumps before the cutoff and returns the count", async () => {
+    mockWhere.mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: "d1" }, { id: "d2" }]),
+    });
+
+    const result = await deleteWebhookPayloadDumpsBefore(new Date("2026-01-01T00:00:00.000Z"));
+
+    expect(result).toEqual({ ok: true, deleted: 2 });
+  });
+
+  // Error path: a failing delete must not throw into the pg-boss worker; ok:false lets the
+  // service log it and keeps the worker healthy.
+  it("returns ok false when the delete query fails", async () => {
+    mockWhere.mockReturnValue({
+      returning: vi.fn().mockRejectedValue(new Error("connection lost")),
+    });
+
+    const result = await deleteWebhookPayloadDumpsBefore(new Date("2026-01-01T00:00:00.000Z"));
+
+    expect(result).toEqual({ ok: false, deleted: 0 });
   });
 });

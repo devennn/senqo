@@ -40,7 +40,13 @@ export async function downloadIncomingMedia(downloadUrl: string): Promise<Downlo
   const apiKey = env.whatsappServiceApiKey;
   const response = await fetch(downloadUrl, {
     headers: apiKey ? { "x-api-key": apiKey } : {},
+    // Never silently follow redirects: the allowlist check above covers this URL only.
+    redirect: "manual",
   });
+
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error(`Download media blocked: unexpected redirect (${response.status})`);
+  }
 
   if (!response.ok) {
     const bodyText = await response.text();

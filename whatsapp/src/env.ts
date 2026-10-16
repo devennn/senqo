@@ -18,8 +18,8 @@ function required(name: string): string {
  *
  * - `serviceApiKey` guards the inbound REST API (backend sends it as `x-api-key`).
  * - `backendWebhookUrl` + `webhookToken` are how this service pushes canonical
- *   `WhatsappBackendEvent`s back to the backend (`?token=` matches the backend's
- *   `WHATSAPP_WEBHOOK_AUTHORIZATION`).
+ *   `WhatsappBackendEvent`s back to the backend (`x-webhook-token` header matches
+ *   the backend's `WHATSAPP_WEBHOOK_AUTHORIZATION`).
  */
 export const env = {
   port: Number(optional("PORT", "8080")),
@@ -30,7 +30,7 @@ export const env = {
     "BACKEND_WEBHOOK_URL",
     "http://backend:3001/api/whatsapp/events",
   ),
-  /** Shared secret appended as `?token=` on webhook delivery. */
+  /** Shared secret sent as the `x-webhook-token` header on webhook delivery. */
   webhookToken: required("WHATSAPP_WEBHOOK_AUTHORIZATION"),
   /** Directory holding per-connection multi-file auth state (Docker volume). */
   sessionsDir: path.resolve(optional("SESSIONS_DIR", "/app/sessions")),

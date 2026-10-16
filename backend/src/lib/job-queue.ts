@@ -7,6 +7,7 @@ import {
 } from "../services/agent-knowledge-import-job-run.js";
 import { executeEvalScheduleRun } from "../services/eval-schedule-run.js";
 import { tickEvalSchedules } from "../services/eval-schedule-tick.js";
+import { runWebhookDumpRetention } from "../services/webhook-dump-retention.js";
 import type { TaskExecutePayload } from "../types/task-execute.js";
 import { env } from "./env.js";
 
@@ -15,6 +16,7 @@ export const QUEUE_TASK_EXECUTE = "task-execute";
 export const QUEUE_AGENT_KNOWLEDGE_IMPORT = "agent-knowledge-import";
 export const QUEUE_EVAL_SCHEDULE_TICK = "eval-schedule-tick";
 export const QUEUE_EVAL_SCHEDULE_RUN = "eval-schedule-run";
+export const QUEUE_WEBHOOK_DUMP_RETENTION = "webhook-dump-retention";
 
 export type InboundAiJobData = {
   workspaceId: string;
@@ -67,8 +69,14 @@ export async function startJobQueue(): Promise<void> {
     retryLimit: 0,
     policy: "singleton",
   });
+  await instance.createQueue(QUEUE_WEBHOOK_DUMP_RETENTION, {
+    expireInSeconds: 600,
+    retryLimit: 0,
+  });
 
   await instance.schedule(QUEUE_EVAL_SCHEDULE_TICK, "* * * * *", {});
+  // Daily retention pass over webhook payload dumps (S-09).
+  await instance.schedule(QUEUE_WEBHOOK_DUMP_RETENTION, "0 4 * * *", {});
 
   await instance.work<InboundAiJobData>(QUEUE_INBOUND_AI, async (jobs) => {
     for (const job of jobs) {
@@ -144,6 +152,10 @@ export async function startJobQueue(): Promise<void> {
       }
     },
   );
+
+  await instance.work(QUEUE_WEBHOOK_DUMP_RETENTION, async () => {
+    await runWebhookDumpRetention();
+  });
 
   boss = instance;
   console.info("[JobQueue/start] Success: pg-boss workers registered");

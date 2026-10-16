@@ -5,6 +5,8 @@ vi.mock("@/lib/auth-client", () => ({
   getAccessToken: mockGetAccessToken,
 }));
 
+const mockFetch = vi.fn();
+
 const { useRealtime } = await import("@/hooks/useRealtime");
 
 import { renderHook } from "@testing-library/react";
@@ -40,6 +42,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   eventSourceInstances = [];
   mockGetAccessToken.mockResolvedValue("test-token");
+  vi.stubGlobal("fetch", mockFetch);
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ ticket: "test-ticket" }),
+  });
   (globalThis as unknown as { EventSource: typeof MockEventSource }).EventSource =
     MockEventSource;
   // Mock import.meta.env
@@ -48,12 +55,14 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe("useRealtime", () => {
-  // Verifies that an EventSource is opened with the correct workspaceId and token query params.
-  // Ensures SSE connections are scoped to the current workspace so only relevant events arrive.
-  it("subscribes to SSE when workspaceId is provided", async () => {
+  // Verifies that an EventSource is opened with the workspaceId and a single-use ticket — never the
+  // access token itself. Keeps reusable credentials out of URLs (and request logs) while scoping the
+  // stream to the current workspace so only relevant events arrive.
+  it("subscribes to SSE with a single-use ticket when workspaceId is provided", async () => {
     const onEvent = vi.fn();
 
     renderHook(() => useRealtime("ws-1", onEvent));
@@ -64,7 +73,8 @@ describe("useRealtime", () => {
 
     const es = eventSourceInstances[0];
     expect(es.url).toContain("workspaceId=ws-1");
-    expect(es.url).toContain("token=test-token");
+    expect(es.url).toContain("ticket=test-ticket");
+    expect(es.url).not.toContain("token=");
   });
 
   // Confirms that no EventSource is created when workspaceId is null/falsy.
@@ -74,6 +84,20 @@ describe("useRealtime", () => {
 
     renderHook(() => useRealtime(null, onEvent));
 
+    expect(eventSourceInstances.length).toBe(0);
+  });
+
+  // Failure path for the ticket exchange (backend down or expired session): no stream may open,
+  // and the hook must never fall back to putting the access token in the URL.
+  it("does not open a stream when the ticket request fails", async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+    const onEvent = vi.fn();
+
+    renderHook(() => useRealtime("ws-1", onEvent));
+
+    await vi.waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
     expect(eventSourceInstances.length).toBe(0);
   });
 
