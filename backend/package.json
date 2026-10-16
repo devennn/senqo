@@ -36,7 +36,7 @@
     "hono": "^4.7.10",
     "isolated-vm": "^5.0.4",
     "jose": "^6.2.3",
-    "nodemailer": "^9.0.0",
+    "nodemailer": "^10.1.1",
     "papaparse": "^5.5.3",
     "pdf-parse": "^2.4.5",
     "pg": "^8.21.0",
@@ -44,6 +44,7 @@
     "resend": "^6.12.2",
     "tailwind-merge": "^3.5.0",
     "typescript": "^5.9.3",
+    "undici": "^6.29.1",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
