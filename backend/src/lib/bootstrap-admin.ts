@@ -1,5 +1,6 @@
 import { hashPassword } from "../lib/auth-users.js";
 import { env } from "./env.js";
+import { PASSWORD_MIN_LENGTH } from "./password-policy.js";
 import { countUsers, createUser, findUserByEmail } from "../repositories/auth-users.js";
 import { provisionOwnerWorkspace } from "../repositories/profiles.js";
 import { seedInstanceSettings } from "../repositories/instance-settings.js";
@@ -28,8 +29,10 @@ export async function bootstrapAdminIfNeeded(): Promise<void> {
     return;
   }
 
-  if (password.length < 8) {
-    throw new Error("[BootstrapAdmin] BOOTSTRAP_ADMIN_PASSWORD must be at least 8 characters");
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    throw new Error(
+      `[BootstrapAdmin] BOOTSTRAP_ADMIN_PASSWORD must be at least ${PASSWORD_MIN_LENGTH} characters`,
+    );
   }
 
   const existing = await findUserByEmail(email);

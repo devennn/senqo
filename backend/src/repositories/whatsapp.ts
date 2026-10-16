@@ -25,7 +25,7 @@ import {
   conversations,
   messages,
 } from "../db/schema/index.js";
-import { eq, desc, asc, and, isNull, inArray, or, sql, not } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, inArray, or, sql, not, lt } from "drizzle-orm";
 
 const WHATSAPP_MODES: readonly WhatsappConnectionMode[] = ["inactive", "testing", "dry_run", "live"];
 
@@ -403,6 +403,30 @@ export async function recordWebhookPayloadDump(input: WhatsappWebhookPayloadDump
   } catch (error) {
     console.error(`[${scope}/recordWebhookPayloadDump] Unexpected error: ${String(error)}`);
     return { ok: false };
+  }
+}
+
+/**
+ * Retention (S-09): deletes webhook payload dumps older than the cutoff so raw
+ * customer message content is not stored forever. Returns the removed row count.
+ */
+export async function deleteWebhookPayloadDumpsBefore(
+  cutoff: Date,
+): Promise<{ ok: boolean; deleted: number }> {
+  try {
+    const deleted = await db
+      .delete(zzzWaDumps)
+      .where(lt(zzzWaDumps.createdAt, cutoff))
+      .returning({ id: zzzWaDumps.id });
+    console.info(
+      `[${scope}/deleteWebhookPayloadDumpsBefore] Success: deleted=${deleted.length} cutoff=${cutoff.toISOString()}`,
+    );
+    return { ok: true, deleted: deleted.length };
+  } catch (error) {
+    console.error(
+      `[${scope}/deleteWebhookPayloadDumpsBefore] Unexpected error: ${String(error)}`,
+    );
+    return { ok: false, deleted: 0 };
   }
 }
 

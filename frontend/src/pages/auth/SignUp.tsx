@@ -130,7 +130,7 @@ export default function SignUpPage() {
                   id="password"
                   name="password"
                   type="password"
-                  minLength={8}
+                  minLength={12}
                   required
                   disabled={registrationBlocked}
                 />
