@@ -20,6 +20,17 @@ function clampInt(
   return Math.min(max, Math.max(min, Math.floor(n)));
 }
 
+/** 32-byte hex key check — any other form would silently weaken AES-256-GCM (S-07). */
+function requireHexKey(name: string): string {
+  const value = requireEnv(name);
+  if (!/^[0-9a-f]{64}$/i.test(value)) {
+    throw new Error(
+      `${name} must be 64 hexadecimal characters (32 bytes) — generate one with \`openssl rand -hex 32\`.`,
+    );
+  }
+  return value;
+}
+
 const modelEnv = loadModelEnv(
   parseModelProvider(requireEnv("MODEL_PROVIDER")),
 );
@@ -55,9 +66,16 @@ export const env = {
     process.env.WHATSAPP_SERVICE_URL ?? "http://whatsapp:8080",
   /** Shared secret presented to the WhatsApp service as the `x-api-key` header. */
   whatsappServiceApiKey: process.env.WHATSAPP_SERVICE_API_KEY ?? "",
+  /** Days to keep webhook payload dumps; `0` keeps them forever (S-09 retention). */
+  whatsappPayloadDumpRetentionDays: clampInt(
+    process.env.WHATSAPP_PAYLOAD_DUMP_RETENTION_DAYS,
+    30,
+    0,
+    3650,
+  ),
   apiKeyPepper: requireEnv("API_KEY_PEPPER"),
   /** AES-256-GCM key for workspace secrets (32-byte hex from openssl rand -hex 32). */
-  workspaceSecretsKey: requireEnv("WORKSPACE_SECRETS_KEY"),
+  workspaceSecretsKey: requireHexKey("WORKSPACE_SECRETS_KEY"),
   bootstrapAdminEmail:
     process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase() ?? "",
   bootstrapAdminPassword: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "",
@@ -65,6 +83,8 @@ export const env = {
     process.env.BOOTSTRAP_WORKSPACE_NAME?.trim() || "Default Workspace",
   initialAllowPublicRegistration:
     process.env.ALLOW_PUBLIC_REGISTRATION !== "false",
+  /** Optional breached-password screening at registration (opt-in: PASSWORD_BREACH_CHECK=on). */
+  passwordBreachCheck: process.env.PASSWORD_BREACH_CHECK === "on",
   /** Optional override for eval Spec agent; falls back to chat LLM. */
   evalSpecModel: process.env.EVAL_SPEC_MODEL?.trim() || "",
   /** Optional override for eval Judge agent; falls back to chat LLM. */

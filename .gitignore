@@ -52,3 +52,5 @@ next-env.d.ts
 
 # Claude Code local tool permissions (personal; not for public repos)
 .claude/settings.local.json
+# Local security-study artifact (contains exploitation details) — never commit.
+senqo-security-report.zip

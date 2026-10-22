@@ -55,6 +55,10 @@ vi.mock("../repositories/registration-invites.js", () => ({
   acceptRegistrationInvite: vi.fn().mockResolvedValue({ ok: true }),
 }));
 
+vi.mock("../lib/env.js", () => ({
+  env: { passwordBreachCheck: false },
+}));
+
 import {
   hashPassword,
   verifyPassword,
@@ -67,6 +71,7 @@ import {
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../lib/auth-jwt.js";
 import { provisionOwnerWorkspace } from "../repositories/profiles.js";
 import { getAllowPublicRegistration } from "../repositories/instance-settings.js";
+import { LOGIN_MAX_FAILURES } from "../middleware/login-attempts.js";
 
 const hashPasswordMock = vi.mocked(hashPassword);
 const verifyPasswordMock = vi.mocked(verifyPassword);
@@ -122,7 +127,7 @@ describe("POST /register", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "test@example.com",
-        password: "password123",
+        password: "valid-test-passphrase",
       }),
     });
 
@@ -143,7 +148,7 @@ describe("POST /register", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "test@example.com",
-        password: "password123",
+        password: "valid-test-passphrase",
       }),
     });
 
@@ -161,7 +166,7 @@ describe("POST /register", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "test@example.com",
-        password: "password123",
+        password: "valid-test-passphrase",
       }),
     });
 
@@ -177,7 +182,7 @@ describe("POST /register", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "not-an-email",
-        password: "password123",
+        password: "valid-test-passphrase",
       }),
     });
 
@@ -186,7 +191,7 @@ describe("POST /register", () => {
     expect(body.error).toBe("invalid_payload");
   });
 
-  // Password is too short (<8 chars) → 400 with invalid_payload, needed to enforce minimum password length policy via Zod schema.
+  // Password is too short (<12 chars) → 400 with invalid_payload, needed to enforce the minimum password length policy via Zod schema.
   it("rejects short password with 400", async () => {
     const res = await app.request("/register", {
       method: "POST",
@@ -201,6 +206,23 @@ describe("POST /register", () => {
     const body = await res.json();
     expect(body.error).toBe("invalid_payload");
   });
+
+  // Security regression (S-10): a long but widely-leaked password must be refused with a specific
+  // error so users pick something an attacker cannot replay from breach corpora.
+  it("rejects a common breached password with 400", async () => {
+    const res = await app.request("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "qwertyqwerty",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("password_too_common");
+  });
 });
 
 describe("POST /login", () => {
@@ -213,7 +235,7 @@ describe("POST /login", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "test@example.com",
-        password: "password123",
+        password: "valid-test-passphrase",
       }),
     });
 
@@ -253,13 +275,85 @@ describe("POST /login", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: "unknown@example.com",
-        password: "password123",
+        password: "valid-test-passphrase",
       }),
     });
 
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe("invalid_credentials");
+  });
+});
+
+describe("POST /login — brute-force lockout", () => {
+  // Security regression (S-03): repeated wrong passwords previously never throttled. After
+  // LOGIN_MAX_FAILURES failures for the same account + IP the next attempt must be refused with
+  // 429 too_many_attempts and a Retry-After header instead of hashing another guess.
+  it("locks out after repeated wrong passwords → 429 with Retry-After", async () => {
+    findUserByEmailMock.mockResolvedValue(mockUser);
+    verifyPasswordMock.mockResolvedValue(false);
+    const headers = { "Content-Type": "application/json", "x-real-ip": "203.0.113.90" };
+    const body = JSON.stringify({ email: "lockout@example.com", password: "wrongpassword" });
+
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) {
+      const res = await app.request("/login", { method: "POST", headers, body });
+      expect(res.status).toBe(401);
+    }
+
+    const blocked = await app.request("/login", { method: "POST", headers, body });
+    expect(blocked.status).toBe(429);
+    const blockedBody = await blocked.json();
+    expect(blockedBody.error).toBe("too_many_attempts");
+    expect(Number(blocked.headers.get("Retry-After"))).toBeGreaterThan(0);
+
+    // Even a correct password must be refused while the account + IP is locked out.
+    verifyPasswordMock.mockResolvedValue(true);
+    const blockedWithGoodPassword = await app.request("/login", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ email: "lockout@example.com", password: "password123" }),
+    });
+    expect(blockedWithGoodPassword.status).toBe(429);
+  });
+
+  // A correct password below the threshold must still sign in, and success must clear the failure
+  // counter so earlier typos cannot push the account over the limit later.
+  it("signs in below the threshold and clears the failure counter on success", async () => {
+    findUserByEmailMock.mockResolvedValue(mockUser);
+    verifyPasswordMock.mockResolvedValue(false);
+    const headers = { "Content-Type": "application/json", "x-real-ip": "203.0.113.91" };
+    const wrongBody = JSON.stringify({ email: "clear@example.com", password: "wrongpassword" });
+    const rightBody = JSON.stringify({ email: "clear@example.com", password: "password123" });
+
+    const firstAttempt = await app.request("/login", { method: "POST", headers, body: wrongBody });
+    expect(firstAttempt.status).toBe(401);
+
+    verifyPasswordMock.mockResolvedValue(true);
+    const ok = await app.request("/login", { method: "POST", headers, body: rightBody });
+    expect(ok.status).toBe(200);
+
+    // Counter was cleared: a fresh below-threshold run must not be blocked early.
+    verifyPasswordMock.mockResolvedValue(false);
+    for (let i = 0; i < LOGIN_MAX_FAILURES - 1; i++) {
+      const res = await app.request("/login", { method: "POST", headers, body: wrongBody });
+      expect(res.status).toBe(401);
+    }
+  });
+
+  // Unknown emails must count toward the lockout too — otherwise an attacker could probe for
+  // accounts with unlimited guesses and only real accounts would be throttled.
+  it("counts unknown-email failures toward the lockout", async () => {
+    findUserByEmailMock.mockResolvedValue(null);
+    const headers = { "Content-Type": "application/json", "x-real-ip": "203.0.113.92" };
+    const body = JSON.stringify({ email: "ghost@example.com", password: "whatever" });
+
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) {
+      const res = await app.request("/login", { method: "POST", headers, body });
+      expect(res.status).toBe(401);
+    }
+
+    const blocked = await app.request("/login", { method: "POST", headers, body });
+    expect(blocked.status).toBe(429);
   });
 });
 

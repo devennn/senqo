@@ -10,10 +10,28 @@ const apiBaseUrl = (
   (import.meta.env as Record<string, string | undefined>).VITE_API_BASE_URL ?? ""
 ).replace(/\/$/, "");
 
-function buildStreamUrl(workspaceId: string, token: string): string {
+function buildStreamUrl(workspaceId: string, ticket: string): string {
   const base = apiBaseUrl || "";
-  const params = new URLSearchParams({ workspaceId, token });
+  const params = new URLSearchParams({ workspaceId, ticket });
   return `${base}/api/realtime/stream?${params.toString()}`;
+}
+
+/**
+ * Exchanges the access token for a single-use stream ticket. The token itself
+ * must never ride in the stream URL (query strings end up in logs/history).
+ */
+async function fetchStreamTicket(workspaceId: string, token: string): Promise<string | null> {
+  const res = await fetch(`${apiBaseUrl}/api/realtime/ticket`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ workspaceId }),
+  }).catch(() => null);
+  if (!res || !res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { ticket?: unknown } | null;
+  return typeof body?.ticket === "string" ? body.ticket : null;
 }
 
 /**
@@ -38,12 +56,28 @@ export function useRealtime(
     let attempt = 0;
     let stopped = false;
 
+    function scheduleRetry() {
+      if (stopped) return;
+      // Exponential backoff: 1s, 2s, 4s, 8s, capped at 30s.
+      const delay = Math.min(30_000, 1_000 * 2 ** attempt);
+      attempt += 1;
+      retryTimer = setTimeout(() => { void connect(); }, delay);
+    }
+
     async function connect() {
       if (stopped) return;
       const token = await getAccessToken().catch(() => null);
       if (!token || stopped) return;
 
-      const url = buildStreamUrl(workspaceId!, token);
+      const ticket = await fetchStreamTicket(workspaceId!, token);
+      if (stopped) return;
+      if (!ticket) {
+        // Backend unreachable or session expired — retry with backoff like a dropped stream.
+        scheduleRetry();
+        return;
+      }
+
+      const url = buildStreamUrl(workspaceId!, ticket);
       es = new EventSource(url);
 
       es.addEventListener("message.created", (e: MessageEvent) => {

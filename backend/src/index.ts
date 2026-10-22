@@ -5,7 +5,7 @@ loadRepoEnv();
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { requestLogger } from "./middleware/request-logger.js";
 import { secureHeaders } from "hono/secure-headers";
 import { rateLimit } from "./middleware/rate-limit.js";
 import agentRoute from "./routes/agent.js";
@@ -17,7 +17,8 @@ import healthRoute from "./routes/health.js";
 import authRoute from "./routes/auth.js";
 import adminRoute from "./routes/admin.js";
 import { env } from "./lib/env.js";
-import { isHttpPostTooLarge } from "./lib/http-post-max-bytes.js";
+import { bodyLimit } from "hono/body-limit";
+import { HTTP_POST_MAX_BYTES } from "./lib/http-post-max-bytes.js";
 import { startJobQueue, stopJobQueue } from "./lib/job-queue.js";
 import { bootstrapAdminIfNeeded } from "./lib/bootstrap-admin.js";
 
@@ -61,7 +62,7 @@ app.use(
   }),
 );
 
-app.use("*", logger());
+app.use("*", requestLogger());
 
 app.use(
   "*",
@@ -86,18 +87,22 @@ function isWhatsappEventsWebhook(c: { req: { path: string } }): boolean {
 app.use(
   "*",
   rateLimit({
+    keyPrefix: "global",
     windowMs: 15 * 60 * 1000,
     limit: 200,
     skip: isWhatsappEventsWebhook,
   }),
 );
 
-app.post("*", async (c, next) => {
-  if (isHttpPostTooLarge(c.req.header("content-length"))) {
-    return c.json({ error: "payload_too_large" }, 413);
-  }
-  await next();
-});
+// Cap POST bodies (chunked requests without a Content-Length included — the old
+// content-length-only check let those through to the body parser).
+app.post(
+  "*",
+  bodyLimit({
+    maxSize: HTTP_POST_MAX_BYTES,
+    onError: (c) => c.json({ error: "payload_too_large" }, 413),
+  }),
+);
 
 app.route("/api/agent", agentRoute);
 app.route("/api/whatsapp", whatsappRoute);

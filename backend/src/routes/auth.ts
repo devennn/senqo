@@ -20,6 +20,18 @@ import {
   acceptRegistrationInvite,
   getRegistrationInviteByToken,
 } from "../repositories/registration-invites.js";
+import { env } from "../lib/env.js";
+import { isPasswordBreached } from "../lib/breached-password.js";
+import {
+  PASSWORD_MIN_LENGTH,
+  checkPasswordPolicy,
+} from "../lib/password-policy.js";
+import { clientIp, rateLimit } from "../middleware/rate-limit.js";
+import {
+  clearLoginFailures,
+  getLoginBlock,
+  recordLoginFailure,
+} from "../middleware/login-attempts.js";
 
 function authTokensResponse(
   user: { id: string; email: string; isInstanceAdmin?: boolean },
@@ -45,7 +57,7 @@ async function rejectIfDisabled(user: Awaited<ReturnType<typeof findUserById>>) 
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(PASSWORD_MIN_LENGTH),
   fullName: z.string().trim().optional(),
   inviteToken: z.string().trim().optional(),
 });
@@ -69,11 +81,36 @@ export const authRoute = new Hono()
 
     return c.json({ email: invite.email });
   })
+  .use(
+    "/register",
+    rateLimit({ keyPrefix: "auth-register", windowMs: 60 * 60 * 1000, limit: 10 }),
+  )
   .post("/register", async (c) => {
     const parsed = registerSchema.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
 
     const { email, password, fullName, inviteToken } = parsed.data;
+
+    const policy = checkPasswordPolicy(password);
+    if (!policy.ok) {
+      return c.json(
+        { error: policy.reason === "too_common" ? "password_too_common" : "invalid_payload" },
+        400,
+      );
+    }
+
+    // Optional (PASSWORD_BREACH_CHECK=on): refuse passwords known from breaches.
+    // A lookup outage logs and allows signup rather than blocking registration.
+    if (env.passwordBreachCheck) {
+      try {
+        if (await isPasswordBreached(password)) {
+          return c.json({ error: "password_breached" }, 400);
+        }
+      } catch (error) {
+        console.warn(`[Auth/register] Password breach lookup failed: ${String(error)}`);
+      }
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
     const allowPublicRegistration = await getAllowPublicRegistration();
 
@@ -122,20 +159,40 @@ export const authRoute = new Hono()
       ),
     );
   })
+  .use(
+    "/login",
+    rateLimit({ keyPrefix: "auth-login", windowMs: 15 * 60 * 1000, limit: 60 }),
+  )
   .post("/login", async (c) => {
     const parsed = loginSchema.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: "invalid_payload" }, 400);
 
     const { email, password } = parsed.data;
+    const normalizedEmail = email.trim().toLowerCase();
+    const ip = clientIp(c);
+
+    const block = getLoginBlock(ip, normalizedEmail);
+    if (block.blocked) {
+      c.header("Retry-After", String(block.retryAfterSeconds));
+      return c.json({ error: "too_many_attempts" }, 429);
+    }
 
     const user = await findUserByEmail(email);
-    if (!user || !user.passwordHash) return c.json({ error: "invalid_credentials" }, 401);
+    if (!user || !user.passwordHash) {
+      recordLoginFailure(ip, normalizedEmail);
+      return c.json({ error: "invalid_credentials" }, 401);
+    }
 
     const disabled = await rejectIfDisabled(user);
     if (disabled) return c.json({ error: disabled }, 403);
 
     const valid = await verifyPassword(user.passwordHash, password);
-    if (!valid) return c.json({ error: "invalid_credentials" }, 401);
+    if (!valid) {
+      recordLoginFailure(ip, normalizedEmail);
+      return c.json({ error: "invalid_credentials" }, 401);
+    }
+
+    clearLoginFailures(ip, normalizedEmail);
 
     const accessToken = await signAccessToken(user.id);
     const refreshToken = await signRefreshToken(user.id);
