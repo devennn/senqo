@@ -48,6 +48,7 @@ const mockRecordDryRunAgentFailure = vi.fn();
 const mockCreateConversationMessage = vi.fn();
 const mockSendPreparedOutboundMessages = vi.fn();
 const mockGetChatLLM = vi.fn();
+const mockResolveHistoryMedia = vi.fn();
 
 vi.mock("./session.js", () => ({ resolveSessionId: mockResolveSessionId }));
 vi.mock("./skills-catalog.js", () => ({
@@ -77,6 +78,9 @@ vi.mock("./reply-sources.js", () => ({
   needsKnowledgeSourcesRegen: () => false,
   resolveAgentReplySources: () => [],
   resolveHandoffTopicLabel: () => null,
+}));
+vi.mock("./history-media.js", () => ({
+  resolveHistoryMediaForModel: (...args: unknown[]) => mockResolveHistoryMedia(...args),
 }));
 vi.mock("../services/agent-outbound-messages.js", () => ({
   prepareOutboundMessages: (messages: unknown[]) => messages,
@@ -157,6 +161,9 @@ beforeEach(() => {
     }),
   );
   mockGetChatLLM.mockReturnValue({});
+  mockResolveHistoryMedia.mockImplementation((content: unknown) =>
+    Promise.resolve(content),
+  );
 });
 
 describe("runAgentSession custom tool failures", () => {
@@ -469,5 +476,81 @@ describe("runAgentSession provider history rejection", () => {
     );
 
     expect(aiState.generateCalls).toHaveLength(2);
+  });
+});
+
+describe("runAgentSession media persistence", () => {
+  // Every replayed row must pass through media resolution, otherwise stored
+  // references and expired legacy URLs would reach the model download unchanged.
+  it("resolves stored history content before building model messages", async () => {
+    queueRun([], structuredOutput([{ text: "ok", assetFileName: "" }]));
+    const storedContent = [
+      { type: "media_ref", media: { bucket: "whatsapp-media", path: "ws-1/a.bin" } },
+    ];
+    mockListAgentMessages.mockResolvedValue([
+      { role: "user", content: storedContent, provider_options: null },
+    ]);
+
+    await runAgentSession(baseInput);
+
+    expect(mockResolveHistoryMedia).toHaveBeenCalledWith(storedContent);
+  });
+
+  // Signed URLs expire (~1h) and replayed history is re-downloaded on every run,
+  // so the user turn must persist the stable reference, not the signed URL.
+  it("persists media_ref parts and still passes the fresh URL to the model", async () => {
+    queueRun([], structuredOutput([{ text: "Thanks for the photo", assetFileName: "" }]));
+    const signedUrl = "https://storage.example/signed?X-Amz-Signature=fresh";
+
+    await runAgentSession({
+      ...baseInput,
+      userMediaParts: [
+        {
+          url: signedUrl,
+          storageRef: { bucket: "whatsapp-media", path: "ws-1/chat-1/msg-1/photo.bin" },
+        },
+      ],
+    });
+
+    const persistedUserRow = mockInsertAgentMessages.mock.calls
+      .flatMap((call) => call[0] as Array<{ role: string; content: unknown }>)
+      .find((row) => row.role === "user");
+    expect(persistedUserRow?.content).toEqual([
+      { type: "text", text: "What is the weather?" },
+      {
+        type: "media_ref",
+        media: { bucket: "whatsapp-media", path: "ws-1/chat-1/msg-1/photo.bin" },
+      },
+    ]);
+    expect(JSON.stringify(persistedUserRow?.content)).not.toContain(signedUrl);
+
+    const modelMessages = aiState.generateCalls[0]?.messages as Array<{
+      role: string;
+      content: unknown;
+    }>;
+    const userMessage = modelMessages[modelMessages.length - 1];
+    expect(userMessage?.content).toEqual([
+      { type: "text", text: "What is the weather?" },
+      { type: "image", image: signedUrl, mediaType: "image/jpeg" },
+    ]);
+  });
+
+  // Thumbnail-only attachments have no stored object; their data URL is
+  // self-contained and persists as a regular image part.
+  it("persists data URL media without a storage reference as image_url", async () => {
+    queueRun([], structuredOutput([{ text: "Got it", assetFileName: "" }]));
+
+    await runAgentSession({
+      ...baseInput,
+      userMediaParts: [{ url: "data:image/jpeg;base64,AAAA" }],
+    });
+
+    const persistedUserRow = mockInsertAgentMessages.mock.calls
+      .flatMap((call) => call[0] as Array<{ role: string; content: unknown }>)
+      .find((row) => row.role === "user");
+    expect(persistedUserRow?.content).toEqual([
+      { type: "text", text: "What is the weather?" },
+      { type: "image_url", image_url: { url: "data:image/jpeg;base64,AAAA" } },
+    ]);
   });
 });

@@ -1,7 +1,7 @@
 import { runAgentSession } from "../agent/agent.js";
 import {
   INBOUND_AI_MAX_MEDIA_PARTS,
-  buildInboundUserMediaWireParts,
+  buildInboundUserMediaParts,
   isInboundImageMimeType,
 } from "../lib/inbound-media-to-model-parts.js";
 import {
@@ -176,7 +176,7 @@ export async function executeInboundDebouncedAiRun(input: InboundDebouncedRunInp
     imageDescriptors.length > 0
       ? await resolveInboundMediaSigned(input.workspaceId, imageDescriptors)
       : [];
-  const imageParts = buildInboundUserMediaWireParts(resolvedMedia);
+  const imageParts = buildInboundUserMediaParts(resolvedMedia);
   const userMediaParts = imageParts.slice(0, INBOUND_AI_MAX_MEDIA_PARTS);
 
   const hasRenderableMedia = mediaDescriptors.length > 0;

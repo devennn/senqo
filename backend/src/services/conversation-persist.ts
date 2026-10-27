@@ -1,6 +1,12 @@
 import { asStorableAgentMessageContent } from "../agent/messages.js";
 import { isInboundImageMimeType } from "../lib/inbound-media-to-model-parts.js";
-import type { StoredUserImageUrlPart, StoredUserTextPart } from "../types/agent-multimodal.js";
+import type {
+  StoredMediaRef,
+  StoredUserImageUrlPart,
+  StoredUserMediaRefPart,
+  StoredUserMultimodalPart,
+  StoredUserTextPart,
+} from "../types/agent-multimodal.js";
 import { insertAgentMessages } from "../repositories/agent-messages.js";
 import {
   createAgentSession,
@@ -108,27 +114,29 @@ export async function persistHumanOutboundMediaToAgentSession(input: {
   mimeType: string;
   mediaKind: "file" | "image" | "audio";
   caption: string;
+  /** Stored copy in `whatsapp-media`; persisted as a stable reference instead of an expiring URL. */
+  storagePath?: string;
   sourceUrl: string;
   source: string;
 }): Promise<ConversationAgentMirrorPersistResult> {
   const sourceUrl = input.sourceUrl.trim();
+  const storagePath = input.storagePath?.trim() ?? "";
+  const storageRef: StoredMediaRef | null = storagePath
+    ? { bucket: "whatsapp-media", path: storagePath }
+    : null;
   const useVisionMultimodalOutbound =
     input.mediaKind === "image" &&
     isInboundImageMimeType(input.mimeType) &&
-    sourceUrl.length > 0;
+    (storageRef !== null || sourceUrl.length > 0);
 
   if (useVisionMultimodalOutbound) {
     const textBody = humanOutboundMediaDescription(input);
     const textBlock = `${OPERATOR_SENT_PREFIX}\n${textBody}`;
     const textPart: StoredUserTextPart = { type: "text", text: textBlock };
-    const imagePart: StoredUserImageUrlPart = {
-      type: "image_url",
-      image_url: { url: sourceUrl },
-    };
-    const multimodalContent: Array<StoredUserTextPart | StoredUserImageUrlPart> = [
-      textPart,
-      imagePart,
-    ];
+    const mediaPart: StoredUserImageUrlPart | StoredUserMediaRefPart = storageRef
+      ? { type: "media_ref", media: storageRef }
+      : { type: "image_url", image_url: { url: sourceUrl } };
+    const multimodalContent: StoredUserMultimodalPart[] = [textPart, mediaPart];
     return ensureSessionAndInsertAgentMessage({
       workspaceId: input.workspaceId,
       conversationId: input.conversationId,

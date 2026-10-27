@@ -24,9 +24,12 @@ import { normalizeStoredContentForModelMessage } from "../lib/agent-multimodal-n
 import { BUILTIN_AGENT_TOOL_KEYS } from "../lib/builtin-agent-tool-keys.js";
 import { THREAD_EVENT_HANDOFF_TO_HUMAN } from "../lib/conversation-thread-events.js";
 import type {
+  InboundUserMediaPart,
   StoredUserImageUrlPart,
+  StoredUserMultimodalPart,
   StoredUserTextPart,
 } from "../types/agent-multimodal.js";
+import { resolveHistoryMediaForModel } from "./history-media.js";
 import {
   insertAgentMessages,
   listAgentMessages,
@@ -125,11 +128,13 @@ export async function runAgentSession(
       input.workspaceId,
       sessionId,
     )).filter((row) => !isAgentRunLogProviderOptions(row.provider_options));
-    const rawHistory = historicalRows.map((row) =>
-      toModelMessageFromRow({
-        role: row.role,
-        content: row.content,
-      }),
+    const rawHistory = await Promise.all(
+      historicalRows.map(async (row) =>
+        toModelMessageFromRow({
+          role: row.role,
+          content: await resolveHistoryMediaForModel(row.content),
+        }),
+      ),
     );
     historyMessages = sanitizeAgentHistory(rawHistory);
     if (historyMessages.length < rawHistory.length) {
@@ -155,19 +160,34 @@ export async function runAgentSession(
   const inboundMessageContent = input.messageTimestamp
     ? `Incoming message timestamp: ${input.messageTimestamp}${formatLocalTimestampSuffix(input.messageTimestamp, workspaceTimeZone)}\n\n${input.message}`
     : input.message;
-  const mediaParts = input.userMediaParts ?? [];
+  const mediaParts: InboundUserMediaPart[] = input.userMediaParts ?? [];
   const textPart: StoredUserTextPart = {
     type: "text",
     text: inboundMessageContent,
   };
-  const userContentForDb: Array<StoredUserTextPart | StoredUserImageUrlPart> =
-    mediaParts.length > 0 ? [textPart, ...mediaParts] : [textPart];
+  // Persist stable storage references instead of the expiring signed URLs; the
+  // URL is only used for this run's model call and is re-minted on every replay.
+  const userContentForDb: StoredUserMultimodalPart[] = [
+    textPart,
+    ...mediaParts.map(
+      (part): StoredUserMultimodalPart =>
+        part.storageRef
+          ? { type: "media_ref", media: part.storageRef }
+          : { type: "image_url", image_url: { url: part.url } },
+    ),
+  ];
+  const userMediaPartsForModel: StoredUserImageUrlPart[] = mediaParts.map(
+    (part): StoredUserImageUrlPart => ({
+      type: "image_url",
+      image_url: { url: part.url },
+    }),
+  );
 
   const userMessageForModel = {
     role: "user" as const,
     content: normalizeStoredContentForModelMessage({
       role: "user",
-      content: userContentForDb,
+      content: [textPart, ...userMediaPartsForModel],
     }),
   } as ModelMessage;
 
