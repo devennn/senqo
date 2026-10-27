@@ -1,5 +1,5 @@
 import type { ModelMessage } from "ai";
-import type { StoredUserImageUrlPart } from "./agent-multimodal.js";
+import type { InboundUserMediaPart } from "./agent-multimodal.js";
 import type { AgentOutboundMessage } from "../agent/agent-output-schema.js";
 
 export type RunAgentInput = {
@@ -21,10 +21,12 @@ export type RunAgentInput = {
   /** Optional reason used for operator logs when inference is intentionally skipped. */
   skipInferenceReason?: string;
   /**
-   * Optional image parts (OpenAI-style `image_url`), appended after `message` text in order:
-   * text first, then each image. Persisted to `agent_messages` as stored; normalized for the model at inference.
+   * Optional image attachments, appended after `message` text in order:
+   * text first, then each image. The freshly signed `url` is used for this run's
+   * model call; `storageRef` (when present) is persisted to `agent_messages`
+   * instead of the expiring URL and re-signed on every later replay.
    */
-  userMediaParts?: StoredUserImageUrlPart[];
+  userMediaParts?: InboundUserMediaPart[];
   /**
    * Optional prior messages for dry-run / eval replay. When set, skips DB history load
    * and uses these messages as the conversation prefix before the inbound user turn.

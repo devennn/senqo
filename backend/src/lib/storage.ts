@@ -25,7 +25,8 @@ function client(): S3Client {
   });
 }
 
-const bucket = process.env.S3_BUCKET ?? "senqo-wa";
+const DEFAULT_BUCKET = "senqo-wa";
+const bucket = process.env.S3_BUCKET ?? DEFAULT_BUCKET;
 
 function s3Key(bucketName: string, key: string): string {
   return `${bucketName}/${key}`;
@@ -106,4 +107,51 @@ export async function storageCreateSignedUrl(
     console.error(`[storage/signedUrl] Error: ${String(err)}`);
     return null;
   }
+}
+
+/**
+ * Recovers the storage namespace and key from a path-style URL this module
+ * signed. Legacy agent transcripts stored signed URLs instead of storage
+ * references; replay re-signs them through this parser, so only path-style URLs
+ * for the configured endpoint are recognized — anything else returns null.
+ */
+export function storageParseSignedUrlKey(
+  signedUrl: string,
+): { bucketName: string; key: string } | null {
+  const endpoint = process.env.S3_ENDPOINT;
+  if (!endpoint) return null;
+
+  let url: URL;
+  let endpointUrl: URL;
+  try {
+    url = new URL(signedUrl);
+    endpointUrl = new URL(endpoint);
+  } catch {
+    return null;
+  }
+  if (!url.searchParams.has("X-Amz-Signature")) return null;
+  if (url.origin !== endpointUrl.origin) return null;
+
+  const prefix = endpointUrl.pathname.replace(/\/+$/, "");
+  if (prefix && !url.pathname.startsWith(`${prefix}/`)) return null;
+  const path = prefix ? url.pathname.slice(prefix.length) : url.pathname;
+
+  const segments = path
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    });
+
+  const expectedBucket = process.env.S3_BUCKET ?? DEFAULT_BUCKET;
+  if (segments[0] !== expectedBucket) return null;
+  const bucketName = segments[1];
+  const key = segments.slice(2).join("/");
+  if (!bucketName || !key) return null;
+
+  return { bucketName, key };
 }

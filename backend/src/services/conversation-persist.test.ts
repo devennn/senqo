@@ -15,9 +15,8 @@ vi.mock("../repositories/agent-messages.js", () => ({
   insertAgentMessages: mockInsertAgentMessages,
 }));
 
-const { persistHumanOutboundTextToAgentSession } = await import(
-  "./conversation-persist.js"
-);
+const { persistHumanOutboundTextToAgentSession, persistHumanOutboundMediaToAgentSession } =
+  await import("./conversation-persist.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -115,5 +114,111 @@ describe("persistHumanOutboundTextToAgentSession wa_message_id regression", () =
     if (!result.ok) {
       expect(result.error).toContain("Failed to insert agent message");
     }
+  });
+});
+
+describe("persistHumanOutboundMediaToAgentSession vision mirrors", () => {
+  // Operator images stored by the webhook carry their storage path; the mirror
+  // must persist the stable reference so replay can re-sign a fresh URL instead
+  // of reusing the expiring one that used to be embedded in the transcript.
+  it("persists a media_ref part when a storage copy exists", async () => {
+    const result = await persistHumanOutboundMediaToAgentSession({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      chatId: "60123456789@s.whatsapp.net",
+      whatsappMessageId: "wa-media-1",
+      whatsappConnectionId: "conn-1",
+      fileName: "IMG.bin",
+      mimeType: "image/jpeg",
+      mediaKind: "image",
+      caption: "",
+      storagePath: "ws-1/chat-1/msg-1/IMG.bin",
+      sourceUrl: "https://signed.example/expiring-url",
+      source: "whatsapp_outgoing_webhook",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(mockInsertAgentMessages).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          workspaceId: "ws-1",
+          sessionId: "conv-1",
+          role: "assistant",
+          content: [
+            { type: "text", text: "[Operator sent via WhatsApp]\nIMG.bin" },
+            {
+              type: "media_ref",
+              media: { bucket: "whatsapp-media", path: "ws-1/chat-1/msg-1/IMG.bin" },
+            },
+          ],
+        }),
+      ],
+      { ignoreDuplicates: true },
+    );
+  });
+
+  // Callers without a stored copy (scheduled-task attachments) still need the
+  // vision part; the URL they pass is persisted as before.
+  it("falls back to an image_url part when no storage path exists", async () => {
+    await persistHumanOutboundMediaToAgentSession({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      chatId: "chat-1",
+      whatsappMessageId: "wa-media-2",
+      whatsappConnectionId: "conn-1",
+      fileName: "chart.png",
+      mimeType: "image/png",
+      mediaKind: "image",
+      caption: "",
+      sourceUrl: "https://app.example.com/api/tasks/file.png",
+      source: "task_execute_manual",
+    });
+
+    expect(mockInsertAgentMessages).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          content: [
+            { type: "text", text: "[Operator sent via WhatsApp]\nchart.png" },
+            {
+              type: "image_url",
+              image_url: { url: "https://app.example.com/api/tasks/file.png" },
+            },
+          ],
+        }),
+      ],
+      { ignoreDuplicates: true },
+    );
+  });
+
+  // Non-image attachments keep the text-only fallback (no vision part).
+  it("persists a text description for non-image media", async () => {
+    await persistHumanOutboundMediaToAgentSession({
+      workspaceId: "ws-1",
+      conversationId: "conv-1",
+      chatId: "chat-1",
+      whatsappMessageId: "wa-media-3",
+      whatsappConnectionId: "conn-1",
+      fileName: "report.pdf",
+      mimeType: "application/pdf",
+      mediaKind: "file",
+      caption: "Here you go",
+      storagePath: "ws-1/chat-1/msg-3/report.pdf",
+      sourceUrl: "",
+      source: "manual_conversation_media_send",
+    });
+
+    expect(mockInsertAgentMessages).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          content: [
+            {
+              type: "text",
+              text: "[Operator sent via WhatsApp]\nHere you go\nreport.pdf",
+            },
+          ],
+        }),
+      ],
+      { ignoreDuplicates: true },
+    );
   });
 });

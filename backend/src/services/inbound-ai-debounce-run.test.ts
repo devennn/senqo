@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockRunAgentSession = vi.fn();
+const mockResolveInboundMediaSigned = vi.fn();
 const mockGetConversationHandlingMode = vi.fn();
 const mockListConversationMessagesBareForAi = vi.fn();
 const mockGetContactIsTestForConversation = vi.fn();
@@ -39,7 +40,7 @@ vi.mock("../repositories/agent-messages.js", () => ({
 }));
 
 vi.mock("../lib/inbound-media-resolve.js", () => ({
-  resolveInboundMediaSigned: vi.fn(),
+  resolveInboundMediaSigned: mockResolveInboundMediaSigned,
 }));
 
 vi.mock("./handoff-notify.js", () => ({
@@ -224,6 +225,60 @@ describe("executeInboundDebouncedAiRun", () => {
       null,
     );
     expect(mockScheduleHandoffNotify).not.toHaveBeenCalled();
+  });
+
+  // Image attachments must carry their storage reference alongside the fresh
+  // URL, so the persisted transcript can re-sign instead of storing a URL that
+  // expires and fails every later replay.
+  it("passes storage references alongside fresh URLs for image media", async () => {
+    mockGetWhatsappConnectionModeForInboundAi.mockResolvedValue("dry_run");
+    mockListConversationMessagesBareForAi.mockResolvedValue([
+      {
+        role: "user",
+        content: "[imageMessage]",
+        created_at: "2026-06-11T10:00:00.000Z",
+        metadata: {
+          messageType: "imageMessage",
+          media: {
+            path: "ws-1/chat-1/msg-1/photo.bin",
+            mimeType: "image/jpeg",
+            fileName: "photo.bin",
+          },
+        },
+      },
+    ]);
+    mockResolveInboundMediaSigned.mockResolvedValue([
+      {
+        url: "https://storage.example/signed?X-Amz-Signature=fresh",
+        mimeType: "image/jpeg",
+        fileName: "photo.bin",
+        storageBucket: "whatsapp-media",
+        storagePath: "ws-1/chat-1/msg-1/photo.bin",
+      },
+    ]);
+
+    const result = await executeInboundDebouncedAiRun(baseInput);
+
+    expect(result.ok).toBe(true);
+    expect(mockResolveInboundMediaSigned).toHaveBeenCalledWith("ws-1", [
+      expect.objectContaining({
+        storagePath: "ws-1/chat-1/msg-1/photo.bin",
+        mimeType: "image/jpeg",
+      }),
+    ]);
+    expect(mockRunAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userMediaParts: [
+          {
+            url: "https://storage.example/signed?X-Amz-Signature=fresh",
+            storageRef: {
+              bucket: "whatsapp-media",
+              path: "ws-1/chat-1/msg-1/photo.bin",
+            },
+          },
+        ],
+      }),
+    );
   });
 
   // A voice note the AI cannot process during a dry run must annotate a

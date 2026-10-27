@@ -29,14 +29,11 @@ import {
   getConnectionById,
   markConnectionDisconnected,
 } from "../repositories/whatsapp.js";
-import {
-  getConversationHandlingMode,
-  signWhatsappMediaPathForInboundAi,
-} from "../repositories/conversations.js";
+import { getConversationHandlingMode } from "../repositories/conversations.js";
 import { getContactIsTestForConversation } from "../repositories/contacts.js";
 import {
   INBOUND_AI_MAX_MEDIA_PARTS,
-  buildInboundUserMediaWireParts,
+  buildInboundUserMediaParts,
   isInboundImageMimeType,
   parseInboundMediaFromMetadata,
 } from "../lib/inbound-media-to-model-parts.js";
@@ -63,7 +60,7 @@ import type {
 import type { ResolveConnectionResult } from "../types/api-whatsapp-send.js";
 
 type ContactInfoPayload = NonNullable<Extract<WhatsappMessageEvent, { type: "message.inbound" }>["contactInfo"]>;
-import type { StoredUserImageUrlPart } from "../types/agent-multimodal.js";
+import type { InboundUserMediaPart } from "../types/agent-multimodal.js";
 import type { WhatsappConnectionMode, WhatsappContactInfoInput } from "../types/repositories.js";
 
 const app = new Hono();
@@ -567,17 +564,8 @@ async function handleIncomingMessageReceived(
           : `${webhookMessageId || "attachment"}.bin`;
       const caption = typeof media.caption === "string" ? media.caption : "";
 
-      let sourceUrl = "";
-      if (storagePath.length > 0) {
-        const signed = await signWhatsappMediaPathForInboundAi(
-          input.connection.workspace_id,
-          storagePath,
-        );
-        sourceUrl = signed?.trim() ?? "";
-      }
-      if (!sourceUrl && typeof media.sourceUrl === "string") {
-        sourceUrl = media.sourceUrl.trim();
-      }
+      const sourceUrl =
+        typeof media.sourceUrl === "string" ? media.sourceUrl.trim() : "";
 
       const mediaKind = mediaKindForOutgoingWebhook(messageType, mimeType);
       const mirroredMedia = await persistHumanOutboundMediaToAgentSession({
@@ -590,6 +578,8 @@ async function handleIncomingMessageReceived(
         mimeType,
         mediaKind,
         caption,
+        // Prefer the stable storage reference; the CDN URL expires within days.
+        storagePath: storagePath.length > 0 ? storagePath : undefined,
         sourceUrl,
         source: "whatsapp_outgoing_webhook",
       });
@@ -642,7 +632,7 @@ async function handleIncomingMessageReceived(
         `[${scope}] Contact not enqueued to job queue because ${skipReason}; persisting inbound to agent session conversationId=${conversationId}`,
       );
       let webhookSkipMessage = content;
-      let webhookSkipUserMedia: StoredUserImageUrlPart[] | undefined;
+      let webhookSkipUserMedia: InboundUserMediaPart[] | undefined;
       const parsedInboundMedia = parseInboundMediaFromMetadata(metadata);
       if (parsedInboundMedia) {
         const imageDescriptors = isInboundImageMimeType(parsedInboundMedia.mimeType)
@@ -655,7 +645,7 @@ async function handleIncomingMessageReceived(
                 imageDescriptors,
               )
             : [];
-        const imageWireParts = buildInboundUserMediaWireParts(resolved).slice(
+        const imageWireParts = buildInboundUserMediaParts(resolved).slice(
           0,
           INBOUND_AI_MAX_MEDIA_PARTS,
         );

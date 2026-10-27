@@ -20,7 +20,13 @@ export async function resolveInboundMediaSigned(
       url = raw.thumbnailDataUrl;
     }
     if (!url) continue;
-    resolvedList.push({ url, mimeType: raw.mimeType, fileName: raw.fileName });
+    resolvedList.push({
+      url,
+      mimeType: raw.mimeType,
+      fileName: raw.fileName,
+      storageBucket: raw.storagePath ? "whatsapp-media" : null,
+      storagePath: raw.storagePath,
+    });
   }
   return resolvedList;
 }

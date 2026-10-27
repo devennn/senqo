@@ -1,4 +1,7 @@
-import type { StoredUserImageUrlPart } from "../types/agent-multimodal.js";
+import type {
+  InboundUserMediaPart,
+  MediaStorageBucket,
+} from "../types/agent-multimodal.js";
 
 /** Max image parts attached to one inbound AI run (cost + context). */
 export const INBOUND_AI_MAX_MEDIA_PARTS = 5;
@@ -71,14 +74,27 @@ export type ResolvedInboundMedia = {
   url: string;
   mimeType: string;
   fileName: string | null;
+  /** Present when `url` is a signed URL for a stored object; absent for data-URL thumbnails. */
+  storageBucket?: MediaStorageBucket | null;
+  storagePath?: string | null;
 };
 
-/** Build OpenAI-style `image_url` parts from signed URLs / thumbnails (text is added upstream). */
-export function buildInboundUserMediaWireParts(resolved: ResolvedInboundMedia[]): StoredUserImageUrlPart[] {
-  const parts: StoredUserImageUrlPart[] = [];
+/**
+ * Builds inbound attachment parts from signed URLs / thumbnails (text is added
+ * upstream). Storage-backed media keeps its coordinates so the transcript can
+ * re-sign a fresh URL instead of persisting the expiring one.
+ */
+export function buildInboundUserMediaParts(
+  resolved: ResolvedInboundMedia[],
+): InboundUserMediaPart[] {
+  const parts: InboundUserMediaPart[] = [];
   for (const r of resolved) {
     if (!isInboundImageMimeType(r.mimeType)) continue;
-    parts.push({ type: "image_url", image_url: { url: r.url } });
+    const storageRef =
+      r.storageBucket && r.storagePath
+        ? { bucket: r.storageBucket, path: r.storagePath }
+        : undefined;
+    parts.push(storageRef ? { url: r.url, storageRef } : { url: r.url });
   }
   return parts;
 }
