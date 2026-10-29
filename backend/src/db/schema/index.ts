@@ -1088,3 +1088,20 @@ export const evalRuns = pgTable(
     index("idx_eval_runs_workspace_ran").on(t.workspaceId, t.ranAt.desc()),
   ],
 );
+
+export const adminChatMessages = pgTable(
+  "admin_chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** user | assistant */
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("idx_admin_chat_messages_user_created").on(t.userId, t.createdAt.asc())],
+);

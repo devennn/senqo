@@ -126,3 +126,28 @@ export async function sendAdminRegistrationInvite(
 export async function cancelAdminRegistrationInvite(id: string): Promise<void> {
   await adminRequest(`/api/admin/registration-invites/${id}`, { method: "DELETE" });
 }
+
+export type AdminAiChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
+export async function fetchAdminAiMessages(): Promise<AdminAiChatMessage[]> {
+  const data = await adminRequest<{ messages: AdminAiChatMessage[] }>(
+    "/api/admin/ai/messages",
+  );
+  return data.messages;
+}
+
+export async function sendAdminAiChat(message: string): Promise<{ reply: string }> {
+  return adminRequest<{ reply: string }>("/api/admin/ai/chat", {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
+export async function clearAdminAiMessages(): Promise<void> {
+  await adminRequest("/api/admin/ai/messages", { method: "DELETE" });
+}

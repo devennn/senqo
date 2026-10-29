@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { InstanceAdminRegistrationSection } from "@/pages/admin/components/instance-admin-registration-section";
 import { InstanceAdminWorkspacesSection } from "@/pages/admin/components/instance-admin-workspaces-section";
 import { InstanceAdminUsersSection } from "@/pages/admin/components/instance-admin-users-section";
+import { InstanceAdminAiChatSection } from "@/pages/admin/components/instance-admin-ai-chat";
 
 export default function InstanceAdminPage() {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ export default function InstanceAdminPage() {
       </div>
 
       <div className="space-y-8">
+        <InstanceAdminAiChatSection />
         <InstanceAdminRegistrationSection />
         <InstanceAdminWorkspacesSection />
         <InstanceAdminUsersSection currentUserId={user.id} />

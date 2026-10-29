@@ -16,6 +16,7 @@ import publicTasksRoute from "./routes/public-tasks.js";
 import healthRoute from "./routes/health.js";
 import authRoute from "./routes/auth.js";
 import adminRoute from "./routes/admin.js";
+import adminAiRoute from "./routes/admin-ai.js";
 import { env } from "./lib/env.js";
 import { bodyLimit } from "hono/body-limit";
 import { HTTP_POST_MAX_BYTES } from "./lib/http-post-max-bytes.js";
@@ -112,6 +113,7 @@ app.route("/api/tasks", publicTasksRoute);
 app.route("/api/health", healthRoute);
 app.route("/api/auth", authRoute);
 app.route("/api/admin", adminRoute);
+app.route("/api/admin/ai", adminAiRoute);
 
 app.onError((err, c) => {
   console.error("[GlobalError]", err);

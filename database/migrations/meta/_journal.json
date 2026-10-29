@@ -204,6 +204,13 @@
       "when": 1780540924827,
       "tag": "0028_agent_evals_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1780540924828,
+      "tag": "0029_admin_chat_messages",
+      "breakpoints": true
     }
   ]
 }
