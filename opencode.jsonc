@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // Use OpenRouter for this repo. API key is read from .secrets/openrouter.key (gitignored).
+  "providers": {
+    "openrouter": {
+      "settings": {
+        "apiKey": "{file:.secrets/openrouter.key}"
+      }
+    }
+  }
+  // Pick a model with /models in the TUI, or set one here, e.g.:
+  // "model": "openrouter/openai/gpt-4o-mini"
+}

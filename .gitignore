@@ -54,3 +54,9 @@ next-env.d.ts
 .claude/settings.local.json
 # Local security-study artifact (contains exploitation details) — never commit.
 senqo-security-report.zip
+
+# Local OpenCode project config (may contain personal preferences)
+# opencode.jsonc
+
+# Local secrets
+.secrets/
