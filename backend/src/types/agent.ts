@@ -123,6 +123,8 @@ export type AgentSystemPromptInput = {
   }>;
   workspaceContext: string;
   responseTemplates: string;
+  /** Ready-made interactive button messages the agent can send by id. */
+  buttonTemplates: string;
   handoffTopics: string;
   conversationLabels: string;
   assetGroups: AgentAssetInstructionGroup[];

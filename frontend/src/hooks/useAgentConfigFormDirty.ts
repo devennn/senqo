@@ -8,6 +8,7 @@ import {
 } from "react";
 import type {
   AgentConfigRecord,
+  WorkspaceButtonTemplateGroupSummary,
   WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
@@ -18,6 +19,7 @@ import type {
 import type { AgentConfigConnectionOption, AgentConfigFormSectionDirtyState } from "@/types/ui";
 import {
   agentAutoAssignSectionDirty,
+  agentButtonTemplateGroupsDirty,
   agentConfigFormSnapshotsEqual,
   agentConnectionSectionDirty,
   agentAssetGroupsDirty,
@@ -38,6 +40,7 @@ type Args = {
   availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+  buttonTemplateGroups: WorkspaceButtonTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
@@ -50,6 +53,7 @@ const emptySections: AgentConfigFormSectionDirtyState = {
   workspaceContext: false,
   assetGroups: false,
   responseTemplates: false,
+  buttonTemplates: false,
   handoffTopics: false,
   tools: false,
   skills: false,
@@ -62,6 +66,7 @@ export function useAgentConfigFormDirty({
   availableTools,
   availableSkills,
   responseTemplateGroups,
+  buttonTemplateGroups,
   workspaceContextGroups,
   workspaceAssetGroups,
   handoffTopicGroups,
@@ -83,6 +88,7 @@ export function useAgentConfigFormDirty({
         availableTools,
         availableSkills,
         responseTemplateGroups,
+        buttonTemplateGroups,
         workspaceContextGroups,
         workspaceAssetGroups,
         handoffTopicGroups,
@@ -93,6 +99,7 @@ export function useAgentConfigFormDirty({
       availableTools,
       availableSkills,
       responseTemplateGroups,
+      buttonTemplateGroups,
       workspaceContextGroups,
       workspaceAssetGroups,
       handoffTopicGroups,
@@ -116,6 +123,7 @@ export function useAgentConfigFormDirty({
       workspaceContext: agentWorkspaceContextGroupsDirty(baseline, current),
       assetGroups: agentAssetGroupsDirty(baseline, current),
       responseTemplates: agentResponseTemplateGroupsDirty(baseline, current),
+      buttonTemplates: agentButtonTemplateGroupsDirty(baseline, current),
       handoffTopics: agentHandoffTopicGroupsDirty(baseline, current),
       tools: agentToolsDirty(baseline, current),
       skills: agentSkillsDirty(baseline, current),

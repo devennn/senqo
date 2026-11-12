@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-export type KnowledgeTab = "context" | "templates" | "handoff" | "assets";
+export type KnowledgeTab = "context" | "templates" | "buttons" | "handoff" | "assets";
 
 type Props = {
   value: KnowledgeTab;
@@ -20,6 +20,12 @@ export function KnowledgeTabBar({ value, onChange }: Props) {
         label="Response templates"
         selected={value === "templates"}
         onClick={() => onChange("templates")}
+      />
+      <TabButton
+        id="buttons"
+        label="Button templates"
+        selected={value === "buttons"}
+        onClick={() => onChange("buttons")}
       />
       <TabButton
         id="handoff"

@@ -10,11 +10,13 @@ import {
 import { KnowledgeImportDocsButton } from "@/pages/dashboard/components/knowledge-import-docs-button";
 import { ContextGroupsPanel } from "@/pages/dashboard/components/context-groups-panel";
 import { ResponseTemplatesPanel } from "@/pages/dashboard/components/response-templates-panel";
+import { ButtonTemplatesPanel } from "@/pages/dashboard/components/button-templates-panel";
 import { HandoffTopicGroupsPanel } from "@/pages/dashboard/components/handoff-topic-groups-panel";
 import { AssetGroupsPanel } from "@/pages/dashboard/components/asset-groups-panel";
 
 function parseKnowledgeTab(tabParam: string | null): KnowledgeTab {
   if (tabParam === "templates") return "templates";
+  if (tabParam === "buttons") return "buttons";
   if (tabParam === "handoff") return "handoff";
   if (tabParam === "assets") return "assets";
   return "context";
@@ -36,6 +38,11 @@ export default function KnowledgePage() {
       p.delete("template");
       p.delete("templateGroupId");
       p.delete("templateEntryId");
+    }
+    if (next !== "buttons") {
+      p.delete("button");
+      p.delete("buttonGroupId");
+      p.delete("buttonEntryId");
     }
     if (next !== "handoff") {
       p.delete("handoffGroupId");
@@ -69,9 +76,9 @@ export default function KnowledgePage() {
                   <h1 className="text-2xl font-extrabold tracking-tight">Knowledge</h1>
                   <InlineHelpHint label="About knowledge">
                     <p>
-                      Workspace facts, reply templates, handoff topics, and files the agent can send or read
-                      live. Attach groups to an agent on Agent → Profile (Attached knowledge / Capability).
-                      Knowledge groups older than 90 days show a may-be-outdated hint.
+                      Workspace facts, reply templates, button templates, handoff topics, and files the agent
+                      can send or read live. Attach groups to an agent on Agent → Profile (Attached knowledge /
+                      Capability). Knowledge groups older than 90 days show a may-be-outdated hint.
                     </p>
                   </InlineHelpHint>
                 </div>
@@ -91,6 +98,15 @@ export default function KnowledgePage() {
               <div className="mt-6">
                 <ResponseTemplatesPanel
                   groups={data.responseTemplateGroups}
+                  agents={data.agents}
+                  reload={reload}
+                  agentId={undefined}
+                />
+              </div>
+            ) : tab === "buttons" ? (
+              <div className="mt-6">
+                <ButtonTemplatesPanel
+                  groups={data.buttonTemplateGroups}
                   agents={data.agents}
                   reload={reload}
                   agentId={undefined}

@@ -192,6 +192,30 @@ export async function sendMediaByUrl(
   });
 }
 
+export type WhatsappButtonType = "quick_reply" | "cta_url" | "cta_call" | "cta_copy";
+
+export type WhatsappButton = {
+  type: WhatsappButtonType;
+  label: string;
+  value: string;
+};
+
+export async function sendButtonsMessage(
+  connectionId: string,
+  payload: { chatId: string; text: string; footer?: string; buttons: WhatsappButton[] },
+): Promise<{ messageId: string }> {
+  const res = await svcFetch<{ messageId: string }>(
+    `/sessions/${encodeURIComponent(connectionId)}/send-buttons`,
+    jsonInit("POST", {
+      chatId: payload.chatId,
+      text: payload.text,
+      footer: payload.footer,
+      buttons: payload.buttons,
+    }),
+  );
+  return { messageId: res.messageId ?? "" };
+}
+
 export async function sendTyping(
   connectionId: string,
   payload: { chatId: string; durationMs?: number; typingType?: "recording" },

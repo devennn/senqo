@@ -94,12 +94,21 @@ function isSupportedIncomingMessageType(type: string): boolean {
     "textMessage",
     "extendedTextMessage",
     "quotedMessage",
+    "interactiveResponseMessage",
     "imageMessage",
     "documentMessage",
     "videoMessage",
     "audioMessage",
   ].includes(type);
 }
+
+/** Text-only inbound types that skip the media payload requirement. */
+const TEXT_LIKE_INCOMING_TYPES = [
+  "textMessage",
+  "extendedTextMessage",
+  "quotedMessage",
+  "interactiveResponseMessage",
+];
 
 function toRecord(payload: unknown): Record<string, unknown> {
   return typeof payload === "object" && payload !== null
@@ -443,14 +452,17 @@ async function handleIncomingMessageReceived(
     const quotedMetadata = buildWhatsappQuotedMetadata(event.quoted);
     if (quotedMetadata) metadata.quoted = quotedMetadata;
   }
+  if (messageType === "interactiveResponseMessage" && event.interactiveResponse) {
+    metadata.interactiveResponse = {
+      name: event.interactiveResponse.name ?? "",
+      id: event.interactiveResponse.id ?? "",
+      paramsJson: event.interactiveResponse.paramsJson ?? "",
+    };
+  }
 
   let content = event.text?.trim() ?? "";
 
-  if (
-    !["textMessage", "extendedTextMessage", "quotedMessage"].includes(
-      messageType,
-    )
-  ) {
+  if (!TEXT_LIKE_INCOMING_TYPES.includes(messageType)) {
     if (!fileData?.base64 && !fileData?.downloadUrl)
       return Response.json({
         received: true,

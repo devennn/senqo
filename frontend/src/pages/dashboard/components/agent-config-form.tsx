@@ -18,6 +18,7 @@ export function AgentConfigForm({
   availableTools,
   availableSkills,
   responseTemplateGroups,
+  buttonTemplateGroups,
   workspaceContextGroups,
   workspaceAssetGroups,
   handoffTopicGroups,
@@ -33,6 +34,7 @@ export function AgentConfigForm({
     availableTools,
     availableSkills,
     responseTemplateGroups,
+    buttonTemplateGroups,
     workspaceContextGroups,
     workspaceAssetGroups,
     handoffTopicGroups,
@@ -52,6 +54,7 @@ export function AgentConfigForm({
         tools: fd.getAll("tools").map(String),
         skills: fd.getAll("skills").map(String),
         responseTemplateGroups: fd.getAll("responseTemplateGroups").map(String),
+        buttonTemplateGroups: fd.getAll("buttonTemplateGroups").map(String),
         contextGroups: fd.getAll("contextGroups").map(String),
         assetGroups: fd.getAll("assetGroups").map(String),
         handoffTopicGroups: fd.getAll("handoffTopicGroups").map(String),
@@ -114,6 +117,7 @@ export function AgentConfigForm({
             availableTools={availableTools}
             availableSkills={availableSkills}
             responseTemplateGroups={responseTemplateGroups}
+            buttonTemplateGroups={buttonTemplateGroups}
             workspaceContextGroups={workspaceContextGroups}
             workspaceAssetGroups={workspaceAssetGroups}
             handoffTopicGroups={handoffTopicGroups}

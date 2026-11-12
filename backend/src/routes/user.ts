@@ -63,6 +63,21 @@ import {
   validateResponseTemplateGroupIdsForWorkspace,
 } from "../repositories/response-templates.js";
 import {
+  listWorkspaceButtonTemplateGroupSummaries,
+  getWorkspaceButtonTemplateGroupDetail,
+  createWorkspaceButtonTemplateGroup,
+  updateWorkspaceButtonTemplateGroupName,
+  addWorkspaceButtonTemplateEntry,
+  updateWorkspaceButtonTemplateEntry,
+  deleteWorkspaceButtonTemplateEntry,
+  deleteWorkspaceButtonTemplateGroup,
+  validateButtonTemplateGroupIdsForWorkspace,
+  BUTTON_TEMPLATE_GROUP_NAME_MAX_LEN,
+  BUTTON_TEMPLATE_TITLE_MAX_LEN,
+  BUTTON_TEMPLATE_BODY_MAX_LEN,
+  BUTTON_TEMPLATE_BUTTONS_MAX,
+} from "../repositories/button-templates.js";
+import {
   listWorkspaceHandoffTopicGroupSummaries,
   getWorkspaceHandoffTopicGroupDetail,
   createWorkspaceHandoffTopicGroup,
@@ -414,6 +429,7 @@ app.get("/agents", async (c) => {
     agents,
     connections,
     responseTemplateGroups,
+    buttonTemplateGroups,
     handoffTopicGroups,
     workspaceContextGroups,
     workspaceAssetGroups,
@@ -421,6 +437,7 @@ app.get("/agents", async (c) => {
     listAgentConfigs(workspaceId),
     listConnections(workspaceId),
     listWorkspaceResponseTemplateGroupSummaries(workspaceId),
+    listWorkspaceButtonTemplateGroupSummaries(workspaceId),
     listWorkspaceHandoffTopicGroupSummaries(workspaceId),
     listWorkspaceContextGroupSummaries(workspaceId),
     listWorkspaceAssetGroupSummaries(workspaceId),
@@ -433,6 +450,7 @@ app.get("/agents", async (c) => {
     agents,
     agentIdsWithConnection: [...agentIdsWithConnection],
     responseTemplateGroups,
+    buttonTemplateGroups,
     handoffTopicGroups,
     workspaceContextGroups,
     workspaceAssetGroups,
@@ -459,6 +477,7 @@ const updateAgentSchema = z.object({
   attachedConnectionIds: z.array(z.string().uuid()).optional(),
   autoAssignConversationLabels: z.boolean().optional().default(true),
   responseTemplateGroups: z.array(z.string().uuid()).max(40).optional(),
+  buttonTemplateGroups: z.array(z.string().uuid()).max(40).optional(),
   handoffTopicGroups: z.array(z.string().uuid()).max(40).optional(),
   contextGroups: z.array(z.string().uuid()).max(40).optional(),
   assetGroups: z.array(z.string().uuid()).max(40).optional(),
@@ -502,6 +521,21 @@ app.put("/agents/:id", async (c) => {
       );
     }
     responseTemplateGroups = validated.normalized;
+  }
+
+  let buttonTemplateGroups = existing.button_template_groups;
+  if (body.data.buttonTemplateGroups !== undefined) {
+    const validated = await validateButtonTemplateGroupIdsForWorkspace(
+      workspaceId,
+      body.data.buttonTemplateGroups,
+    );
+    if (!validated.ok) {
+      return c.json(
+        { error: "invalid_button_templates", message: validated.message },
+        400,
+      );
+    }
+    buttonTemplateGroups = validated.normalized;
   }
 
   let handoffTopicGroups = existing.handoff_topic_groups;
@@ -574,6 +608,7 @@ app.put("/agents/:id", async (c) => {
     skills: normalizedSkills,
     auto_assign_conversation_labels: body.data.autoAssignConversationLabels,
     response_template_groups: responseTemplateGroups,
+    button_template_groups: buttonTemplateGroups,
     handoff_topic_groups: handoffTopicGroups,
     context_groups: contextGroups,
     asset_groups: assetGroups,
@@ -872,6 +907,148 @@ app.delete("/response-template-groups/:id", async (c) => {
     workspaceId,
     groupId,
   );
+  if (!outcome.ok)
+    return c.json({ error: "delete_failed", message: outcome.message }, 400);
+  return c.json({ ok: true });
+});
+
+const workspaceButtonTemplateEntryBodySchema = z
+  .object({
+    title: z.string().max(BUTTON_TEMPLATE_TITLE_MAX_LEN + 20),
+    body: z.string().max(BUTTON_TEMPLATE_BODY_MAX_LEN + 20),
+    buttons: z
+      .array(
+        z
+          .object({
+            type: z.enum(["quick_reply", "cta_url", "cta_call", "cta_copy"]),
+            label: z.string().max(60),
+            value: z.string().max(1100),
+          })
+          .strict(),
+      )
+      .max(BUTTON_TEMPLATE_BUTTONS_MAX),
+  })
+  .strict();
+
+const patchButtonTemplateGroupNameSchema = z
+  .object({ name: z.string().max(BUTTON_TEMPLATE_GROUP_NAME_MAX_LEN + 10) })
+  .strict();
+
+app.get("/button-template-groups", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groups = await listWorkspaceButtonTemplateGroupSummaries(workspaceId);
+  return c.json({ groups });
+});
+
+app.get("/button-template-groups/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const group = await getWorkspaceButtonTemplateGroupDetail(workspaceId, groupId);
+  if (!group) return c.json({ error: "not_found" }, 404);
+  return c.json({ group });
+});
+
+app.patch("/button-template-groups/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const parsed = patchButtonTemplateGroupNameSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "Invalid payload" }, 400);
+
+  const outcome = await updateWorkspaceButtonTemplateGroupName({
+    workspaceId,
+    groupId,
+    name: parsed.data.name,
+  });
+
+  if (!outcome.ok) {
+    return c.json({ error: "update_failed", message: outcome.message }, 400);
+  }
+  return c.json({ ok: true });
+});
+
+app.post("/button-template-groups/:id/entries", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const parsed = workspaceButtonTemplateEntryBodySchema.safeParse(
+    await c.req.json(),
+  );
+  if (!parsed.success) return c.json({ error: "Invalid payload" }, 400);
+
+  const outcome = await addWorkspaceButtonTemplateEntry({
+    workspaceId,
+    groupId,
+    title: parsed.data.title,
+    body: parsed.data.body,
+    buttons: parsed.data.buttons,
+  });
+
+  if (!outcome.ok)
+    return c.json({ error: "create_failed", message: outcome.message }, 400);
+  return c.json({ entry: outcome.entry });
+});
+
+app.patch("/button-template-groups/:id/entries/:entryId", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const entryId = c.req.param("entryId");
+  const parsed = workspaceButtonTemplateEntryBodySchema.safeParse(
+    await c.req.json(),
+  );
+  if (!parsed.success) return c.json({ error: "Invalid payload" }, 400);
+
+  const outcome = await updateWorkspaceButtonTemplateEntry({
+    workspaceId,
+    groupId,
+    entryId,
+    title: parsed.data.title,
+    body: parsed.data.body,
+    buttons: parsed.data.buttons,
+  });
+
+  if (!outcome.ok)
+    return c.json({ error: "update_failed", message: outcome.message }, 400);
+  return c.json({ ok: true });
+});
+
+app.delete("/button-template-groups/:id/entries/:entryId", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const entryId = c.req.param("entryId");
+  const outcome = await deleteWorkspaceButtonTemplateEntry({
+    workspaceId,
+    groupId,
+    entryId,
+  });
+  if (!outcome.ok)
+    return c.json({ error: "delete_failed", message: outcome.message }, 400);
+  return c.json({ ok: true });
+});
+
+const createButtonTemplateGroupSchema = z
+  .object({ name: z.string().max(BUTTON_TEMPLATE_GROUP_NAME_MAX_LEN + 10) })
+  .strict();
+
+app.post("/button-template-groups", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const parsed = createButtonTemplateGroupSchema.safeParse(await c.req.json());
+  if (!parsed.success) return c.json({ error: "Invalid payload" }, 400);
+  const name = parsed.data.name.trim();
+  if (name.length === 0)
+    return c.json(
+      { error: "name_required", message: "Group name is required." },
+      400,
+    );
+
+  const result = await createWorkspaceButtonTemplateGroup(workspaceId, name);
+  if (!result.ok)
+    return c.json({ error: "create_failed", message: result.message }, 400);
+  return c.json({ id: result.id });
+});
+
+app.delete("/button-template-groups/:id", async (c) => {
+  const workspaceId = c.get("workspaceId");
+  const groupId = c.req.param("id");
+  const outcome = await deleteWorkspaceButtonTemplateGroup(workspaceId, groupId);
   if (!outcome.ok)
     return c.json({ error: "delete_failed", message: outcome.message }, 400);
   return c.json({ ok: true });

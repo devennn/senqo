@@ -58,6 +58,7 @@ const baseInput = {
   }>,
   workspaceContext: "We sell widgets.",
   responseTemplates: "Q: Returns? A: 30 days.",
+  buttonTemplates: "",
   handoffTopics: "Billing, Complaints",
   conversationLabels: "VIP, New Lead",
   assetGroups: [],

@@ -11,6 +11,61 @@ import {
   startSession,
   stopAll,
 } from "./session-manager.js";
+import type { SessionButton, SessionButtonType } from "./baileys-session.js";
+
+const BUTTON_TYPES: readonly SessionButtonType[] = [
+  "quick_reply",
+  "cta_url",
+  "cta_call",
+  "cta_copy",
+];
+
+type ButtonsPayload = {
+  chatId?: unknown;
+  text?: unknown;
+  footer?: unknown;
+  buttons?: unknown;
+};
+
+function validateButtonsPayload(
+  body: ButtonsPayload,
+): { ok: true; chatId: string; text: string; buttons: SessionButton[] } | { ok: false; message: string } {
+  if (typeof body.chatId !== "string" || body.chatId.trim().length === 0) {
+    return { ok: false, message: "chatId is required" };
+  }
+  if (typeof body.text !== "string" || body.text.trim().length === 0) {
+    return { ok: false, message: "text is required" };
+  }
+  if (!Array.isArray(body.buttons) || body.buttons.length < 1 || body.buttons.length > 3) {
+    return { ok: false, message: "1 to 3 buttons are required" };
+  }
+
+  const buttons: SessionButton[] = [];
+  for (const raw of body.buttons) {
+    const item = raw as { type?: unknown; label?: unknown; value?: unknown };
+    if (
+      typeof item?.type !== "string" ||
+      typeof item?.label !== "string" ||
+      typeof item?.value !== "string"
+    ) {
+      return { ok: false, message: "each button needs type, label and value" };
+    }
+    if (!(BUTTON_TYPES as readonly string[]).includes(item.type)) {
+      return { ok: false, message: `unsupported button type: ${item.type}` };
+    }
+    const label = item.label.trim();
+    const value = item.value.trim();
+    if (label.length === 0 || value.length === 0) {
+      return { ok: false, message: "each button needs a label and a value" };
+    }
+    if (item.type === "cta_url" && !/^https?:\/\//i.test(value)) {
+      return { ok: false, message: "cta_url buttons need an http(s) link" };
+    }
+    buttons.push({ type: item.type as SessionButtonType, label, value });
+  }
+
+  return { ok: true, chatId: body.chatId.trim(), text: body.text.trim(), buttons };
+}
 
 const app = new Hono();
 
@@ -120,6 +175,31 @@ app.post("/sessions/:id/send-media", async (c) => {
     return c.json({ messageId });
   } catch (error) {
     logger.error({ id, error: String(error) }, "send-media failed");
+    return c.json({ error: String(error) }, 502);
+  }
+});
+
+app.post("/sessions/:id/send-buttons", async (c) => {
+  const id = c.req.param("id");
+  const session = get(id);
+  if (!session) return c.json({ error: "session not found" }, 404);
+  const body = (await c.req.json().catch(() => ({}))) as ButtonsPayload;
+  const validation = validateButtonsPayload(body);
+  if (!validation.ok) return c.json({ error: validation.message }, 400);
+  try {
+    const footer =
+      typeof body.footer === "string" && body.footer.trim().length > 0
+        ? body.footer.trim()
+        : undefined;
+    const messageId = await session.sendButtons({
+      chatId: validation.chatId,
+      text: validation.text,
+      ...(footer ? { footer } : {}),
+      buttons: validation.buttons,
+    });
+    return c.json({ messageId });
+  } catch (error) {
+    logger.error({ id, error: String(error) }, "send-buttons failed");
     return c.json({ error: String(error) }, 502);
   }
 });

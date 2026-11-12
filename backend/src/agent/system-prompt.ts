@@ -108,6 +108,7 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
   const linkedDocsText = formatLinkedDocs(input.linkedDocs ?? []);
   const workspaceContext = input.workspaceContext.trim();
   const responseTemplates = input.responseTemplates.trim();
+  const buttonTemplates = input.buttonTemplates.trim();
   const handoffTopics = input.handoffTopics.trim();
   const conversationLabels = input.conversationLabels.trim();
   const assetsSection = formatAgentAssets(input.assetGroups);
@@ -142,6 +143,7 @@ export function buildAgentSystemPrompt(input: AgentSystemPromptInput): string {
 ## Tool Usage Rules
 - ${whatsappRule}
 - When sending a listed asset helps, put it on a \`messages\` item: exact \`assetFileName\` plus \`text\` as caption or companion copy. For text-only bubbles set \`assetFileName\` to an empty string.
+- When one of the Button templates below fits the customer's moment (a choice, confirmation, or quick action), set that \`messages\` item's \`buttonsTemplateId\` to its exact id and copy the template's Message text into \`text\`. The runtime sends the template exactly as authored (message text plus buttons). Only use ids from the list; otherwise set \`buttonsTemplateId\` to an empty string.
 - Use \`create_task\` when a follow-up should happen in the future (one-time or recurring), for example reminders, re-engagement, check-ins, or scheduled outreach. Include a clear task prompt and valid schedule fields.
 - Use \`load_skills\` when workspace skill content is needed beyond embedded context and templates.
 - Use \`handoff_to_human\` when configured handoff topics match or human judgment is required. When you hand off, set \`handoff_enabled\` to true, prefer empty \`messages\` (or one short courtesy bubble), and do not continue normal resolution.
@@ -169,6 +171,9 @@ ${workspaceContext}
 
 ### Response templates
 ${responseTemplates}
+
+### Button templates
+${buttonTemplates}
 
 ### Handoff Guidance
 ${handoffTopics}

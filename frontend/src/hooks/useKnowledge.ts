@@ -4,6 +4,7 @@ import { useWorkspace } from "@/context/workspace";
 import type {
   AgentConfigRecord,
   WorkspaceAssetGroupSummary,
+  WorkspaceButtonTemplateGroupSummary,
   WorkspaceContextGroupSummary,
   WorkspaceHandoffTopicGroupSummary,
   WorkspaceResponseTemplateGroupSummary,
@@ -12,6 +13,7 @@ import type {
 export type KnowledgePageData = {
   agents: AgentConfigRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+  buttonTemplateGroups: WorkspaceButtonTemplateGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
@@ -21,6 +23,7 @@ function normalizeAgent(a: AgentConfigRecord): AgentConfigRecord {
   return {
     ...a,
     response_template_groups: Array.isArray(a.response_template_groups) ? [...a.response_template_groups] : [],
+    button_template_groups: Array.isArray(a.button_template_groups) ? [...a.button_template_groups] : [],
     handoff_topic_groups: Array.isArray(a.handoff_topic_groups) ? [...a.handoff_topic_groups] : [],
     context_groups: Array.isArray(a.context_groups) ? [...a.context_groups] : [],
     asset_groups: Array.isArray(a.asset_groups) ? [...a.asset_groups] : [],
@@ -36,6 +39,7 @@ export function useKnowledge() {
   const [data, setData] = useState<KnowledgePageData>({
     agents: [],
     responseTemplateGroups: [],
+    buttonTemplateGroups: [],
     handoffTopicGroups: [],
     workspaceContextGroups: [],
     workspaceAssetGroups: [],
@@ -50,6 +54,7 @@ export function useKnowledge() {
         const res = await api.get<{
           agents: AgentConfigRecord[];
           responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+          buttonTemplateGroups?: WorkspaceButtonTemplateGroupSummary[];
           handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
           workspaceContextGroups?: WorkspaceContextGroupSummary[];
           workspaceAssetGroups?: WorkspaceAssetGroupSummary[];
@@ -57,6 +62,7 @@ export function useKnowledge() {
         setData({
           agents: res.agents.map(normalizeAgent),
           responseTemplateGroups: res.responseTemplateGroups ?? [],
+          buttonTemplateGroups: res.buttonTemplateGroups ?? [],
           handoffTopicGroups: res.handoffTopicGroups ?? [],
           workspaceContextGroups: res.workspaceContextGroups ?? [],
           workspaceAssetGroups: res.workspaceAssetGroups ?? [],

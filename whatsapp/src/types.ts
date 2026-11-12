@@ -56,10 +56,21 @@ export type BackendMessageType =
   | "textMessage"
   | "extendedTextMessage"
   | "quotedMessage"
+  | "interactiveResponseMessage"
   | "imageMessage"
   | "videoMessage"
   | "audioMessage"
   | "documentMessage";
+
+/** Raw payload when a customer taps an interactive button (native flow or legacy). */
+export type InteractiveResponsePayload = {
+  /** Button name (e.g. quick_reply) or legacy source (buttons/list/template). */
+  name?: string;
+  /** Raw params JSON as sent by WhatsApp, when present. */
+  paramsJson?: string;
+  /** Selected button/row id, when present. */
+  id?: string;
+};
 
 type MessageFields = {
   connectionId: string;
@@ -79,6 +90,7 @@ type MessageFields = {
   caption?: string;
   jpegThumbnail?: string;
   quoted?: QuotedMessage;
+  interactiveResponse?: InteractiveResponsePayload;
   timestamp: number;
   isGroup: boolean;
   group?: GroupInfo;

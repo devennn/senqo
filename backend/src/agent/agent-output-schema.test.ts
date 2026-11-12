@@ -3,7 +3,7 @@ import { agentOutputObjectSchema, agentOutputSchema } from "./agent-output-schem
 
 function baseFields(overrides: Record<string, unknown> = {}) {
   return {
-    messages: [{ text: "Hi", assetFileName: "" }],
+    messages: [{ text: "Hi", assetFileName: "", buttonsTemplateId: "" }],
     reasoning_for_operators: "Greeting",
     knowledge_used: false,
     sources: [],
@@ -17,9 +17,9 @@ describe("agentOutputSchema", () => {
   it("accepts handoff_enabled false with one to three messages", () => {
     const parsed = agentOutputSchema.safeParse({
       messages: [
-        { text: "Hi", assetFileName: "" },
-        { text: "We can help", assetFileName: "" },
-        { text: "Anytime", assetFileName: "" },
+        { text: "Hi", assetFileName: "", buttonsTemplateId: "" },
+        { text: "We can help", assetFileName: "", buttonsTemplateId: "" },
+        { text: "Anytime", assetFileName: "", buttonsTemplateId: "" },
       ],
       reasoning_for_operators: "Greeting",
       knowledge_used: false,
@@ -44,7 +44,7 @@ describe("agentOutputSchema", () => {
   // Optional courtesy bubble while handing off without citing knowledge.
   it("accepts handoff_enabled true with a single courtesy message", () => {
     const parsed = agentOutputSchema.safeParse({
-      messages: [{ text: "A teammate will help you shortly.", assetFileName: "" }],
+      messages: [{ text: "A teammate will help you shortly.", assetFileName: "", buttonsTemplateId: "" }],
       reasoning_for_operators: "Courtesy after handoff",
       knowledge_used: false,
       sources: [],
@@ -57,7 +57,7 @@ describe("agentOutputSchema", () => {
   it("accepts assetFileName string including empty for text-only", () => {
     const withAsset = agentOutputSchema.safeParse(
       baseFields({
-        messages: [{ text: "Menu", assetFileName: "menu.pdf" }],
+        messages: [{ text: "Menu", assetFileName: "menu.pdf", buttonsTemplateId: "" }],
         reasoning_for_operators: "",
       }),
     );
@@ -80,7 +80,7 @@ describe("agentOutputSchema", () => {
   // handoff_enabled is required on every structured result.
   it("rejects missing handoff_enabled", () => {
     const parsed = agentOutputSchema.safeParse({
-      messages: [{ text: "Hi", assetFileName: "" }],
+      messages: [{ text: "Hi", assetFileName: "", buttonsTemplateId: "" }],
       reasoning_for_operators: "",
       knowledge_used: false,
       sources: [],
@@ -91,7 +91,7 @@ describe("agentOutputSchema", () => {
   // knowledge_used is required on every structured result.
   it("rejects missing knowledge_used", () => {
     const parsed = agentOutputSchema.safeParse({
-      messages: [{ text: "Hi", assetFileName: "" }],
+      messages: [{ text: "Hi", assetFileName: "", buttonsTemplateId: "" }],
       reasoning_for_operators: "",
       sources: [],
       handoff_enabled: false,
@@ -102,7 +102,7 @@ describe("agentOutputSchema", () => {
   // Azure structured output requires sources on every result.
   it("rejects missing sources", () => {
     const parsed = agentOutputSchema.safeParse({
-      messages: [{ text: "Hi", assetFileName: "" }],
+      messages: [{ text: "Hi", assetFileName: "", buttonsTemplateId: "" }],
       reasoning_for_operators: "",
       knowledge_used: false,
       handoff_enabled: false,
@@ -173,10 +173,10 @@ describe("agentOutputSchema", () => {
     const parsed = agentOutputSchema.safeParse(
       baseFields({
         messages: [
-          { text: "1", assetFileName: "" },
-          { text: "2", assetFileName: "" },
-          { text: "3", assetFileName: "" },
-          { text: "4", assetFileName: "" },
+          { text: "1", assetFileName: "", buttonsTemplateId: "" },
+          { text: "2", assetFileName: "", buttonsTemplateId: "" },
+          { text: "3", assetFileName: "", buttonsTemplateId: "" },
+          { text: "4", assetFileName: "", buttonsTemplateId: "" },
         ],
         reasoning_for_operators: "",
       }),
@@ -188,7 +188,7 @@ describe("agentOutputSchema", () => {
   it("rejects message items without text", () => {
     const parsed = agentOutputSchema.safeParse(
       baseFields({
-        messages: [{ text: "", assetFileName: "a.pdf" }],
+        messages: [{ text: "", assetFileName: "a.pdf", buttonsTemplateId: "" }],
         reasoning_for_operators: "",
       }),
     );

@@ -16,6 +16,7 @@ import {
 } from "@/lib/conversation-operator-ai-reasoning";
 import { asConversationThreadEventType, AGENT_ERROR_SUMMARY } from "@/lib/conversation-thread-events";
 import { MessageMedia } from "@/pages/dashboard/components/message-media";
+import { ConversationMessageButtons } from "@/pages/dashboard/components/conversation-message-buttons";
 import { ConversationOperatorAiReasoning } from "@/pages/dashboard/components/conversation-operator-ai-reasoning";
 import { ConversationThreadEvent } from "@/pages/dashboard/components/conversation-thread-event";
 import { formatConversationMessageTime } from "@/lib/format-conversation-message-time";
@@ -219,6 +220,9 @@ export function ConversationMessageItem({
               {message.media && <MessageMedia media={message.media} />}
               {showContent ? (
                 <p className="whitespace-pre-wrap break-words">{message.content}</p>
+              ) : null}
+              {metadata?.buttons ? (
+                <ConversationMessageButtons buttons={metadata.buttons} />
               ) : null}
               {messageTimeLabel ? (
                 <div className="mt-1 flex justify-end">

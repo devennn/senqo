@@ -38,6 +38,13 @@ const messageFields = {
   caption: z.string().optional(),
   jpegThumbnail: z.string().optional(),
   quoted: quotedMessageSchema.optional(),
+  interactiveResponse: z
+    .object({
+      name: z.string().optional(),
+      paramsJson: z.string().optional(),
+      id: z.string().optional(),
+    })
+    .optional(),
   timestamp: z.number(),
 };
 

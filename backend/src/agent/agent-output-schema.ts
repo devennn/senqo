@@ -34,6 +34,11 @@ export const agentOutboundMessageSchema = z.object({
     .describe(
       "Exact filename from the agent Assets list when attaching that file. Use an empty string for text-only bubbles.",
     ),
+  buttonsTemplateId: z
+    .string()
+    .describe(
+      "Exact id from the Button templates list when this bubble should carry interactive buttons; the runtime sends the template's buttons with `text` as the lead-in. Use an empty string for plain bubbles.",
+    ),
 });
 
 /** Plain object fields (Azure JSON Schema). Cross-field rules live on `agentOutputSchema`. */

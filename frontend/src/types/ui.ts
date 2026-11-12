@@ -1,5 +1,6 @@
 import type {
   AgentConfigRecord,
+  WorkspaceButtonTemplateGroupSummary,
   WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
@@ -25,6 +26,7 @@ export type AgentConfigFormNormalizedSnapshot = {
   tools: readonly string[];
   skills: readonly string[];
   responseTemplateGroups: readonly string[];
+  buttonTemplateGroups: readonly string[];
   workspaceContextGroups: readonly string[];
   assetGroups: readonly string[];
   handoffTopicGroups: readonly string[];
@@ -70,6 +72,7 @@ export type AgentConfigFormProps = {
   availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+  buttonTemplateGroups: WorkspaceButtonTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
@@ -91,6 +94,7 @@ export type AgentConfigFormSectionDirtyState = {
   workspaceContext: boolean;
   assetGroups: boolean;
   responseTemplates: boolean;
+  buttonTemplates: boolean;
   handoffTopics: boolean;
   tools: boolean;
   skills: boolean;
@@ -115,16 +119,19 @@ export type AgentConfigKnowledgeCapabilityFieldsProps = {
   availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+  buttonTemplateGroups: WorkspaceButtonTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   selectedTools: Set<string>;
   selectedSkills: Set<string>;
   selectedResponseTemplateGroups: Set<string>;
+  selectedButtonTemplateGroups: Set<string>;
   selectedContextGroups: Set<string>;
   selectedAssetGroups: Set<string>;
   selectedHandoffTopicGroups: Set<string>;
   templatesTabHref: string;
+  buttonsTabHref: string;
   contextTabHref: string;
   assetsTabHref: string;
   handoffTabHref: string;
@@ -132,6 +139,7 @@ export type AgentConfigKnowledgeCapabilityFieldsProps = {
   workspaceContextDirty: boolean;
   assetGroupsDirty: boolean;
   responseTemplatesDirty: boolean;
+  buttonTemplatesDirty: boolean;
   handoffTopicsDirty: boolean;
   toolsDirty: boolean;
   skillsDirty: boolean;
@@ -154,6 +162,12 @@ export type AgentResponseTemplateGroupsFieldsProps = {
   groups: WorkspaceResponseTemplateGroupSummary[];
   selectedIds: Set<string>;
   templatesTabHref: string;
+} & AgentConfigSubsectionInlineSaveProps;
+
+export type AgentButtonTemplateGroupsFieldsProps = {
+  groups: WorkspaceButtonTemplateGroupSummary[];
+  selectedIds: Set<string>;
+  buttonsTabHref: string;
 } & AgentConfigSubsectionInlineSaveProps;
 
 export type AgentHandoffTopicGroupsFieldsProps = {

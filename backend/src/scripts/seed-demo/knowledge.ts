@@ -352,6 +352,7 @@ export async function seedConnectionsAndKnowledge(params: {
       skills: spec.skills.filter((key) => skillKeys.has(key)),
       auto_assign_conversation_labels: true,
       response_template_groups: templateIds,
+      button_template_groups: [],
       handoff_topic_groups: handoffIds,
       context_groups: contextIds,
       asset_groups: assetIds,

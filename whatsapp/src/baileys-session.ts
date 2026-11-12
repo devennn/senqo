@@ -4,6 +4,7 @@ import makeWASocket, {
   Browsers,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  generateWAMessageFromContent,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
   type Contact,
@@ -51,6 +52,51 @@ async function getVersion(): Promise<[number, number, number] | undefined> {
 
 const GROUP_META_TTL_MS = 5 * 60 * 1000;
 const SELF_SENT_TTL_MS = 5 * 60 * 1000;
+
+export type SessionButtonType = "quick_reply" | "cta_url" | "cta_call" | "cta_copy";
+
+export type SessionButton = {
+  type: SessionButtonType;
+  label: string;
+  value: string;
+};
+
+/** Per-type `buttonParamsJson` schemas understood by WhatsApp clients. */
+function buildButtonParamsJson(button: SessionButton): string {
+  switch (button.type) {
+    case "quick_reply":
+      return JSON.stringify({ display_text: button.label, id: button.value });
+    case "cta_url":
+      return JSON.stringify({ display_text: button.label, url: button.value });
+    case "cta_call":
+      return JSON.stringify({
+        display_text: button.label,
+        phone_number: button.value,
+      });
+    case "cta_copy":
+      return JSON.stringify({ display_text: button.label, copy_code: button.value });
+  }
+}
+
+function buildInteractiveButtonContent(args: {
+  text: string;
+  footer?: string;
+  buttons: SessionButton[];
+}): WAMessageContent {
+  return {
+    interactiveMessage: {
+      body: { text: args.text },
+      ...(args.footer ? { footer: { text: args.footer } } : {}),
+      nativeFlowMessage: {
+        buttons: args.buttons.map((button) => ({
+          name: button.type,
+          buttonParamsJson: buildButtonParamsJson(button),
+        })),
+        messageVersion: 3,
+      },
+    },
+  };
+}
 
 /** A single WhatsApp connection: its socket, auth state, caches, and event wiring. */
 export class BaileysSession {
@@ -408,6 +454,56 @@ export class BaileysSession {
     }
     const res = await this.requireSock().sendMessage(jid, content);
     const id = res?.key?.id ?? "";
+    this.rememberSelfSent(id);
+    return id;
+  }
+
+  /**
+   * Send an interactive message with native-flow buttons. Baileys 7.0.0-rc14
+   * has no typed send API for these, so the `interactiveMessage` content is
+   * built at the proto level and relayed directly. Callers validate the button
+   * list (1-3 items, type-specific values) before reaching this method.
+   */
+  async sendButtons(args: {
+    chatId: string;
+    text: string;
+    footer?: string;
+    buttons: SessionButton[];
+  }): Promise<string> {
+    const jid = toSendableJid(args.chatId);
+    const sock = this.requireSock();
+    const selfJid = sock.user?.id;
+    if (!selfJid) throw new Error("session is not authorized");
+
+    const msg = generateWAMessageFromContent(
+      jid,
+      buildInteractiveButtonContent({
+        text: args.text,
+        footer: args.footer,
+        buttons: args.buttons,
+      }),
+      { userJid: selfJid },
+    );
+    const id = msg.key?.id ?? "";
+    // Required for WhatsApp clients to render native-flow buttons. Do not add a
+    // `bot` node or wrap the payload in `documentWithCaptionMessage`: both were
+    // tested against the live client and prevent delivery entirely.
+    await sock.relayMessage(jid, msg.message ?? {}, {
+      messageId: id,
+      additionalNodes: [
+        {
+          tag: "biz",
+          attrs: {},
+          content: [
+            {
+              tag: "interactive",
+              attrs: { type: "native_flow", v: "1" },
+              content: [{ tag: "native_flow", attrs: { v: "9", name: "mixed" } }],
+            },
+          ],
+        },
+      ],
+    });
     this.rememberSelfSent(id);
     return id;
   }

@@ -73,6 +73,7 @@ describe("AgentWorkspaceContextGroupsFields", () => {
       availableTools: [],
       availableSkills: [],
       responseTemplateGroups: [],
+      buttonTemplateGroups: [],
       workspaceContextGroups: [],
       workspaceAssetGroups: [],
       handoffTopicGroups: [],

@@ -1,5 +1,6 @@
 import type {
   AgentConfigRecord,
+  WorkspaceButtonTemplateGroupSummary,
   WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
@@ -59,6 +60,13 @@ export function agentResponseTemplateGroupsDirty(
   return !stringArraysEqual(current.responseTemplateGroups, baseline.responseTemplateGroups);
 }
 
+export function agentButtonTemplateGroupsDirty(
+  baseline: AgentConfigFormNormalizedSnapshot,
+  current: AgentConfigFormNormalizedSnapshot,
+): boolean {
+  return !stringArraysEqual(current.buttonTemplateGroups, baseline.buttonTemplateGroups);
+}
+
 export function agentAssetGroupsDirty(
   baseline: AgentConfigFormNormalizedSnapshot,
   current: AgentConfigFormNormalizedSnapshot,
@@ -100,6 +108,7 @@ export function buildAgentConfigFormBaseline(input: {
   availableTools: WorkspaceCustomToolListItem[];
   availableSkills: WorkspaceSkillDefinitionRecord[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+  buttonTemplateGroups: WorkspaceButtonTemplateGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
@@ -107,6 +116,7 @@ export function buildAgentConfigFormBaseline(input: {
   const configurableToolKeys = new Set(input.availableTools.map((t) => t.tool_key));
   const skillKeys = new Set(input.availableSkills.map((s) => s.skill_key));
   const templateGroupIds = new Set(input.responseTemplateGroups.map((g) => g.id));
+  const buttonTemplateGroupIds = new Set(input.buttonTemplateGroups.map((g) => g.id));
   const contextGroupIds = new Set(input.workspaceContextGroups.map((g) => g.id));
   const assetGroupIds = new Set(input.workspaceAssetGroups.map((g) => g.id));
   const handoffGroupIds = new Set(input.handoffTopicGroups.map((g) => g.id));
@@ -124,6 +134,9 @@ export function buildAgentConfigFormBaseline(input: {
   const groupsSorted = sortedCopy(
     (input.agent.response_template_groups ?? []).filter((id) => templateGroupIds.has(id)),
   );
+  const buttonGroupsSorted = sortedCopy(
+    (input.agent.button_template_groups ?? []).filter((id) => buttonTemplateGroupIds.has(id)),
+  );
   const contextSorted = sortedCopy(
     (input.agent.context_groups ?? []).filter((id) => contextGroupIds.has(id)),
   );
@@ -139,6 +152,7 @@ export function buildAgentConfigFormBaseline(input: {
     tools: toolsSorted,
     skills: skillsSorted,
     responseTemplateGroups: groupsSorted,
+    buttonTemplateGroups: buttonGroupsSorted,
     workspaceContextGroups: contextSorted,
     assetGroups: assetSorted,
     handoffTopicGroups: handoffSorted,
@@ -156,6 +170,7 @@ export function readAgentConfigFormSnapshot(form: HTMLFormElement): AgentConfigF
     tools: sortedCopy(fd.getAll("tools").map(String)),
     skills: sortedCopy(fd.getAll("skills").map(String)),
     responseTemplateGroups: sortedCopy(fd.getAll("responseTemplateGroups").map(String)),
+    buttonTemplateGroups: sortedCopy(fd.getAll("buttonTemplateGroups").map(String)),
     workspaceContextGroups: sortedCopy(fd.getAll("contextGroups").map(String)),
     assetGroups: sortedCopy(fd.getAll("assetGroups").map(String)),
     handoffTopicGroups: sortedCopy(fd.getAll("handoffTopicGroups").map(String)),
@@ -177,6 +192,7 @@ export function agentConfigFormSnapshotsEqual(
     stringArraysEqual(a.tools, b.tools) &&
     stringArraysEqual(a.skills, b.skills) &&
     stringArraysEqual(a.responseTemplateGroups, b.responseTemplateGroups) &&
+    stringArraysEqual(a.buttonTemplateGroups, b.buttonTemplateGroups) &&
     stringArraysEqual(a.workspaceContextGroups, b.workspaceContextGroups) &&
     stringArraysEqual(a.assetGroups, b.assetGroups) &&
     stringArraysEqual(a.handoffTopicGroups, b.handoffTopicGroups)

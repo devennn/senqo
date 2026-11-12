@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useWorkspace } from "@/context/workspace";
 import type {
   AgentConfigRecord,
+  WorkspaceButtonTemplateGroupSummary,
   WorkspaceCustomToolListItem,
   WorkspaceAssetGroupSummary,
   WorkspaceContextGroupSummary,
@@ -17,6 +18,7 @@ export type AgentPageData = {
   agents: AgentConfigRecord[];
   agentIdsWithConnection: string[];
   responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+  buttonTemplateGroups: WorkspaceButtonTemplateGroupSummary[];
   handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
   workspaceContextGroups: WorkspaceContextGroupSummary[];
   workspaceAssetGroups: WorkspaceAssetGroupSummary[];
@@ -32,6 +34,7 @@ export function useAgents() {
     agents: [],
     agentIdsWithConnection: [],
     responseTemplateGroups: [],
+    buttonTemplateGroups: [],
     handoffTopicGroups: [],
     workspaceContextGroups: [],
     workspaceAssetGroups: [],
@@ -54,6 +57,7 @@ export function useAgents() {
             agents: AgentConfigRecord[];
             agentIdsWithConnection: string[];
             responseTemplateGroups: WorkspaceResponseTemplateGroupSummary[];
+            buttonTemplateGroups?: WorkspaceButtonTemplateGroupSummary[];
             handoffTopicGroups: WorkspaceHandoffTopicGroupSummary[];
             workspaceContextGroups?: WorkspaceContextGroupSummary[];
             workspaceAssetGroups?: WorkspaceAssetGroupSummary[];
@@ -77,6 +81,9 @@ export function useAgents() {
           response_template_groups: Array.isArray(a.response_template_groups)
             ? [...a.response_template_groups]
             : [],
+          button_template_groups: Array.isArray(a.button_template_groups)
+            ? [...a.button_template_groups]
+            : [],
           handoff_topic_groups: Array.isArray(a.handoff_topic_groups)
             ? [...a.handoff_topic_groups]
             : [],
@@ -88,6 +95,7 @@ export function useAgents() {
         })),
         agentIdsWithConnection: agentsRes.agentIdsWithConnection,
         responseTemplateGroups: agentsRes.responseTemplateGroups ?? [],
+        buttonTemplateGroups: agentsRes.buttonTemplateGroups ?? [],
         handoffTopicGroups: agentsRes.handoffTopicGroups ?? [],
         workspaceContextGroups: agentsRes.workspaceContextGroups ?? [],
         workspaceAssetGroups: agentsRes.workspaceAssetGroups ?? [],
@@ -160,6 +168,7 @@ export function useAgents() {
         tools: Array.isArray(agent.tools) ? agent.tools : [],
         skills: Array.isArray(agent.skills) ? agent.skills : [],
         responseTemplateGroups: Array.isArray(agent.response_template_groups) ? agent.response_template_groups : [],
+        buttonTemplateGroups: Array.isArray(agent.button_template_groups) ? agent.button_template_groups : [],
         contextGroups: Array.isArray(agent.context_groups) ? agent.context_groups : [],
         handoffTopicGroups: Array.isArray(agent.handoff_topic_groups) ? agent.handoff_topic_groups : [],
         assetGroups: Array.isArray(agent.asset_groups) ? agent.asset_groups : [],

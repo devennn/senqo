@@ -5,8 +5,10 @@ import {
   sendMediaByUrl,
   uploadAndSendMedia,
   sendTyping,
+  sendButtonsMessage,
 } from "../services/whatsapp-client.js";
 import { getAgentConfigById } from "../repositories/agent.js";
+import { getWorkspaceButtonTemplateForSend } from "../repositories/button-templates.js";
 import {
   downloadAgentAssetBytes,
   getAgentAssetByFileNameForAgent,
@@ -46,11 +48,16 @@ export async function sendAgentWhatsappMessage(input: {
   message: string;
   agentRunId?: string;
   assetFileName?: string;
+  buttonsTemplateId?: string;
 }): Promise<{ ok: boolean; idMessage?: string; error?: string }> {
   const message = input.message.trim();
   const assetFileName = input.assetFileName?.trim() ?? "";
-  if (!message && !assetFileName) {
-    return { ok: false, error: "Message or asset file name is required." };
+  const buttonsTemplateId = input.buttonsTemplateId?.trim() ?? "";
+  if (!message && !assetFileName && !buttonsTemplateId) {
+    return {
+      ok: false,
+      error: "Message, asset file name, or button template is required.",
+    };
   }
 
   const connection = await resolveWhatsappConnectionForConversationAgentOutbound(
@@ -76,6 +83,52 @@ export async function sendAgentWhatsappMessage(input: {
   };
 
   try {
+    if (buttonsTemplateId) {
+      const agentConfig = await getAgentConfigById(input.workspaceId, input.agentConfigId);
+      const groupIds = agentConfig?.button_template_groups ?? [];
+      const template = await getWorkspaceButtonTemplateForSend(
+        input.workspaceId,
+        groupIds,
+        buttonsTemplateId,
+      );
+      if (!template) {
+        return { ok: false, error: `Button template not found: ${buttonsTemplateId}` };
+      }
+      if (assetFileName) {
+        console.warn(
+          `[${scope}/sendAgentWhatsappMessage] Failed query: both buttons and asset set; sending buttons only conversationId=${input.conversationId}`,
+        );
+      }
+
+      await notifyWhatsappTyping(connection.id, chatId, template.body);
+      const sent = await sendButtonsMessage(connection.id, {
+        chatId,
+        text: template.body,
+        buttons: template.buttons,
+      });
+
+      await createConversationMessage(
+        input.workspaceId,
+        input.conversationId,
+        "assistant",
+        template.body,
+        {
+          ...baseMeta,
+          whatsappMessageId: sent.messageId,
+          button_template_id: template.id,
+          button_template_title: template.title,
+          buttons: template.buttons,
+        },
+        "ai_agent",
+        { waMessageId: sent.messageId || null },
+      );
+
+      console.info(
+        `[${scope}/sendAgentWhatsappMessage] Success: userId=${input.workspaceId} conversationId=${input.conversationId} buttons=${template.title}`,
+      );
+      return { ok: true, idMessage: sent.messageId };
+    }
+
     if (assetFileName) {
       const agentConfig = await getAgentConfigById(input.workspaceId, input.agentConfigId);
       const groupIds = agentConfig?.asset_groups ?? [];

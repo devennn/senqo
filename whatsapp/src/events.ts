@@ -13,6 +13,7 @@ import type {
   BackendMessageType,
   GroupParticipant,
   InboundMessageEvent,
+  InteractiveResponsePayload,
   OutboundMirrorEvent,
   QuotedMessage,
   WhatsappBackendEvent,
@@ -45,7 +46,33 @@ type Extracted = {
   isMedia: boolean;
   thumbNode?: { jpegThumbnail?: Uint8Array | null };
   contextInfo?: proto.IContextInfo | null;
+  interactiveResponse?: InteractiveResponsePayload;
 };
+
+/**
+ * Quick-reply taps carry `{ id, display_text }` JSON in `paramsJson`; other
+ * button kinds vary or send nothing, so callers fall back to the button name.
+ */
+function parseInteractiveParams(paramsJson: string | null | undefined): {
+  id?: string;
+  displayText?: string;
+} {
+  if (!paramsJson) return {};
+  try {
+    const parsed = JSON.parse(paramsJson) as {
+      id?: unknown;
+      display_text?: unknown;
+    };
+    const id = typeof parsed.id === "string" ? parsed.id.trim() : undefined;
+    const displayText =
+      typeof parsed.display_text === "string"
+        ? parsed.display_text.trim()
+        : undefined;
+    return { id: id || undefined, displayText: displayText || undefined };
+  } catch {
+    return {};
+  }
+}
 
 /** Classify a Baileys content message into the backend's message-type vocabulary. */
 function classify(content: proto.IMessage): Extracted | null {
@@ -103,6 +130,60 @@ function classify(content: proto.IMessage): Extracted | null {
         isMedia: true,
         contextInfo: content.stickerMessage?.contextInfo,
       };
+    case "interactiveResponseMessage": {
+      const node = content.interactiveResponseMessage?.nativeFlowResponseMessage;
+      const { id, displayText } = parseInteractiveParams(node?.paramsJson);
+      const name = node?.name?.trim() || undefined;
+      const bodyText =
+        content.interactiveResponseMessage?.body?.text?.trim() || undefined;
+      return {
+        backendType: "interactiveResponseMessage",
+        text: displayText ?? id ?? bodyText ?? name,
+        isMedia: false,
+        contextInfo: content.interactiveResponseMessage?.contextInfo,
+        interactiveResponse: {
+          name,
+          paramsJson: node?.paramsJson ?? undefined,
+          id,
+        },
+      };
+    }
+    case "buttonsResponseMessage": {
+      const node = content.buttonsResponseMessage;
+      const id = node?.selectedButtonId?.trim() || undefined;
+      const display = node?.selectedDisplayText?.trim() || undefined;
+      return {
+        backendType: "interactiveResponseMessage",
+        text: display ?? id,
+        isMedia: false,
+        contextInfo: node?.contextInfo,
+        interactiveResponse: { name: "buttons", id },
+      };
+    }
+    case "listResponseMessage": {
+      const node = content.listResponseMessage;
+      const id = node?.singleSelectReply?.selectedRowId?.trim() || undefined;
+      const display = node?.title?.trim() || undefined;
+      return {
+        backendType: "interactiveResponseMessage",
+        text: display ?? id,
+        isMedia: false,
+        contextInfo: node?.contextInfo,
+        interactiveResponse: { name: "list", id },
+      };
+    }
+    case "templateButtonReplyMessage": {
+      const node = content.templateButtonReplyMessage;
+      const id = node?.selectedId?.trim() || undefined;
+      const display = node?.selectedDisplayText?.trim() || undefined;
+      return {
+        backendType: "interactiveResponseMessage",
+        text: display ?? id,
+        isMedia: false,
+        contextInfo: node?.contextInfo,
+        interactiveResponse: { name: "template", id },
+      };
+    }
     default:
       return null;
   }
@@ -229,6 +310,7 @@ export async function buildMessageEvent(
     mimeType: extracted.mimeType,
     fileName: extracted.fileName,
     quoted,
+    interactiveResponse: extracted.interactiveResponse,
     timestamp,
     isGroup,
   };

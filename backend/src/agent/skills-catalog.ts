@@ -8,6 +8,11 @@ import {
   type ResponseTemplateGroupForInstructions,
 } from "../repositories/response-templates.js";
 import {
+  listButtonTemplatesForInstructions,
+  type ButtonTemplateGroupForInstructions,
+} from "../repositories/button-templates.js";
+import type { ButtonTemplateButton } from "../types/repositories.js";
+import {
   listWorkspaceContextForInstructions,
   type ContextGroupForInstructions,
 } from "../repositories/workspace-context-groups.js";
@@ -95,6 +100,46 @@ function formatGroupedResponseTemplates(
   }
 
   return chunks.filter((s) => s.trim().length > 0).join("\n\n");
+}
+
+function formatButtonSpec(button: ButtonTemplateButton): string {
+  const label = `"${button.label}"`;
+  switch (button.type) {
+    case "quick_reply":
+      return `${label} (reply id=${button.value})`;
+    case "cta_url":
+      return `${label} (url=${button.value})`;
+    case "cta_call":
+      return `${label} (phone=${button.value})`;
+    case "cta_copy":
+      return `${label} (copy code=${button.value})`;
+  }
+}
+
+function formatGroupedButtonTemplates(
+  groups: ButtonTemplateGroupForInstructions[],
+): string {
+  if (groups.length === 0) return "";
+  const chunks: string[] = [
+    "Ready-made WhatsApp button messages for this agent (not loaded via a tool). To send one, set `buttonsTemplateId` on a `messages` item to its exact id and copy its Message text into `text`; the runtime sends the template exactly as authored.",
+    "---",
+  ];
+
+  for (const grp of groups) {
+    chunks.push(`#### ${grp.name}`);
+    for (const entry of grp.entries) {
+      chunks.push(
+        `- id=\`${entry.id}\` "${entry.title}"`,
+        `  Message: ${entry.body.replace(/\s+/g, " ").trim()}`,
+      );
+      if (entry.buttons.length > 0) {
+        chunks.push(`  Buttons: ${entry.buttons.map(formatButtonSpec).join(" | ")}`);
+      }
+    }
+    chunks.push("---");
+  }
+
+  return chunks.filter((s) => s.trim().length > 0).join("\n");
 }
 
 export function formatConversationLabelsInstruction(
@@ -290,6 +335,7 @@ function emptyAgentSystemPromptInput(
     linkedDocs: [],
     workspaceContext: "",
     responseTemplates: "",
+    buttonTemplates: "",
     handoffTopics: "",
     conversationLabels: "",
     assetGroups: [],
@@ -344,6 +390,13 @@ export async function buildAgentInstructionsWithCatalog(
     groupIds,
   );
   const responseTemplates = formatGroupedResponseTemplates(groupedTemplates);
+
+  const buttonGroupIds = activeConfig.button_template_groups ?? [];
+  const groupedButtonTemplates = await listButtonTemplatesForInstructions(
+    workspaceId,
+    buttonGroupIds,
+  );
+  const buttonTemplates = formatGroupedButtonTemplates(groupedButtonTemplates);
 
   const handoffGroupIds = activeConfig.handoff_topic_groups ?? [];
   const handoffGrouped = await listHandoffTopicsForInstructions(
@@ -443,6 +496,7 @@ export async function buildAgentInstructionsWithCatalog(
       linkedDocs,
       workspaceContext,
       responseTemplates,
+      buttonTemplates,
       handoffTopics,
       conversationLabels,
       assetGroups,

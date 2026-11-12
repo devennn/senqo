@@ -10,6 +10,11 @@ function parseResponseTemplateGroupIds(raw: unknown): string[] {
   return raw.map((x) => String(x)).filter(Boolean);
 }
 
+function parseButtonTemplateGroupIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((x) => String(x)).filter(Boolean);
+}
+
 function parseHandoffTopicGroupIds(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((x) => String(x)).filter(Boolean);
@@ -40,6 +45,7 @@ type AgentConfigRow = {
   firstUsedAt: Date | null;
   autoAssignConversationLabels: boolean | null;
   responseTemplateGroups: unknown;
+  buttonTemplateGroups: unknown;
   handoffTopicGroups: unknown;
   contextGroups: unknown;
   assetGroups: unknown;
@@ -60,6 +66,7 @@ function mapAgentConfigRow(row: AgentConfigRow): AgentConfigRecord {
     first_used_at: row.firstUsedAt?.toISOString() ?? null,
     auto_assign_conversation_labels: row.autoAssignConversationLabels !== false,
     response_template_groups: parseResponseTemplateGroupIds(row.responseTemplateGroups),
+    button_template_groups: parseButtonTemplateGroupIds(row.buttonTemplateGroups),
     handoff_topic_groups: parseHandoffTopicGroupIds(row.handoffTopicGroups),
     context_groups: parseContextGroupIds(row.contextGroups),
     asset_groups: parseAssetGroupIds(row.assetGroups),
@@ -81,6 +88,7 @@ export async function listAgentConfigs(workspaceId: string): Promise<AgentConfig
         firstUsedAt: agentConfigs.firstUsedAt,
         autoAssignConversationLabels: agentConfigs.autoAssignConversationLabels,
         responseTemplateGroups: agentConfigs.responseTemplateGroups,
+        buttonTemplateGroups: agentConfigs.buttonTemplateGroups,
         handoffTopicGroups: agentConfigs.handoffTopicGroups,
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
@@ -120,6 +128,7 @@ export async function getAgentConfigById(
         firstUsedAt: agentConfigs.firstUsedAt,
         autoAssignConversationLabels: agentConfigs.autoAssignConversationLabels,
         responseTemplateGroups: agentConfigs.responseTemplateGroups,
+        buttonTemplateGroups: agentConfigs.buttonTemplateGroups,
         handoffTopicGroups: agentConfigs.handoffTopicGroups,
         contextGroups: agentConfigs.contextGroups,
         assetGroups: agentConfigs.assetGroups,
@@ -179,6 +188,7 @@ export async function updateAgentConfig(payload: {
   skills: string[];
   auto_assign_conversation_labels: boolean;
   response_template_groups: string[];
+  button_template_groups: string[];
   handoff_topic_groups: string[];
   context_groups: string[];
   asset_groups: string[];
@@ -194,6 +204,7 @@ export async function updateAgentConfig(payload: {
         skills: payload.skills,
         autoAssignConversationLabels: payload.auto_assign_conversation_labels,
         responseTemplateGroups: payload.response_template_groups,
+        buttonTemplateGroups: payload.button_template_groups,
         handoffTopicGroups: payload.handoff_topic_groups,
         contextGroups: payload.context_groups,
         assetGroups: payload.asset_groups,

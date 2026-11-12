@@ -269,6 +269,7 @@ export const agentConfigs = pgTable(
       .notNull()
       .default(true),
     responseTemplateGroups: jsonb("response_template_groups").default([]),
+    buttonTemplateGroups: jsonb("button_template_groups").default([]),
     handoffTopicGroups: jsonb("handoff_topic_groups").default([]),
     contextGroups: jsonb("context_groups").default([]),
     assetGroups: jsonb("asset_groups").default([]),
@@ -726,6 +727,43 @@ export const workspaceResponseTemplateEntries = pgTable(
       }),
     title: text("title").notNull(),
     body: text("body").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+export const workspaceButtonTemplateGroups = pgTable(
+  "workspace_button_template_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+export const workspaceButtonTemplateEntries = pgTable(
+  "workspace_button_template_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => workspaceButtonTemplateGroups.id, {
+        onDelete: "cascade",
+      }),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    /** WhatsApp interactive buttons: [{ type, label, value }] — 1-3 items. */
+    buttons: jsonb("buttons").notNull().default([]),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -49,6 +49,50 @@ export type WorkspaceResponseTemplateGroupWithEntries = {
   entries: WorkspaceResponseTemplateEntryRecord[];
 };
 
+export const BUTTON_TEMPLATE_BUTTON_TYPES = [
+  "quick_reply",
+  "cta_url",
+  "cta_call",
+  "cta_copy",
+] as const;
+
+export type ButtonTemplateButtonType =
+  (typeof BUTTON_TEMPLATE_BUTTON_TYPES)[number];
+
+export type ButtonTemplateButton = {
+  type: ButtonTemplateButtonType;
+  label: string;
+  value: string;
+};
+
+export type WorkspaceButtonTemplateEntryInput = {
+  title: string;
+  body: string;
+  buttons: ButtonTemplateButton[];
+};
+
+export type WorkspaceButtonTemplateEntryRecord = {
+  id: string;
+  sort_order: number;
+  title: string;
+  body: string;
+  buttons: ButtonTemplateButton[];
+};
+
+export type WorkspaceButtonTemplateGroupSummary = {
+  id: string;
+  name: string;
+  updated_at: string;
+  entry_count: number;
+};
+
+export type WorkspaceButtonTemplateGroupWithEntries = {
+  id: string;
+  name: string;
+  updated_at: string;
+  entries: WorkspaceButtonTemplateEntryRecord[];
+};
+
 export type WorkspaceHandoffTopicEntryRecord = {
   id: string;
   sort_order: number;
@@ -101,6 +145,7 @@ export type AgentConfigRecord = {
   first_used_at: string | null;
   auto_assign_conversation_labels: boolean;
   response_template_groups: string[];
+  button_template_groups: string[];
   handoff_topic_groups: string[];
   context_groups: string[];
   asset_groups: string[];

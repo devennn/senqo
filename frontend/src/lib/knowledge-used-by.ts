@@ -1,11 +1,12 @@
 import type { AgentConfigRecord } from "@/types/repositories";
 
-export type KnowledgeAttachmentKind = "context" | "templates" | "handoff";
+export type KnowledgeAttachmentKind = "context" | "templates" | "buttons" | "handoff";
 
 function attachmentIds(agent: AgentConfigRecord, kind: KnowledgeAttachmentKind): string[] {
-  if (kind === "context") return agent.context_groups;
-  if (kind === "templates") return agent.response_template_groups;
-  return agent.handoff_topic_groups;
+  if (kind === "context") return agent.context_groups ?? [];
+  if (kind === "templates") return agent.response_template_groups ?? [];
+  if (kind === "buttons") return agent.button_template_groups ?? [];
+  return agent.handoff_topic_groups ?? [];
 }
 
 /** Profile names of agents that attach the given workspace knowledge group. */

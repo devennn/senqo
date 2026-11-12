@@ -168,6 +168,7 @@ export default function AgentPage() {
                   availableTools={data.tools}
                   availableSkills={data.skills}
                   responseTemplateGroups={data.responseTemplateGroups}
+                  buttonTemplateGroups={data.buttonTemplateGroups}
                   workspaceContextGroups={data.workspaceContextGroups}
                   workspaceAssetGroups={data.workspaceAssetGroups}
                   handoffTopicGroups={data.handoffTopicGroups}

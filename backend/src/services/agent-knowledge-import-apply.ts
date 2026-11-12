@@ -126,6 +126,7 @@ export async function applyAgentKnowledgeImport(input: {
       skills: skillKeys,
       auto_assign_conversation_labels: agent.auto_assign_conversation_labels,
       response_template_groups: templateGroupIds,
+      button_template_groups: agent.button_template_groups,
       handoff_topic_groups: agent.handoff_topic_groups,
       context_groups: contextGroupIds,
       asset_groups: agent.asset_groups,

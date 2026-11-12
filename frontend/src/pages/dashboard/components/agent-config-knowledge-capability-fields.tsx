@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { AgentToolsFields } from "@/pages/dashboard/components/agent-tools-fields";
 import { AgentResponseTemplateGroupsFields } from "@/pages/dashboard/components/agent-response-template-groups-fields";
+import { AgentButtonTemplateGroupsFields } from "@/pages/dashboard/components/agent-button-template-groups-fields";
 import { AgentHandoffTopicGroupsFields } from "@/pages/dashboard/components/agent-handoff-topic-groups-fields";
 import { AgentAssetGroupsFields } from "@/pages/dashboard/components/agent-asset-groups-fields";
 import { AgentWorkspaceContextGroupsFields } from "@/pages/dashboard/components/agent-workspace-context-groups-fields";
@@ -11,16 +12,19 @@ export function AgentConfigKnowledgeCapabilityFields({
   availableTools,
   availableSkills,
   responseTemplateGroups,
+  buttonTemplateGroups,
   workspaceContextGroups,
   workspaceAssetGroups,
   handoffTopicGroups,
   selectedTools,
   selectedSkills,
   selectedResponseTemplateGroups,
+  selectedButtonTemplateGroups,
   selectedContextGroups,
   selectedAssetGroups,
   selectedHandoffTopicGroups,
   templatesTabHref,
+  buttonsTabHref,
   contextTabHref,
   assetsTabHref,
   handoffTabHref,
@@ -28,6 +32,7 @@ export function AgentConfigKnowledgeCapabilityFields({
   workspaceContextDirty,
   assetGroupsDirty,
   responseTemplatesDirty,
+  buttonTemplatesDirty,
   handoffTopicsDirty,
   toolsDirty,
   skillsDirty,
@@ -75,6 +80,13 @@ export function AgentConfigKnowledgeCapabilityFields({
           selectedIds={selectedResponseTemplateGroups}
           templatesTabHref={templatesTabHref}
           subsectionDirty={responseTemplatesDirty}
+          saving={saving}
+        />
+        <AgentButtonTemplateGroupsFields
+          groups={buttonTemplateGroups}
+          selectedIds={selectedButtonTemplateGroups}
+          buttonsTabHref={buttonsTabHref}
+          subsectionDirty={buttonTemplatesDirty}
           saving={saving}
         />
         <AgentHandoffTopicGroupsFields

@@ -47,7 +47,7 @@ describe("prepareOutboundMessages", () => {
       { text: "Hello" },
       { text: "" },
     ]);
-    expect(prepared).toEqual([{ text: "Hello", assetFileName: "" }]);
+    expect(prepared).toEqual([{ text: "Hello", assetFileName: "", buttonsTemplateId: "" }]);
   });
 
   // Hard cap of three bubbles even if the model returns more.
@@ -179,7 +179,7 @@ describe("sendPreparedOutboundMessages", () => {
       dryRun: true,
     });
     expect(result.sent).toBe(0);
-    expect(result.messages).toEqual([{ text: "Draft", assetFileName: "" }]);
+    expect(result.messages).toEqual([{ text: "Draft", assetFileName: "", buttonsTemplateId: "" }]);
     expect(mockSendAgentWhatsappMessage).not.toHaveBeenCalled();
   });
 

@@ -1,6 +1,7 @@
 import { mediaKindFromMimeType } from "../lib/mime-media-kind.js";
 import { getAgentConfigById } from "../repositories/agent.js";
 import { getAgentAssetByFileNameForAgent } from "../repositories/workspace-asset-groups.js";
+import { getWorkspaceButtonTemplateForSend } from "../repositories/button-templates.js";
 import {
   createConversationMessage,
   recordFailedOutboundMessage,
@@ -13,6 +14,7 @@ const MAX_OUTBOUND_MESSAGES = 3;
 export type PreparedOutboundMessage = {
   text: string;
   assetFileName: string;
+  buttonsTemplateId: string;
 };
 
 function normalizeText(text: string): string {
@@ -20,12 +22,16 @@ function normalizeText(text: string): string {
 }
 
 function dedupeKey(message: PreparedOutboundMessage): string {
-  return `${normalizeText(message.text).toLowerCase()}\0${message.assetFileName}`;
+  return `${normalizeText(message.text).toLowerCase()}\0${message.assetFileName}\0${message.buttonsTemplateId}`;
 }
 
-/** Trim, drop empties, cap at 3, skip identical text+asset within the batch. */
+/** Trim, drop empties, cap at 3, skip identical text+asset+buttons within the batch. */
 export function prepareOutboundMessages(
-  messages: Array<{ text?: string; assetFileName?: string }>,
+  messages: Array<{
+    text?: string;
+    assetFileName?: string;
+    buttonsTemplateId?: string;
+  }>,
 ): PreparedOutboundMessage[] {
   const prepared: PreparedOutboundMessage[] = [];
   const seen = new Set<string>();
@@ -36,7 +42,15 @@ export function prepareOutboundMessages(
 
     const assetFileName =
       typeof raw.assetFileName === "string" ? raw.assetFileName.trim() : "";
-    const item: PreparedOutboundMessage = { text, assetFileName };
+    const buttonsTemplateId =
+      typeof raw.buttonsTemplateId === "string"
+        ? raw.buttonsTemplateId.trim()
+        : "";
+    const item: PreparedOutboundMessage = {
+      text,
+      assetFileName,
+      buttonsTemplateId,
+    };
 
     const key = dedupeKey(item);
     if (seen.has(key)) {
@@ -92,6 +106,24 @@ async function persistDryRunDraft(input: {
         : { dry_run_asset_missing: input.message.assetFileName };
   }
 
+  let buttonMetadata: Record<string, unknown> = {};
+  if (input.message.buttonsTemplateId) {
+    const agentConfig = await getAgentConfigById(input.workspaceId, input.agentConfigId);
+    const groupIds = agentConfig?.button_template_groups ?? [];
+    const template = await getWorkspaceButtonTemplateForSend(
+      input.workspaceId,
+      groupIds,
+      input.message.buttonsTemplateId,
+    );
+    buttonMetadata = template
+      ? {
+          button_template_id: template.id,
+          button_template_title: template.title,
+          buttons: template.buttons,
+        }
+      : { dry_run_button_template_missing: input.message.buttonsTemplateId };
+  }
+
   const saved = await createConversationMessage(
     input.workspaceId,
     input.conversationId,
@@ -102,6 +134,7 @@ async function persistDryRunDraft(input: {
       dry_run: true,
       ...(input.agentRunId ? { agent_run_id: input.agentRunId } : {}),
       ...assetMetadata,
+      ...buttonMetadata,
     },
     "ai_agent",
     { status: "dry_run" },
@@ -167,6 +200,9 @@ export async function sendPreparedOutboundMessages(input: {
       agentConfigId: input.agentConfigId,
       message: message.text,
       ...(message.assetFileName ? { assetFileName: message.assetFileName } : {}),
+      ...(message.buttonsTemplateId
+        ? { buttonsTemplateId: message.buttonsTemplateId }
+        : {}),
       ...(input.agentRunId ? { agentRunId: input.agentRunId } : {}),
     });
     if (!result.ok) {
@@ -186,7 +222,7 @@ export async function sendPreparedOutboundMessages(input: {
     const idMessage = result.idMessage ?? "";
     deliveries.push({ ...message, idMessage });
     console.info(
-      `[${scope}/sendPreparedOutboundMessages] Sent bubble ${sent}/${messages.length}: idMessage=${idMessage} asset=${message.assetFileName} text=${message.text.slice(0, 200)}`,
+      `[${scope}/sendPreparedOutboundMessages] Sent bubble ${sent}/${messages.length}: idMessage=${idMessage} asset=${message.assetFileName} buttons=${message.buttonsTemplateId} text=${message.text.slice(0, 200)}`,
     );
   }
 
